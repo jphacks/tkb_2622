@@ -12,6 +12,7 @@ struct APIHomeRepository: HomeRepository {
         let id: String
         let status: String
         let version: ProtoJSONInt64?
+        let minimumReached: Bool?
         let taskSnapshot: TaskSettingsDTO?
         let durations: DurationsDTO?
     }
@@ -124,14 +125,20 @@ struct APIHomeRepository: HomeRepository {
             restrictionSessionID: restriction.sessionId
         )
 
+        let activeMillis = session?.durations?.activeMillis?.value ?? 0
+        let minimumSeconds = session?.taskSnapshot?.minimumSeconds?.value
+        let minimumProgress = minimumSeconds.map { minimum in
+            minimum <= 0 ? 1 : min(Double(max(0, activeMillis)) / (Double(minimum) * 1_000), 1)
+        }
+
         return MobileHomeSnapshot(
             sessionStatus: try sessionStatus(session?.status),
             elapsedMinutes: session.map {
                 Int(max(0, ($0.durations?.activeMillis?.value ?? 0) / 60_000))
             },
-            minimumMinutes: session?.taskSnapshot?.minimumSeconds.map {
-                Int(max(0, $0.value / 60))
-            },
+            minimumSeconds: minimumSeconds.map { Int(max(0, $0)) },
+            minimumProgress: minimumProgress,
+            minimumReached: session?.minimumReached ?? false,
             rewardBalanceMinutes: Int(max(0, balance.balanceSeconds.value / 60)),
             desiredRestriction: desiredRestrictionMode(restriction.desiredMode),
             restrictionStatus: appliedRestrictionStatus(restriction),

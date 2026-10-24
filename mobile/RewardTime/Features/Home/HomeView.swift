@@ -90,10 +90,9 @@ struct HomeView: View {
                     .accessibilityIdentifier("elapsedWorkTime")
             }
 
-            if let elapsed = snapshot.elapsedMinutes,
-               let minimum = snapshot.minimumMinutes {
-                let remaining = max(minimum - elapsed, 0)
-                let progress = minimum > 0 ? min(Double(elapsed) / Double(minimum), 1) : 1
+            if snapshot.elapsedMinutes != nil,
+               let minimumSeconds = snapshot.minimumSeconds {
+                let progress = snapshot.minimumProgress ?? 0
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Capsule().fill(AppTheme.lavender)
@@ -101,9 +100,9 @@ struct HomeView: View {
                     }
                 }
                 .frame(height: 8)
-                Text(remaining > 0
-                     ? "最小作業時間 \(minimum)分 まで あと \(remaining)分"
-                     : "最小作業時間 \(minimum)分を達成")
+                Text(snapshot.minimumReached
+                     ? "最小作業時間を達成"
+                     : "最小作業時間 \(formattedDuration(minimumSeconds)) まで計測中")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(AppTheme.secondaryInk)
             } else {
@@ -338,6 +337,12 @@ struct HomeView: View {
     private func formattedWorkTime(_ minutes: Int?) -> String {
         guard let minutes else { return "--:--" }
         return String(format: "%d:%02d", minutes / 60, minutes % 60)
+    }
+
+    private func formattedDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return remainder == 0 ? "\(minutes)分" : "\(minutes)分\(remainder)秒"
     }
 
     private func sessionTitle(_ status: SessionStatus) -> String {

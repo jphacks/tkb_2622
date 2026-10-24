@@ -3,7 +3,9 @@ import Foundation
 struct MobileHomeSnapshot {
     let sessionStatus: SessionStatus
     let elapsedMinutes: Int?
-    let minimumMinutes: Int?
+    let minimumSeconds: Int?
+    let minimumProgress: Double?
+    let minimumReached: Bool
     let rewardBalanceMinutes: Int
     let desiredRestriction: DesiredRestrictionMode
     let restrictionStatus: RestrictionStatus
@@ -25,7 +27,9 @@ struct MobileHomeSnapshot {
     static let workingSample = MobileHomeSnapshot(
         sessionStatus: .working,
         elapsedMinutes: 48,
-        minimumMinutes: 60,
+        minimumSeconds: 60 * 60,
+        minimumProgress: 0.8,
+        minimumReached: false,
         rewardBalanceMinutes: 32,
         desiredRestriction: .shielded,
         restrictionStatus: .restricted,
@@ -48,7 +52,9 @@ struct MobileHomeSnapshot {
     static let pausedSample = MobileHomeSnapshot(
         sessionStatus: .paused,
         elapsedMinutes: 48,
-        minimumMinutes: 60,
+        minimumSeconds: 60 * 60,
+        minimumProgress: 0.8,
+        minimumReached: false,
         rewardBalanceMinutes: 42,
         desiredRestriction: .shielded,
         restrictionStatus: .restricted,
@@ -71,7 +77,9 @@ struct MobileHomeSnapshot {
     static let releasedSample = MobileHomeSnapshot(
         sessionStatus: .paused,
         elapsedMinutes: 48,
-        minimumMinutes: 60,
+        minimumSeconds: 60 * 60,
+        minimumProgress: 0.8,
+        minimumReached: false,
         rewardBalanceMinutes: 32,
         desiredRestriction: .timedUnlock,
         restrictionStatus: .temporarilyReleased(endsAt: .now.addingTimeInterval(10 * 60)),
@@ -94,7 +102,9 @@ struct MobileHomeSnapshot {
     static let noSessionSample = MobileHomeSnapshot(
         sessionStatus: .noSession,
         elapsedMinutes: nil,
-        minimumMinutes: nil,
+        minimumSeconds: nil,
+        minimumProgress: nil,
+        minimumReached: false,
         rewardBalanceMinutes: 0,
         desiredRestriction: .unrestricted,
         restrictionStatus: .unrestricted,
