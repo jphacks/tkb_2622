@@ -31,6 +31,9 @@ func AuthInterceptor(verifier Verifier) connect.UnaryInterceptorFunc {
 		}
 	}
 }
+
+// PrincipalFromContext returns the principal verified by AuthInterceptor for other modules' handlers.
+func PrincipalFromContext(ctx context.Context) application.Principal { return principal(ctx) }
 func principal(ctx context.Context) application.Principal {
 	p, _ := ctx.Value(principalKey{}).(application.Principal)
 	return p

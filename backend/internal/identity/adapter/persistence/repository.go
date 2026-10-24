@@ -231,3 +231,26 @@ func (r *Repository) RevokeDevice(ctx context.Context, p application.Principal, 
 	})
 	return
 }
+func (r *Repository) Actor(ctx context.Context, p application.Principal) (application.Actor, error) {
+	queries := q.New(r.db)
+	u, err := queries.GetUser(ctx, uid(p.Subject))
+	if err != nil {
+		return application.Actor{}, translate(err)
+	}
+	if u.Status != "ACTIVE" {
+		return application.Actor{}, application.ErrForbidden
+	}
+	out := application.Actor{UserID: u.ID.String()}
+	d, err := queries.SessionDevice(ctx, uid(p.SessionID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return out, nil
+	}
+	if err != nil {
+		return application.Actor{}, err
+	}
+	if d.UserID != u.ID || d.Status != "ACTIVE" {
+		return application.Actor{}, application.ErrForbidden
+	}
+	out.DeviceID, out.DevicePlatform = d.ID.String(), d.Platform
+	return out, nil
+}

@@ -81,6 +81,656 @@ components:
           description: Deserialized error detail payload. The 'type' field indicates the schema. This field is for easier debugging and should not be relied upon for application logic.
       additionalProperties: true
       description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message, with an additional debug field for ConnectRPC error details.
+    focus.v1.AbortSessionRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        sessionId:
+          type: string
+          title: session_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+        endedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: ended_at
+        lastSeq:
+          type: string
+          title: last_seq
+          format: int64
+        remainingSegments:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.ActivitySegment'
+          title: remaining_segments
+      title: AbortSessionRequest
+      additionalProperties: false
+    focus.v1.AbortSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        discardedSeconds:
+          type: string
+          title: discarded_seconds
+          format: int64
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: AbortSessionResponse
+      additionalProperties: false
+    focus.v1.ActivityClass:
+      type: string
+      title: ActivityClass
+      enum:
+        - ACTIVITY_CLASS_UNSPECIFIED
+        - ACTIVITY_CLASS_TASK
+        - ACTIVITY_CLASS_RELATED_TRANSITION
+        - ACTIVITY_CLASS_DISTRACTION
+        - ACTIVITY_CLASS_UNKNOWN
+        - ACTIVITY_CLASS_IDLE
+    focus.v1.ActivityReceipt:
+      type: object
+      properties:
+        batchId:
+          type: string
+          title: batch_id
+        seq:
+          type: string
+          title: seq
+          format: int64
+        status:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.BatchStatus'
+          title: status
+        acceptedThroughSeq:
+          type: string
+          title: accepted_through_seq
+          format: int64
+        missingSeqs:
+          type: array
+          items:
+            type: string
+            format: int64
+          title: missing_seqs
+        earnedSeconds:
+          type: string
+          title: earned_seconds
+          format: int64
+      title: ActivityReceipt
+      additionalProperties: false
+    focus.v1.ActivitySegment:
+      type: object
+      properties:
+        startTime:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: start_time
+        endTime:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: end_time
+        classification:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.ActivityClass'
+          title: classification
+        reasons:
+          type: array
+          items:
+            type: string
+          title: reasons
+      title: ActivitySegment
+      additionalProperties: false
+      description: Half-open interval [start_time, end_time) classified on the PC.
+    focus.v1.BatchStatus:
+      type: string
+      title: BatchStatus
+      enum:
+        - BATCH_STATUS_UNSPECIFIED
+        - BATCH_STATUS_ACCEPTED
+        - BATCH_STATUS_PENDING
+        - BATCH_STATUS_HISTORY
+    focus.v1.CreateTaskRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        settings:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.TaskSettings'
+          title: settings
+      title: CreateTaskRequest
+      additionalProperties: false
+    focus.v1.CreateTaskResponse:
+      type: object
+      properties:
+        task:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Task'
+          title: task
+      title: CreateTaskResponse
+      additionalProperties: false
+    focus.v1.Durations:
+      type: object
+      properties:
+        taskMillis:
+          type: string
+          title: task_millis
+          format: int64
+        relatedTransitionMillis:
+          type: string
+          title: related_transition_millis
+          format: int64
+        distractionMillis:
+          type: string
+          title: distraction_millis
+          format: int64
+        unknownMillis:
+          type: string
+          title: unknown_millis
+          format: int64
+        idleMillis:
+          type: string
+          title: idle_millis
+          format: int64
+        activeMillis:
+          type: string
+          title: active_millis
+          format: int64
+        workMillis:
+          type: string
+          title: work_millis
+          format: int64
+      title: Durations
+      additionalProperties: false
+      description: Milliseconds per class. active = T + R + D + U + I (paused time excluded), work = T + R.
+    focus.v1.FinishSessionRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        sessionId:
+          type: string
+          title: session_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+        endedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: ended_at
+        lastSeq:
+          type: string
+          title: last_seq
+          format: int64
+        remainingSegments:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.ActivitySegment'
+          title: remaining_segments
+          description: Unsent segments; stored for history and never rewarded.
+      title: FinishSessionRequest
+      additionalProperties: false
+    focus.v1.FinishSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        discardedSeconds:
+          type: string
+          title: discarded_seconds
+          format: int64
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: FinishSessionResponse
+      additionalProperties: false
+    focus.v1.FocusMode:
+      type: string
+      title: FocusMode
+      enum:
+        - FOCUS_MODE_UNSPECIFIED
+        - FOCUS_MODE_NORMAL
+        - FOCUS_MODE_READING
+        - FOCUS_MODE_VIDEO
+    focus.v1.GetCurrentSessionRequest:
+      type: object
+      title: GetCurrentSessionRequest
+      additionalProperties: false
+    focus.v1.GetCurrentSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+      title: GetCurrentSessionResponse
+      additionalProperties: false
+      description: session is unset when there is no unfinished session.
+    focus.v1.GetSessionOperationRequest:
+      type: object
+      properties:
+        kind:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.OperationKind'
+          title: kind
+        operationId:
+          type: string
+          title: operation_id
+      title: GetSessionOperationRequest
+      additionalProperties: false
+    focus.v1.GetSessionOperationResponse:
+      type: object
+      properties:
+        status:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.OperationStatus'
+          title: status
+        sessionId:
+          type: string
+          title: session_id
+      title: GetSessionOperationResponse
+      additionalProperties: false
+    focus.v1.GetSessionRequest:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          title: session_id
+      title: GetSessionRequest
+      additionalProperties: false
+    focus.v1.GetSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        reward:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardSummary'
+          title: reward
+      title: GetSessionResponse
+      additionalProperties: false
+    focus.v1.GetTaskRequest:
+      type: object
+      properties:
+        taskId:
+          type: string
+          title: task_id
+      title: GetTaskRequest
+      additionalProperties: false
+    focus.v1.GetTaskResponse:
+      type: object
+      properties:
+        task:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Task'
+          title: task
+      title: GetTaskResponse
+      additionalProperties: false
+    focus.v1.ListTasksRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListTasksRequest
+      additionalProperties: false
+    focus.v1.ListTasksResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.Task'
+          title: tasks
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListTasksResponse
+      additionalProperties: false
+    focus.v1.OperationKind:
+      type: string
+      title: OperationKind
+      enum:
+        - OPERATION_KIND_UNSPECIFIED
+        - OPERATION_KIND_START
+        - OPERATION_KIND_PAUSE
+        - OPERATION_KIND_RESUME
+        - OPERATION_KIND_FINISH
+        - OPERATION_KIND_ABORT
+    focus.v1.OperationStatus:
+      type: string
+      title: OperationStatus
+      enum:
+        - OPERATION_STATUS_UNSPECIFIED
+        - OPERATION_STATUS_NOT_FOUND
+        - OPERATION_STATUS_SUCCEEDED
+    focus.v1.PauseSessionRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        sessionId:
+          type: string
+          title: session_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+        pausedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: paused_at
+        lastSeq:
+          type: string
+          title: last_seq
+          format: int64
+          description: Last batch seq sent before pausing (0 if none).
+      title: PauseSessionRequest
+      additionalProperties: false
+    focus.v1.PauseSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: PauseSessionResponse
+      additionalProperties: false
+    focus.v1.ResumeSessionRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        sessionId:
+          type: string
+          title: session_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+      title: ResumeSessionRequest
+      additionalProperties: false
+    focus.v1.ResumeSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: ResumeSessionResponse
+      additionalProperties: false
+    focus.v1.Session:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        deviceId:
+          type: string
+          title: device_id
+        taskId:
+          type: string
+          title: task_id
+        taskSnapshot:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.TaskSettings'
+          title: task_snapshot
+          description: Task settings fixed at start.
+        status:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.SessionStatus'
+          title: status
+        version:
+          type: string
+          title: version
+          format: int64
+        startedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: started_at
+        pausedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: paused_at
+        endedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: ended_at
+        durations:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Durations'
+          title: durations
+        acceptedThroughSeq:
+          type: string
+          title: accepted_through_seq
+          format: int64
+        minimumReached:
+          type: boolean
+          title: minimum_reached
+        focusScore:
+          type:
+            - number
+            - "null"
+          title: focus_score
+          format: double
+          description: B100 = 100 * (T + R) / (T + R + D). Unset when the denominator is 0.
+        quality:
+          type:
+            - number
+            - "null"
+          title: quality
+          format: double
+          description: Q = (T + R + D + I) / E. Unset when E is 0.
+        workRate:
+          type:
+            - number
+            - "null"
+          title: work_rate
+          format: double
+          description: Wrate = (T + R) / E. Unset when E is 0.
+      title: Session
+      additionalProperties: false
+    focus.v1.SessionStatus:
+      type: string
+      title: SessionStatus
+      enum:
+        - SESSION_STATUS_UNSPECIFIED
+        - SESSION_STATUS_RUNNING
+        - SESSION_STATUS_PAUSED
+        - SESSION_STATUS_FINALIZED
+        - SESSION_STATUS_ABORTED
+    focus.v1.StartSessionRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        taskId:
+          type: string
+          title: task_id
+        taskVersion:
+          type: string
+          title: task_version
+          format: int64
+      title: StartSessionRequest
+      additionalProperties: false
+    focus.v1.StartSessionResponse:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: StartSessionResponse
+      additionalProperties: false
+    focus.v1.Task:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        settings:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.TaskSettings'
+          title: settings
+        version:
+          type: string
+          title: version
+          format: int64
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: created_at
+        updatedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: updated_at
+      title: Task
+      additionalProperties: false
+    focus.v1.TaskCategory:
+      type: string
+      title: TaskCategory
+      enum:
+        - TASK_CATEGORY_UNSPECIFIED
+        - TASK_CATEGORY_PROGRAMMING
+        - TASK_CATEGORY_DOCUMENT_WRITING
+        - TASK_CATEGORY_READING
+        - TASK_CATEGORY_DESIGN
+        - TASK_CATEGORY_STUDY
+        - TASK_CATEGORY_OTHER
+    focus.v1.TaskSettings:
+      type: object
+      properties:
+        name:
+          type: string
+          title: name
+        category:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.TaskCategory'
+          title: category
+        mode:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.FocusMode'
+          title: mode
+        plannedSeconds:
+          type: string
+          title: planned_seconds
+          format: int64
+        minimumSeconds:
+          type: string
+          title: minimum_seconds
+          format: int64
+      title: TaskSettings
+      additionalProperties: false
+    focus.v1.UpdateTaskRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        taskId:
+          type: string
+          title: task_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+        settings:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.TaskSettings'
+          title: settings
+      title: UpdateTaskRequest
+      additionalProperties: false
+    focus.v1.UpdateTaskResponse:
+      type: object
+      properties:
+        task:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Task'
+          title: task
+      title: UpdateTaskResponse
+      additionalProperties: false
+    focus.v1.UploadActivityBatchRequest:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          title: session_id
+        batchId:
+          type: string
+          title: batch_id
+        seq:
+          type: string
+          title: seq
+          format: int64
+          description: Starts at 1 and increases by 1 per batch within the session.
+        evaluatorVersion:
+          type: string
+          title: evaluator_version
+        rulesVersion:
+          type: string
+          title: rules_version
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.ActivitySegment'
+          title: segments
+      title: UploadActivityBatchRequest
+      additionalProperties: false
+    focus.v1.UploadActivityBatchResponse:
+      type: object
+      properties:
+        receipt:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.ActivityReceipt'
+          title: receipt
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: UploadActivityBatchResponse
+      additionalProperties: false
+    google.protobuf.Timestamp:
+      type: string
+      examples:
+        - "2023-01-15T01:30:15.01Z"
+        - "2024-12-25T12:00:00Z"
+      format: date-time
+      description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
     identity.v1.Device:
       type: object
       properties:
@@ -234,7 +884,555 @@ components:
           title: created_at
       title: User
       additionalProperties: false
+    reward.v1.GetBalanceRequest:
+      type: object
+      title: GetBalanceRequest
+      additionalProperties: false
+    reward.v1.GetBalanceResponse:
+      type: object
+      properties:
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+      title: GetBalanceResponse
+      additionalProperties: false
+    reward.v1.RewardBalance:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          title: session_id
+        balanceSeconds:
+          type: string
+          title: balance_seconds
+          format: int64
+        version:
+          type: string
+          title: version
+          format: int64
+        evaluatedThroughSeq:
+          type: string
+          title: evaluated_through_seq
+          format: int64
+          description: Highest contiguous activity batch seq that has been evaluated for interim rewards.
+      title: RewardBalance
+      additionalProperties: false
+      description: Unused reward seconds of the current (unfinished) work session. Zero with no session_id when idle.
+    reward.v1.RewardSummary:
+      type: object
+      properties:
+        earnedSeconds:
+          type: string
+          title: earned_seconds
+          format: int64
+        spentSeconds:
+          type: string
+          title: spent_seconds
+          format: int64
+        discardedSeconds:
+          type: string
+          title: discarded_seconds
+          format: int64
+      title: RewardSummary
+      additionalProperties: false
+      description: Earned, spent and discarded seconds of one session. Spending arrives with the Restriction API.
 paths:
+  /focus.v1.FocusService/AbortSession:
+    post:
+      tags:
+        - FocusService
+      summary: AbortSession
+      operationId: focus.v1.FocusService.AbortSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.AbortSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.AbortSessionResponse'
+  /focus.v1.FocusService/CreateTask:
+    post:
+      tags:
+        - FocusService
+      summary: CreateTask
+      operationId: focus.v1.FocusService.CreateTask
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.CreateTaskRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.CreateTaskResponse'
+  /focus.v1.FocusService/FinishSession:
+    post:
+      tags:
+        - FocusService
+      summary: FinishSession
+      operationId: focus.v1.FocusService.FinishSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.FinishSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.FinishSessionResponse'
+  /focus.v1.FocusService/GetCurrentSession:
+    post:
+      tags:
+        - FocusService
+      summary: GetCurrentSession
+      operationId: focus.v1.FocusService.GetCurrentSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.GetCurrentSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.GetCurrentSessionResponse'
+  /focus.v1.FocusService/GetSession:
+    post:
+      tags:
+        - FocusService
+      summary: GetSession
+      operationId: focus.v1.FocusService.GetSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.GetSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.GetSessionResponse'
+  /focus.v1.FocusService/GetSessionOperation:
+    post:
+      tags:
+        - FocusService
+      summary: GetSessionOperation
+      operationId: focus.v1.FocusService.GetSessionOperation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.GetSessionOperationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.GetSessionOperationResponse'
+  /focus.v1.FocusService/GetTask:
+    post:
+      tags:
+        - FocusService
+      summary: GetTask
+      operationId: focus.v1.FocusService.GetTask
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.GetTaskRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.GetTaskResponse'
+  /focus.v1.FocusService/ListTasks:
+    post:
+      tags:
+        - FocusService
+      summary: ListTasks
+      operationId: focus.v1.FocusService.ListTasks
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.ListTasksRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.ListTasksResponse'
+  /focus.v1.FocusService/PauseSession:
+    post:
+      tags:
+        - FocusService
+      summary: PauseSession
+      operationId: focus.v1.FocusService.PauseSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.PauseSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.PauseSessionResponse'
+  /focus.v1.FocusService/ResumeSession:
+    post:
+      tags:
+        - FocusService
+      summary: ResumeSession
+      operationId: focus.v1.FocusService.ResumeSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.ResumeSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.ResumeSessionResponse'
+  /focus.v1.FocusService/StartSession:
+    post:
+      tags:
+        - FocusService
+      summary: StartSession
+      description: The measuring device is the PC device registered for the caller's auth session.
+      operationId: focus.v1.FocusService.StartSession
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.StartSessionRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.StartSessionResponse'
+  /focus.v1.FocusService/UpdateTask:
+    post:
+      tags:
+        - FocusService
+      summary: UpdateTask
+      operationId: focus.v1.FocusService.UpdateTask
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.UpdateTaskRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.UpdateTaskResponse'
+  /focus.v1.FocusService/UploadActivityBatch:
+    post:
+      tags:
+        - FocusService
+      summary: UploadActivityBatch
+      operationId: focus.v1.FocusService.UploadActivityBatch
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.UploadActivityBatchRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.UploadActivityBatchResponse'
   /identity.v1.IdentityService/EnsureUser:
     post:
       tags:
@@ -425,5 +1623,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+  /reward.v1.RewardService/GetBalance:
+    post:
+      tags:
+        - RewardService
+      summary: GetBalance
+      operationId: reward.v1.RewardService.GetBalance
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/reward.v1.GetBalanceRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/reward.v1.GetBalanceResponse'
 tags:
+  - name: RewardService
+  - name: FocusService
   - name: IdentityService
