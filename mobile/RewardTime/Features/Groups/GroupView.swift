@@ -450,9 +450,7 @@ struct GroupView: View {
 
       ForEach(Array(group.members.enumerated()), id: \.offset) { _, member in
         HStack(spacing: 11) {
-          Image(systemName: member.isCurrentUser ? "person.crop.circle.fill" : "person.crop.circle")
-            .font(.title2)
-            .foregroundStyle(member.isCurrentUser ? AppTheme.primary : AppTheme.secondaryInk)
+          ProfileAvatarImage(avatarID: member.avatarID, size: 40)
           Text(member.displayName)
             .font(.subheadline.weight(.medium))
           if member.isCurrentUser {

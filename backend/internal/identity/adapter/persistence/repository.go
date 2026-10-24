@@ -115,7 +115,7 @@ func (r *Repository) EnsureUser(ctx context.Context, p application.Principal, op
 		return save(ctx, queries, u, "ensure", op, h, out)
 	})
 	if err == nil {
-		err = r.loadDisplayName(ctx, &out)
+		err = r.loadProfile(ctx, &out)
 	}
 	return
 }
@@ -128,7 +128,7 @@ func (r *Repository) GetMe(ctx context.Context, p application.Principal) (out do
 		return nil
 	})
 	if err == nil {
-		err = r.loadDisplayName(ctx, &out)
+		err = r.loadProfile(ctx, &out)
 	}
 	return
 }
@@ -145,8 +145,21 @@ func (r *Repository) UpdateDisplayName(ctx context.Context, p application.Princi
 	}
 	return r.GetMe(ctx, p)
 }
-func (r *Repository) loadDisplayName(ctx context.Context, user *domain.User) error {
-	return r.db.QueryRowContext(ctx, `SELECT display_name FROM app.users WHERE id = $1`, uid(user.ID)).Scan(&user.DisplayName)
+func (r *Repository) UpdateAvatar(ctx context.Context, p application.Principal, avatarID string) (out domain.User, err error) {
+	err = r.transaction(ctx, p, false, func(tx *sql.Tx, queries *q.Queries, u q.AppUser) error {
+		if e := checkSession(ctx, queries, p, u.ID); e != nil {
+			return e
+		}
+		_, e := tx.ExecContext(ctx, `UPDATE app.users SET avatar_id = $1 WHERE id = $2`, avatarID, u.ID)
+		return e
+	})
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.GetMe(ctx, p)
+}
+func (r *Repository) loadProfile(ctx context.Context, user *domain.User) error {
+	return r.db.QueryRowContext(ctx, `SELECT display_name, avatar_id FROM app.users WHERE id = $1`, uid(user.ID)).Scan(&user.DisplayName, &user.AvatarID)
 }
 func (r *Repository) RegisterDevice(ctx context.Context, p application.Principal, in application.RegisterInput) (out domain.Device, err error) {
 	err = r.transaction(ctx, p, false, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {

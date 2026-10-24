@@ -174,8 +174,12 @@ struct MobileIdentity: Decodable {
   let status: String
   let createdAt: String
   let displayName: String
+  let avatarID: String
 
-  private enum CodingKeys: String, CodingKey { case id, status, createdAt, displayName }
+  private enum CodingKeys: String, CodingKey {
+    case id, status, createdAt, displayName
+    case avatarID = "avatarId"
+  }
 
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -183,6 +187,7 @@ struct MobileIdentity: Decodable {
     status = try container.decode(String.self, forKey: .status)
     createdAt = try container.decode(String.self, forKey: .createdAt)
     displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "メンバー"
+    avatarID = try container.decodeIfPresent(String.self, forKey: .avatarID) ?? ProfileAvatar.defaultAvatar.rawValue
   }
 }
 
@@ -192,6 +197,12 @@ struct EnsureUserRequest: Encodable {
 
 struct UpdateDisplayNameRequest: Encodable {
   let displayName: String
+}
+
+struct UpdateAvatarRequest: Encodable {
+  let avatarID: String
+
+  private enum CodingKeys: String, CodingKey { case avatarID = "avatarId" }
 }
 
 struct EmptyIdentityRequest: Encodable {}
@@ -205,6 +216,10 @@ private struct GetMeResponse: Decodable {
 }
 
 private struct UpdateDisplayNameResponse: Decodable {
+  let user: MobileIdentity
+}
+
+private struct UpdateAvatarResponse: Decodable {
   let user: MobileIdentity
 }
 
@@ -238,6 +253,16 @@ struct IdentityAPIRepository {
       method: "UpdateDisplayName",
       requestBody: UpdateDisplayNameRequest(displayName: displayName),
       responseType: UpdateDisplayNameResponse.self
+    )
+    return response.user
+  }
+
+  func updateAvatar(_ avatarID: String) async throws -> MobileIdentity {
+    let response: UpdateAvatarResponse = try await client.call(
+      service: "identity.v1.IdentityService",
+      method: "UpdateAvatar",
+      requestBody: UpdateAvatarRequest(avatarID: avatarID),
+      responseType: UpdateAvatarResponse.self
     )
     return response.user
   }

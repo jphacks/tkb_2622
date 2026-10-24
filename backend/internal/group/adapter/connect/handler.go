@@ -102,6 +102,7 @@ func groupMessage(group domain.Group) *v1.Group {
 			IsCurrentUser: member.IsCurrentUser,
 			JoinedAt:      timestamppb.New(member.JoinedAt),
 			DisplayName:   member.DisplayName,
+			AvatarId:      member.AvatarID,
 		})
 	}
 	return out

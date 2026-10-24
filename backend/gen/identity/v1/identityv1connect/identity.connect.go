@@ -41,6 +41,9 @@ const (
 	// IdentityServiceUpdateDisplayNameProcedure is the fully-qualified name of the IdentityService's
 	// UpdateDisplayName RPC.
 	IdentityServiceUpdateDisplayNameProcedure = "/identity.v1.IdentityService/UpdateDisplayName"
+	// IdentityServiceUpdateAvatarProcedure is the fully-qualified name of the IdentityService's
+	// UpdateAvatar RPC.
+	IdentityServiceUpdateAvatarProcedure = "/identity.v1.IdentityService/UpdateAvatar"
 	// IdentityServiceRegisterDeviceProcedure is the fully-qualified name of the IdentityService's
 	// RegisterDevice RPC.
 	IdentityServiceRegisterDeviceProcedure = "/identity.v1.IdentityService/RegisterDevice"
@@ -57,6 +60,7 @@ type IdentityServiceClient interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
 	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
+	UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -87,6 +91,11 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			baseURL+IdentityServiceUpdateDisplayNameProcedure,
 			opts...,
 		),
+		updateAvatar: connect.NewClient[v1.UpdateAvatarRequest, v1.UpdateAvatarResponse](
+			httpClient,
+			baseURL+IdentityServiceUpdateAvatarProcedure,
+			opts...,
+		),
 		registerDevice: connect.NewClient[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse](
 			httpClient,
 			baseURL+IdentityServiceRegisterDeviceProcedure,
@@ -110,6 +119,7 @@ type identityServiceClient struct {
 	ensureUser        *connect.Client[v1.EnsureUserRequest, v1.EnsureUserResponse]
 	getMe             *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
 	updateDisplayName *connect.Client[v1.UpdateDisplayNameRequest, v1.UpdateDisplayNameResponse]
+	updateAvatar      *connect.Client[v1.UpdateAvatarRequest, v1.UpdateAvatarResponse]
 	registerDevice    *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
 	listDevices       *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
 	revokeDevice      *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
@@ -128,6 +138,11 @@ func (c *identityServiceClient) GetMe(ctx context.Context, req *connect.Request[
 // UpdateDisplayName calls identity.v1.IdentityService.UpdateDisplayName.
 func (c *identityServiceClient) UpdateDisplayName(ctx context.Context, req *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error) {
 	return c.updateDisplayName.CallUnary(ctx, req)
+}
+
+// UpdateAvatar calls identity.v1.IdentityService.UpdateAvatar.
+func (c *identityServiceClient) UpdateAvatar(ctx context.Context, req *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error) {
+	return c.updateAvatar.CallUnary(ctx, req)
 }
 
 // RegisterDevice calls identity.v1.IdentityService.RegisterDevice.
@@ -150,6 +165,7 @@ type IdentityServiceHandler interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
 	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
+	UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -176,6 +192,11 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		svc.UpdateDisplayName,
 		opts...,
 	)
+	identityServiceUpdateAvatarHandler := connect.NewUnaryHandler(
+		IdentityServiceUpdateAvatarProcedure,
+		svc.UpdateAvatar,
+		opts...,
+	)
 	identityServiceRegisterDeviceHandler := connect.NewUnaryHandler(
 		IdentityServiceRegisterDeviceProcedure,
 		svc.RegisterDevice,
@@ -199,6 +220,8 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceGetMeHandler.ServeHTTP(w, r)
 		case IdentityServiceUpdateDisplayNameProcedure:
 			identityServiceUpdateDisplayNameHandler.ServeHTTP(w, r)
+		case IdentityServiceUpdateAvatarProcedure:
+			identityServiceUpdateAvatarHandler.ServeHTTP(w, r)
 		case IdentityServiceRegisterDeviceProcedure:
 			identityServiceRegisterDeviceHandler.ServeHTTP(w, r)
 		case IdentityServiceListDevicesProcedure:
@@ -224,6 +247,10 @@ func (UnimplementedIdentityServiceHandler) GetMe(context.Context, *connect.Reque
 
 func (UnimplementedIdentityServiceHandler) UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.UpdateDisplayName is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.UpdateAvatar is not implemented"))
 }
 
 func (UnimplementedIdentityServiceHandler) RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
