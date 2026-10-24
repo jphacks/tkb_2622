@@ -43,7 +43,7 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 
 | モック | 実装場所・現在の動作 |
 | --- | --- |
-| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。ホームタブを表示したアプリのforeground中は30秒ごとに再取得し、Desktopでの作業開始・一時停止・再開・終了を同期。アプリ復帰時にも即時取得し、画面を離れている間はポーリングしない。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenを表示。API接続失敗時は直前の表示を保持し、手動再読み込みではエラーを表示。小休憩へ進めるのは一時停止中だけ |
+| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。ホームタブを表示したアプリのforeground中は30秒ごとに再取得し、Desktopでの作業開始・一時停止・再開・終了を同期。アプリ復帰時にも即時取得し、画面を離れている間はポーリングしない。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenを表示。API再取得に失敗したときは前回表示値を残して古い情報だと警告し、古い制限状態をiOSへ再適用しない。小休憩へ進めるのは一時停止中だけ |
 | 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`は画面案の静的プレビュー。実際のShieldはFamilyControlsの選択をManagedSettingsへ適用するとiOSが対象アプリ上に表示する。セッション状態との同期コードも実装済みだが、実機での表示確認は未完了 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |

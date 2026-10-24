@@ -13,14 +13,14 @@
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。監査で、設定画面からの認証状態変更通知がsessionの有無だけでauthenticatedへ切り替える経路を発見したため、通知後もRoot側で同期を再実行するよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のresolver testはあるが、SwiftUI rootの通知連携と実backend復旧はSimulator受け入れ待ち。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲートの7件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート・Home更新失敗の8件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
 | --- | --- | --- |
 | 起動・アカウント | Supabase OTP／refresh、Identity `EnsureUser`・`GetMe`・`UpdateDisplayName`・`UpdateAvatar` | 起動時業務User同期とAuth状態の分離を要確認 |
-| Home | Focus `GetCurrentSession`、Reward `GetBalance`、Restriction `GetRestrictionState` | 3 API間のsession ID／version整合・部分失敗時の表示を要確認 |
-| Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | 作成・更新後reload、空状態・エラー状態を要確認 |
+| Home | Focus `GetCurrentSession`、Reward `GetBalance`、Restriction `GetRestrictionState` | refresh失敗時に古いsnapshotを残しつつ警告を表示し、古いrestriction状態をOSへ再適用しないよう修正。回帰XCTestを追加。3 API間のsession ID／version整合・部分失敗時の実API表示は未確認 |
+| Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | RPC名とproto JSON DTO、REST response項目をGo handlerと静的照合し一致。過去の`internal`／`not_found`は現在再現せず、画面・認証付き実API成功は未確認 |
 | History | Focus `ListSessions`、Reward `ListTransactions` | ページング・片方だけの失敗・reloadを要確認 |
 | 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
@@ -31,7 +31,7 @@
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
 | 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、今回の読み取り確認でlocal DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない | 成功済み同一tokenの重複要求を抑止するXCTestを追加済み。`not_found`が端末未登録か別原因かは、次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
-| Group作成時の`internal` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認 | `CreateGroup`の要求受信／失敗ログとmigration状態を照合する |
+| Group作成時の`internal`／`not_found` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認。MobileのRPC名、camelCase field、Group protobuf Timestamp形式、work-startsのrequest query／snake_case responseはbackend handlerと一致し、明確なDTO不整合は見つからなかった | 発生時刻・画面操作・Connect codeと`CreateGroup`等のAPI要求受信／失敗ログ、migration状態を照合する。該当するbackend failureがない場合は、端末の接続先／ログ取得場所も確認する |
 
 発生時のサーバーログは次で絞る（プロジェクトrootから実行。migration状態は`make -C backend migrate-status`で読み取り確認）：
 
