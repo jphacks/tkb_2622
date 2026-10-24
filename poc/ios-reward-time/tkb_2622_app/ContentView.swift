@@ -5,17 +5,20 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store: RewardStore
     @StateObject private var screenTime: ScreenTimePrototype
+    @StateObject private var rewardSync: RewardSyncPrototype
     @State private var minutesInput = ""
     @State private var isFamilyActivityPickerPresented = false
 
     init() {
         _store = StateObject(wrappedValue: RewardStore(repository: UserDefaultsRewardRepository()))
         _screenTime = StateObject(wrappedValue: ScreenTimePrototype())
+        _rewardSync = StateObject(wrappedValue: RewardSyncPrototype())
     }
 
     init(store: RewardStore) {
         _store = StateObject(wrappedValue: store)
         _screenTime = StateObject(wrappedValue: ScreenTimePrototype())
+        _rewardSync = StateObject(wrappedValue: RewardSyncPrototype())
     }
 
     var body: some View {
@@ -107,6 +110,47 @@ struct ContentView: View {
                         }
 
                         if let errorMessage = screenTime.errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+
+                    Section("Mac/API通信（PoC）") {
+                        Text("Macが送った仮データをAPIから取得します。ローカルの仮残高は変更しません。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        TextField("http://MacのIPアドレス:8787", text: $rewardSync.serverAddress)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+
+                        Button("APIから報酬状態を取得") {
+                            Task {
+                                await rewardSync.fetchSnapshot()
+                            }
+                        }
+                        .disabled(rewardSync.isLoading)
+
+                        if rewardSync.isLoading {
+                            ProgressView("APIに接続中…")
+                        }
+
+                        if let snapshot = rewardSync.receivedSnapshot {
+                            LabeledContent("APIの仮残高", value: "\(snapshot.balanceMinutes) 分")
+                            LabeledContent(
+                                "APIの解除終了予定",
+                                value: snapshot.unlockEndsAt?.formatted(date: .abbreviated, time: .shortened) ?? "未設定"
+                            )
+                        }
+
+                        if let statusMessage = rewardSync.statusMessage {
+                            Text(statusMessage)
+                                .font(.footnote)
+                        }
+
+                        if let errorMessage = rewardSync.errorMessage {
                             Text(errorMessage)
                                 .font(.footnote)
                                 .foregroundStyle(.red)

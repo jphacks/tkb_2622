@@ -125,3 +125,38 @@ xcrun devicectl device process launch \
 - Family Controlsの認可ダイアログは表示されたが、許可状態とShieldの動作は未確認。配布向け `Family Controls (Distribution)` の警告は、今回の起動待ちとは別の項目。
 
 macOS 26.6以降とiOS 27対応のXcodeに更新した後、Xcodeからプロジェクトを開き、iPhoneのロックを解除して実行先に選び、⌘Rで起動する。アプリ画面が表示されたら、認可状態、アプリ選択、Shield設定・解除の順に実機確認を再開する。白画面が続く場合は、XcodeのデバッグコンソールとDevices and Simulatorsの端末状態を記録し、原因を切り分ける。
+
+## MacからiPhoneへ報酬状態を送るPoC
+
+`poc/reward-sync-api/server.py` は、MacとiPhoneが同じネットワーク上で仮の報酬状態を送受信するための一時API。Python標準ライブラリだけを使い、データはメモリ内に1件だけ保持する。Go / Connect RPCの製品API、認証、DB、報酬ルールを決めるものではない。
+
+### 1. MacでAPIを起動
+
+リポジトリのルートで実行する。
+
+```sh
+python3 poc/reward-sync-api/server.py
+```
+
+MacのIPアドレスをシステム設定のネットワーク詳細で確認する。同じWi-FiにiPhoneを接続する。APIはPoC用のHTTP・認証なしで起動するため、家庭内などの信頼できるネットワークでのみ使用し、インターネットに公開しない。
+
+### 2. Macから仮の報酬状態を送信
+
+別のターミナルで、`MAC_IP` をMacのIPアドレスに置き換えて実行する。
+
+```sh
+MAC_IP="157.82.201.173"
+UNLOCK_ENDS_AT="$(date -u -v+10M '+%Y-%m-%dT%H:%M:%SZ')"
+
+curl --fail-with-body -X POST "http://${MAC_IP}:8787/v1/reward-snapshot" \
+  -H 'Content-Type: application/json' \
+  -d "{\"balanceMinutes\":42,\"unlockEndsAt\":\"${UNLOCK_ENDS_AT}\"}"
+```
+
+42分は通信確認用の仮データで、正式な報酬ルールではない。レスポンスに同じ残高と終了予定が返ればMacからAPIへの送信は成功。
+
+### 3. iPhoneでAPIから取得
+
+PoCアプリの「Mac/API通信（PoC）」に `http://192.168.1.20:8787` のようにMacのIPアドレスを入力し、「APIから報酬状態を取得」を押す。初回のローカルネットワーク確認では許可する。APIの仮残高と解除終了予定が表示されれば、APIからiPhoneへの取得は成功。アプリ内のローカル仮残高は変更しない。
+
+APIは再起動すると保持データが消える。接続できない場合は、MacとiPhoneが同じネットワーク上にあること、MacのIPアドレス、APIプロセスの起動状態、Macのファイアウォール設定を確認する。
