@@ -6,10 +6,10 @@
 
 | ディレクトリ | 用途・現状 |
 | --- | --- |
-| [backend/](backend/) | Go APIの最小実装。Userテーブル，HTTP／Connectヘルスチェック，Docker起動手順 |
+| [backend/](backend/) | Go APIの最小実装。PostgreSQL，identityのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
 | [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
-| [infra/](infra/) | インフラ構成の管理用 |
+| [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
 | [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
@@ -30,7 +30,7 @@
 | [バックエンド構成](docs/spec/1.バックエンド構成.md) | モジュラーモノリス，クリーンアーキテクチャの依存方向，横断処理・トランザクション方針を記載 |
 | [API仕様書](docs/spec/3.API仕様書.md) | ヘルスチェックを実装済み．小休憩モデルの業務動作，基本APIの契約案，全機能の対応表，未決事項を記載 |
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | 途中報酬・小休憩，終了時の全未使用報酬破棄・制限解除，グループ・通知のモデルを記載 |
-| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLへの移行方針，接続・権限・環境設定を記載．移行未実施 |
+| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLの接続・権限・環境設定，Supabase接続の残作業を記載．コードのPostgreSQL移行は済み，Supabase接続は未実施 |
 | [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
 
 資料が空の場合は仕様未定として扱います。実装に必要な仕様を決めたら該当資料に記載し、資料の追加・移動や記入状況の変更に合わせてこの索引を更新します。
