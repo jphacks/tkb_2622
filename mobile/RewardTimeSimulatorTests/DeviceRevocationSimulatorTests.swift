@@ -63,13 +63,12 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
                 signOutLocally: { didSignOutLocally = true }
             )
             XCTFail("Expected device revocation to fail")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "internal")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RevokeDevice"))
             XCTAssertFalse(didSignOutLocally)
             XCTAssertEqual(defaults.string(forKey: "mobile.device.id"), "device-123")
             XCTAssertEqual(defaults.string(forKey: "mobile.device.registrationID"), "registration-123")
-        } catch {
-            XCTFail("Unexpected error: \(error)")
         }
     }
 
@@ -104,7 +103,10 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         do {
             try await repository().revokeRegisteredDevice(client: client())
             XCTFail("Expected endpoint cleanup to fail once")
-        } catch ConnectJSONClient.ClientError.connect(code: "internal") {}
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/DeleteNotificationEndpoint"))
+        }
 
         try await repository().revokeRegisteredDevice(client: client())
 
@@ -134,6 +136,22 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertEqual(methods, ["ListDevices", "DeleteNotificationEndpoint"])
         XCTAssertNil(defaults.string(forKey: "mobile.device.id"))
         XCTAssertNil(defaults.string(forKey: "mobile.device.registrationID"))
+    }
+
+    func testListDevicesFailureIncludesFailingOperation() async {
+        defaults.set("device-123", forKey: "mobile.device.id")
+        defaults.set("registration-123", forKey: "mobile.device.registrationID")
+        DeviceRevocationURLProtocol.handler = { request in
+            return (Self.response(for: request, status: 500), Data(#"{"code":"internal"}"#.utf8))
+        }
+
+        do {
+            try await repository().revokeRegisteredDevice(client: client())
+            XCTFail("Expected device listing to fail")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/ListDevices"))
+        }
     }
 
     func testGroupConnectErrorsShowDistinctActionsInSimulatorTarget() {

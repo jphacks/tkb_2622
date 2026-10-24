@@ -102,6 +102,11 @@ struct ConfiguredDeviceRevocationRepository {
                 try await deleteNotificationEndpoint(client: client)
                 clearRegistration()
                 return
+            } catch {
+                throw DeviceSettingsRepositoryError.requestFailed(
+                    operation: "identity.v1.IdentityService/ListDevices",
+                    underlying: error
+                )
             }
             if let device = (response.devices ?? []).first(where: { $0.id == registeredDeviceID }) {
                 if device.status == "ACTIVE" {
@@ -126,28 +131,54 @@ struct ConfiguredDeviceRevocationRepository {
 
     private func revokeDevice(client: ConnectJSONClient, operationID: String,
                               deviceID: String, expectedVersion: String) async throws {
-        let revoked: RevokeResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "RevokeDevice",
-            requestBody: RevokeRequest(operationId: operationID, deviceId: deviceID,
-                                       expectedVersion: expectedVersion),
-            responseType: RevokeResponse.self
-        )
+        let revoked: RevokeResponse
+        do {
+            revoked = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "RevokeDevice",
+                requestBody: RevokeRequest(operationId: operationID, deviceId: deviceID,
+                                           expectedVersion: expectedVersion),
+                responseType: RevokeResponse.self
+            )
+        } catch ConnectJSONClient.ClientError.connect(code: "aborted") {
+            throw ConnectJSONClient.ClientError.connect(code: "aborted")
+        } catch {
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/RevokeDevice",
+                underlying: error
+            )
+        }
         guard revoked.device.status == "REVOKED" else {
-            throw DeviceSettingsRepositoryError.deviceNotRevoked
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/RevokeDevice",
+                underlying: DeviceSettingsRepositoryError.deviceNotRevoked
+            )
         }
     }
 
     private func deleteNotificationEndpoint(client: ConnectJSONClient) async throws {
         guard let registrationID = defaults.string(forKey: "mobile.device.registrationID"),
               !registrationID.isEmpty else { return }
-        let response: DeleteEndpointResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "DeleteNotificationEndpoint",
-            requestBody: DeleteEndpointRequest(registrationId: registrationID),
-            responseType: DeleteEndpointResponse.self
-        )
-        guard response.deleted else { throw DeviceSettingsRepositoryError.deviceNotRevoked }
+        let response: DeleteEndpointResponse
+        do {
+            response = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "DeleteNotificationEndpoint",
+                requestBody: DeleteEndpointRequest(registrationId: registrationID),
+                responseType: DeleteEndpointResponse.self
+            )
+        } catch {
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/DeleteNotificationEndpoint",
+                underlying: error
+            )
+        }
+        guard response.deleted else {
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/DeleteNotificationEndpoint",
+                underlying: DeviceSettingsRepositoryError.deviceNotRevoked
+            )
+        }
     }
 
     private func clearRegistration() {

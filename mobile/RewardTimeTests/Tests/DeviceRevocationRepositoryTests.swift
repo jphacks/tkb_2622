@@ -65,11 +65,10 @@ final class DeviceRevocationRepositoryTests: XCTestCase {
         do {
             try await repository().revokeRegisteredDevice(client: client())
             XCTFail("Expected the backend failure to be surfaced")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "internal")
-            XCTAssertEqual(defaults.string(forKey: "mobile.device.id"), "device-123")
         } catch {
-            XCTFail("Unexpected error: \(error)")
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RevokeDevice"))
+            XCTAssertEqual(defaults.string(forKey: "mobile.device.id"), "device-123")
         }
     }
 
@@ -104,7 +103,10 @@ final class DeviceRevocationRepositoryTests: XCTestCase {
         do {
             try await repository().revokeRegisteredDevice(client: client())
             XCTFail("Expected endpoint cleanup to fail once")
-        } catch ConnectJSONClient.ClientError.connect(code: "internal") {}
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/DeleteNotificationEndpoint"))
+        }
         XCTAssertNotNil(defaults.string(forKey: "mobile.device.revoke.pendingOperationID"))
 
         try await repository().revokeRegisteredDevice(client: client())
