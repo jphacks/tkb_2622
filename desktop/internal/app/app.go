@@ -71,13 +71,18 @@ func New() *Host {
 				app.stateLoaded = true
 				if exists {
 					snapshot.Mode = "local-monitor"
-					if snapshot.Monitor.State == "" {
-						if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
-							snapshot.Monitor.State = "paused"
-						} else {
-							snapshot.Monitor = toSessionMonitor(app.recorder.Status())
-						}
+					currentMonitor := toSessionMonitor(app.recorder.Status())
+					if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
+						currentMonitor.State = "paused"
+						currentMonitor.AppName = snapshot.Monitor.AppName
+						currentMonitor.BrowserName = snapshot.Monitor.BrowserName
+						currentMonitor.Domain = snapshot.Monitor.Domain
+						currentMonitor.LastSample = snapshot.Monitor.LastSample
+						currentMonitor.SampleCount = snapshot.Monitor.SampleCount
+					} else {
+						currentMonitor = toSessionMonitor(app.recorder.Status())
 					}
+					snapshot.Monitor = currentMonitor
 					if !engine.Restore(snapshot, now) {
 						app.stateLoaded = false
 						engine.SetLocalStorageReady(false, now)

@@ -1,5 +1,23 @@
 export namespace session {
 	
+	export class AccountState {
+	    status: string;
+	    email: string;
+	    deviceRegistered: boolean;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AccountState(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.email = source["email"];
+	        this.deviceRegistered = source["deviceRegistered"];
+	        this.message = source["message"];
+	    }
+	}
 	export class Capability {
 	    allowed: boolean;
 	    reason: string;
@@ -70,8 +88,8 @@ export namespace session {
 	    plannedSeconds: number;
 	    minimumSeconds: number;
 	    version: number;
-	    pendingOperationId: string;
-	    pendingSettingsHash: string;
+	    pendingOperationId?: string;
+	    pendingSettingsHash?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Task(source);
@@ -146,6 +164,30 @@ export namespace session {
 	        this.retryable = source["retryable"];
 	    }
 	}
+	export class MonitorStatus {
+	    state: string;
+	    appName: string;
+	    browserName: string;
+	    domain: string;
+	    lastSample: string;
+	    sampleCount: number;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new MonitorStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.appName = source["appName"];
+	        this.browserName = source["browserName"];
+	        this.domain = source["domain"];
+	        this.lastSample = source["lastSample"];
+	        this.sampleCount = source["sampleCount"];
+	        this.message = source["message"];
+	    }
+	}
 	export class Result {
 	    sessionId: string;
 	    name: string;
@@ -217,25 +259,6 @@ export namespace session {
 		    return a;
 		}
 	}
-	export class AccountState {
-	    status: string;
-	    email: string;
-	    deviceRegistered: boolean;
-	    message: string;
-
-	    static createFrom(source: any = {}) {
-	        return new AccountState(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.status = source["status"];
-	        this.email = source["email"];
-	        this.deviceRegistered = source["deviceRegistered"];
-	        this.message = source["message"];
-	    }
-	}
-
 	export class Snapshot {
 	    revision: number;
 	    platform: string;
@@ -246,6 +269,7 @@ export namespace session {
 	    sync: string;
 	    permission: string;
 	    online: boolean;
+	    monitor: MonitorStatus;
 	    restrictionDesired: string;
 	    restrictionConfirmed: boolean;
 	    settings: Settings;
@@ -270,6 +294,7 @@ export namespace session {
 	        this.sync = source["sync"];
 	        this.permission = source["permission"];
 	        this.online = source["online"];
+	        this.monitor = this.convertValues(source["monitor"], MonitorStatus);
 	        this.restrictionDesired = source["restrictionDesired"];
 	        this.restrictionConfirmed = source["restrictionConfirmed"];
 	        this.settings = this.convertValues(source["settings"], Settings);
