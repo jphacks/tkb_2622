@@ -180,6 +180,24 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
         XCTAssertEqual(
             AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: false,
+                sessionCheckFailed: true
+            ),
+            .identitySyncRequired
+        )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: true,
+                sessionCheckFailed: true
+            ),
+            .localOnly
+        )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
                 hasValidSession: true,
                 businessUserReady: false,
                 loginDeferred: true
