@@ -9,12 +9,13 @@ import (
 	"github.com/jphacks/tkb_2622/desktop/fixtures"
 )
 
-// Engineは表示・結合確認用のデモであり，クラウドの業務状態を確定しない．
+// Engineは表示確認用のデモとローカル計測を管理し，クラウドの業務状態を確定しない．
 type Engine struct {
-	state    Snapshot
-	fixtures FixtureSet
-	lastTick time.Time
-	sequence int
+	state             Snapshot
+	fixtures          FixtureSet
+	lastTick          time.Time
+	sequence          int
+	localStorageReady bool
 }
 
 func New(platform string, now time.Time) *Engine {
@@ -22,10 +23,10 @@ func New(platform string, now time.Time) *Engine {
 	if err := json.Unmarshal(fixtures.Scenarios, &data); err != nil {
 		panic(err)
 	}
-	e := &Engine{fixtures: data, lastTick: now}
+	e := &Engine{fixtures: data, lastTick: now, localStorageReady: true}
 	e.state = Snapshot{Platform: platform, Mode: "demo", Settings: Settings{
 		Tasks: data.Tasks, SelectedTaskID: data.Task.ID, Classifications: data.Classifications,
-	}, History: []Result{}}
+	}, History: []Result{}, Monitor: MonitorStatus{State: "demo"}}
 	e.applyScenario("ready")
 	e.touch(now)
 	return e
@@ -42,6 +43,77 @@ func (e *Engine) Snapshot() Snapshot {
 	var copy Snapshot
 	_ = json.Unmarshal(data, &copy)
 	return copy
+}
+
+func (e *Engine) SetMode(mode string, now time.Time) {
+	e.state.Mode = mode
+	e.touch(now)
+}
+
+func (e *Engine) SetLocalStorageReady(ready bool, now time.Time) {
+	if e.localStorageReady == ready {
+		return
+	}
+	e.localStorageReady = ready
+	if ready && e.state.Failure != nil && e.state.Failure.Code == "local_storage" {
+		e.state.Failure = nil
+	}
+	e.touch(now)
+}
+
+func (e *Engine) Restore(snapshot Snapshot, now time.Time) bool {
+	if snapshot.Platform != e.state.Platform || len(snapshot.Settings.Tasks) == 0 {
+		return false
+	}
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return false
+	}
+	var restored Snapshot
+	if err := json.Unmarshal(data, &restored); err != nil {
+		return false
+	}
+	if _, valid := normalizeSettings(restored.Settings); !valid {
+		return false
+	}
+	if restored.Session != nil && restored.Session.Status == "RUNNING" {
+		restored.Session.Status = "PAUSED"
+		restored.Session.Evaluation = "pending"
+		if restored.Mode == "local-monitor" {
+			restored.Monitor.State = "paused"
+		}
+	}
+	e.state = restored
+	e.lastTick = now
+	e.touch(now)
+	e.updateActions()
+	return true
+}
+
+func (e *Engine) SetMonitor(status MonitorStatus, now time.Time) {
+	e.state.Monitor = status
+	if status.State == "running" && status.Message == "" && e.state.Failure != nil && e.state.Failure.Code == "monitor_sample" {
+		e.state.Failure = nil
+	}
+	e.touch(now)
+}
+
+func (e *Engine) SetFailure(code, message string, retryable bool, now time.Time) {
+	e.fail(code, message, retryable)
+	e.touch(now)
+}
+
+func (e *Engine) PauseForShutdown(now time.Time) {
+	if e.state.Session == nil || e.state.Session.Status != "RUNNING" {
+		return
+	}
+	e.state.Session.Status = "PAUSED"
+	e.state.Session.Evaluation = "pending"
+	if e.state.Mode == "local-monitor" && e.state.Monitor.State == "running" {
+		e.state.Monitor.State = "paused"
+	}
+	e.lastTick = now
+	e.touch(now)
 }
 
 func (e *Engine) Tick(now time.Time) bool {
@@ -99,6 +171,10 @@ func normalizeSettings(input Settings) (Settings, bool) {
 }
 
 func (e *Engine) Execute(command Command, now time.Time) Snapshot {
+	return e.ExecuteWithSessionID(command, "", now)
+}
+
+func (e *Engine) ExecuteWithSessionID(command Command, requestedSessionID string, now time.Time) Snapshot {
 	e.Tick(now)
 	e.state.Failure = nil
 	e.updateActions()
@@ -124,13 +200,19 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 				task = candidate
 			}
 		}
-		e.state.Session = &WorkSession{ID: fmt.Sprintf("demo-%d-%d", now.UnixNano(), e.sequence), Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task, Evaluation: "pending"}
+		sessionID := requestedSessionID
+		if sessionID == "" {
+			sessionID = fmt.Sprintf("demo-%d-%d", now.UnixNano(), e.sequence)
+		}
+		e.state.Session = &WorkSession{ID: sessionID, Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task, Evaluation: "pending"}
 		if e.state.Session.Name == "" {
 			e.state.Session.Name = task.Name
 		}
 		e.state.Result = nil
 		e.state.BalanceSeconds = nil
-		e.state.RestrictionDesired = "restricted"
+		if e.state.Mode == "demo" {
+			e.state.RestrictionDesired = "restricted"
+		}
 	case "pause":
 		e.state.Session.Status = "PAUSED"
 		e.state.Session.Evaluation = "pending"
@@ -153,7 +235,9 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 	case "resume":
 		e.state.Session.Status = "RUNNING"
 		e.state.Session.Evaluation = "pending"
-		e.state.RestrictionDesired = "restricted"
+		if e.state.Mode == "demo" {
+			e.state.RestrictionDesired = "restricted"
+		}
 	case "finish", "abort":
 		s := e.state.Session
 		if command.Action == "abort" {
@@ -161,7 +245,7 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 		} else {
 			s.Status = "FINALIZED"
 		}
-		if !e.state.Online {
+		if !e.state.Online && e.state.Mode != "local-monitor" {
 			if command.Action == "abort" {
 				s.Status = "ABORTED_LOCAL"
 			} else {
@@ -231,14 +315,22 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 
 func (e *Engine) complete() {
 	s := e.state.Session
-	s.Evaluation = "complete"
-	e.state.Sync = "synced"
-	e.state.RestrictionDesired = "unrestricted"
+	if e.state.Mode == "local-monitor" {
+		s.Evaluation = "pending"
+		e.state.Sync = "pending"
+		e.state.RestrictionDesired = "unknown"
+	} else {
+		s.Evaluation = "complete"
+		e.state.Sync = "synced"
+		e.state.RestrictionDesired = "unrestricted"
+	}
 	discarded := 0
-	if e.state.BalanceSeconds != nil { discarded = *e.state.BalanceSeconds }
+	if e.state.BalanceSeconds != nil {
+		discarded = *e.state.BalanceSeconds
+	}
 	zero := 0
 	e.state.BalanceSeconds = &zero
-	// 計測未接続のため全時間を保留とし，作業時間や報酬を推定しない．
+	// 活動分類未接続のため全時間を保留とし，作業時間や報酬を推定しない．
 	result := Result{SessionID: s.ID, Name: s.Name, Status: s.Status, ElapsedSeconds: s.ElapsedSeconds, UncertainSeconds: s.ElapsedSeconds, DiscardedSeconds: discarded}
 	e.state.Result = &result
 	for _, previous := range e.state.History {
@@ -279,13 +371,16 @@ func (e *Engine) updateActions() {
 	s := e.state.Session
 	active := s != nil && (s.Status == "RUNNING" || s.Status == "PAUSED")
 	available := s == nil || terminal(s.Status)
+	monitorReady := e.state.Mode != "local-monitor" || e.state.Monitor.State == "ready" || e.state.Monitor.State == "finished" || e.state.Monitor.State == "aborted"
+	monitorCanResume := e.state.Mode != "local-monitor" || e.state.Monitor.State == "paused" || e.state.Monitor.State == "ready"
+	storageReady := e.state.Mode != "local-monitor" || e.localStorageReady
 	rules := map[string]bool{
-		"start":  available && e.state.Online && e.state.Permission != "denied",
+		"start":  available && monitorReady && storageReady && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
 		"pause":  active && s.Status == "RUNNING",
-		"resume": active && s.Status == "PAUSED" && e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete" && e.state.Permission != "denied",
+		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && (e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
 		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds,
 		"abort":  active,
-		"retry":  e.state.Sync != "synced",
+		"retry":  e.state.Mode != "local-monitor" && e.state.Sync != "synced",
 	}
 	e.state.Actions = map[string]Capability{}
 	for action, allowed := range rules {
@@ -297,6 +392,26 @@ func (e *Engine) updateActions() {
 	}
 	if !rules["start"] && !e.state.Online {
 		e.state.Actions["start"] = Capability{Reason: "開始にはオンライン接続が必要です。"}
+	}
+	if !rules["start"] && e.state.Mode == "local-monitor" && !monitorReady {
+		reason := e.state.Monitor.Message
+		if reason == "" {
+			reason = "macOS計測ヘルパーを利用できません。アプリ用ビルド手順を確認してください。"
+		}
+		e.state.Actions["start"] = Capability{Reason: reason}
+	}
+	if !rules["start"] && e.state.Mode == "local-monitor" && !storageReady {
+		e.state.Actions["start"] = Capability{Reason: "作業状態を保存できません。保存先の権限を確認してください。"}
+	}
+	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !storageReady {
+		e.state.Actions["resume"] = Capability{Reason: "作業状態を保存できないため再開できません。保存先の権限を確認してください。"}
+	}
+	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !monitorCanResume {
+		reason := e.state.Monitor.Message
+		if reason == "" {
+			reason = "macOS計測ヘルパーを利用できません。アプリ用ビルド手順を確認してください。"
+		}
+		e.state.Actions["resume"] = Capability{Reason: reason}
 	}
 	if !rules["start"] && e.state.Permission == "denied" {
 		e.state.Actions["start"] = Capability{Reason: "計測権限が拒否されています。設定を確認してください。"}

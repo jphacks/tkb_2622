@@ -27,6 +27,16 @@ type Failure struct {
 	Retryable bool   `json:"retryable"`
 }
 
+type MonitorStatus struct {
+	State       string `json:"state"`
+	AppName     string `json:"appName"`
+	BrowserName string `json:"browserName"`
+	Domain      string `json:"domain"`
+	LastSample  string `json:"lastSample"`
+	SampleCount int    `json:"sampleCount"`
+	Message     string `json:"message"`
+}
+
 type Classification struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
@@ -61,6 +71,7 @@ type Snapshot struct {
 	Sync                 string                `json:"sync"`
 	Permission           string                `json:"permission"`
 	Online               bool                  `json:"online"`
+	Monitor              MonitorStatus         `json:"monitor"`
 	RestrictionDesired   string                `json:"restrictionDesired"`
 	RestrictionConfirmed bool                  `json:"restrictionConfirmed"`
 	Settings             Settings              `json:"settings"`
