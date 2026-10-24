@@ -136,6 +136,12 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertNil(defaults.string(forKey: "mobile.device.registrationID"))
     }
 
+    func testGroupConnectErrorsShowDistinctActionsInSimulatorTarget() {
+        XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "unimplemented")).contains("グループAPIがありません"))
+        XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "not_found")).contains("not_found"))
+        XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "unauthenticated")).contains("再ログイン"))
+    }
+
     private func repository() -> ConfiguredDeviceRevocationRepository {
         ConfiguredDeviceRevocationRepository(defaults: defaults)
     }

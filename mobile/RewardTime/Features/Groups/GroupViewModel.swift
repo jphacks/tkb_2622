@@ -103,12 +103,8 @@ final class GroupViewModel: ObservableObject {
             return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。"
         case GroupRepositoryError.invalidConfiguration:
             return "設定タブのSupabase接続情報とAPI URLを確認してください。"
-        case ConnectJSONClient.ClientError.httpStatus(404):
-            return "接続先のbackendにグループAPIがありません。backendを最新版に更新して再起動してください。"
-        case ConnectJSONClient.ClientError.connect(code: "internal"):
-            return "backend内部エラーです。グループ用DBマイグレーションが適用済みか確認してください。"
-        case ConnectJSONClient.ClientError.connect(code: "failed_precondition"):
-            return "業務User登録が未完了です。設定タブでアカウント接続を再確認してください。"
+        case let clientError as ConnectJSONClient.ClientError:
+            return GroupAPIErrorMessage.describe(clientError)
         case let error as LocalizedError:
             return error.errorDescription ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
         default:
