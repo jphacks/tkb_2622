@@ -30,7 +30,22 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
   if (!state) return <div className="startup-message" role="status"><h1>Focus Link</h1><p>{error || '作業スペースを準備しています…'}</p>{error && <button className="button" onClick={() => void store.connect()}>接続を再試行</button>}</div>;
   if (state.platform === 'unsupported') return <div className="startup-message">このOSは対応していません。</div>;
   const Shell = state.platform === 'windows' ? WindowsShell : MacShell;
-  const props = { state, busy, execute: (command: Parameters<DesktopStore['execute']>[0]) => { void store.execute(command); }, onNavigate: (next: 'feedback' | 'history' | 'settings') => setPage(next) };
+  const props = { state, busy, execute: (command: Parameters<DesktopStore['execute']>[0]) => {
+    const session = state.session;
+    const isPendingCompletion = command.action === 'retry' && session && ['COMPLETED_LOCAL', 'ABORTED_LOCAL'].includes(session.status);
+    const shouldOpenFeedback = command.action === 'finish' || command.action === 'abort' || isPendingCompletion;
+    const revisionBeforeCommand = state.revision;
+    void store.execute(command).then(() => {
+      if (!shouldOpenFeedback) return;
+      const updated = store.getSnapshot().snapshot;
+      const result = updated?.result;
+      const completed = updated?.session;
+      if (!updated || updated.revision <= revisionBeforeCommand || !completed || !result || completed.id !== session?.id || result.sessionId !== completed.id || !['FINALIZED', 'ABORTED'].includes(completed.status)) return;
+      setSelectedResult(result);
+      setShowStartup(false);
+      setPage('feedback');
+    });
+  }, onNavigate: (next: 'feedback' | 'history' | 'settings') => setPage(next) };
   const active = state.session && ['RUNNING', 'PAUSED'].includes(state.session.status);
   const content = page === 'session' ? (showStartup ? <StartupPage {...props} onLater={() => setShowStartup(false)} onStarted={() => setShowStartup(false)} onResumed={() => setShowStartup(false)} /> : <SessionPage {...props} />) : page === 'feedback' ? <FeedbackPage result={selectedResult ?? state.result} /> : page === 'history' ? <HistoryPage history={state.history} onSelect={result => { setSelectedResult(result); setPage('feedback'); }} /> : <SettingsPage {...props} />;
   const openMain = page !== 'session';

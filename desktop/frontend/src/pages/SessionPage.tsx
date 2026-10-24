@@ -15,6 +15,14 @@ export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
   const canFinish = state.actions.finish.allowed;
   const act = (action: SessionAction, label: string, primary = false) => <button className={primary ? 'button primary panel-button' : 'button panel-button'} disabled={busy || !state.actions[action].allowed} title={state.actions[action].reason} onClick={() => execute({ action, name })}>{label}</button>;
 
+  if (session && ['COMPLETED_LOCAL', 'ABORTED_LOCAL'].includes(session.status)) return <section className="session-panel running-panel" aria-label="作業の同期待ち">
+    <header className="running-header"><span className="session-status paused"><i />{session.status === 'ABORTED_LOCAL' ? '中止・同期待ち' : '終了・同期待ち'}</span><span className="session-name">{session.name || session.task.name}</span></header>
+    <div className="timer-card"><span>記録した作業時間</span><strong className="panel-timer">{clock(elapsed)}</strong><p>記録の同期と評価が完了すると、結果を表示します。</p></div>
+    <button className="button primary panel-button" disabled={busy || !state.actions.retry.allowed} title={state.actions.retry.reason} onClick={() => execute({ action: 'retry' })}>記録を同期して結果を表示</button>
+    <p className="panel-note">同期が確認されるまで報酬は確定しません。iPhoneの利用制限は未接続です。</p>
+    <footer className="panel-footer"><button onClick={() => onNavigate?.('history')}>これまでの記録</button><button onClick={() => onNavigate?.('settings')}>設定</button></footer>
+  </section>;
+
   if (!active) return <section className="session-panel start-panel" aria-label="作業開始">
     <header className="panel-header"><strong className="panel-brand">Focus Link</strong><span>{state.balanceSeconds === null ? '利用できる時間　未取得' : `利用できる時間　${duration(state.balanceSeconds)}（デモ）`}</span></header>
     <button className="start-button" disabled={busy || !state.actions.start.allowed} title={state.actions.start.reason} onClick={() => execute({ action: 'start', name })}><span aria-hidden="true">▶</span><strong>開始</strong></button>
