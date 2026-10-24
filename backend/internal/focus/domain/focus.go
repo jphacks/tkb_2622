@@ -92,6 +92,7 @@ type Session struct {
 	ID                 string
 	UserID             string
 	DeviceID           string
+	TrackingOnly       bool
 	TaskID             string
 	Snapshot           TaskSettings
 	Status             string
@@ -111,8 +112,8 @@ func (s *Session) Open() bool { return s.Status == Running || s.Status == Paused
 // MinimumReached compares active time (pauses excluded) with the minimum fixed at start.
 func (s *Session) MinimumReached() bool { return s.Totals.Active() >= s.Snapshot.MinimumSeconds*1000 }
 
-func NewSession(id, userID, deviceID string, task Task, now time.Time) Session {
-	return Session{ID: id, UserID: userID, DeviceID: deviceID, TaskID: task.ID, Snapshot: task.Settings, Status: Running, Version: 1, StartedAt: now, RunningSince: &now}
+func NewSession(id, userID, deviceID string, task Task, trackingOnly bool, now time.Time) Session {
+	return Session{ID: id, UserID: userID, DeviceID: deviceID, TrackingOnly: trackingOnly, TaskID: task.ID, Snapshot: task.Settings, Status: Running, Version: 1, StartedAt: now, RunningSince: &now}
 }
 
 // ValidateSegments checks shape only; ordering against the session is checked by Apply.
