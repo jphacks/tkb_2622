@@ -92,6 +92,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 | `SUPABASE_JWT_AUDIENCE` | 許可するaudience．既定`authenticated` |
 | `AUTH_ALLOW_LOCAL_HTTP` | `true`でHTTPのissuer（Supabase CLIのローカル環境等）を許可．既定は無効 |
 | `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
+| `APNS_TEAM_ID`，`APNS_KEY_ID`，`APNS_BUNDLE_ID`，`APNS_AUTH_KEY_PATH` | すべて設定するとAPNs配信を有効化．秘密鍵ファイルは実行環境のSecret管理からマウントする．未設定時はAPNs送信を停止し，Outboxを保持 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 
 接続先や認証情報をログへ出力しないよう，DBエラーは秘匿したメッセージに変換します．`.env`はコードから自動読み込みしません．必要な変数を実行環境から渡してください．
@@ -104,7 +105,11 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 | --- | --- |
 | `app.users` | 業務User．`id`（UUID），`auth_provider`（`supabase`のみ），`auth_subject`（Supabase AuthのユーザーID），公開表示名，プロフィール画像カタログID．プロバイダーとsubjectの組み合わせは一意．状態は`ACTIVE`／`DISABLED` |
 | `app.devices` | 登録端末．プラットフォームは`MACOS`／`WINDOWS`／`IOS`．有効なiPhoneはUserごとに1台 |
+| `app.notification_endpoints` | 有効なiPhone端末ごとのAPNs tokenとSandbox／Production環境 |
+| `app.notification_outbox` | グループ作業開始通知の宛先・送信状態・再試行記録 |
 | `app.identity_operations` | 再送を同じ結果で返すための操作記録 |
+
+作業開始イベントとOutboxは同じPostgreSQLトランザクションで保存します。ローカルAPIは30秒間隔で保留通知を再試行します。本番のCloud Runではプロセス内workerの継続を保証しないため、永続的な再試行にはCloud Scheduler／Cloud Tasks等を接続してください。APNsは`APNS_TEAM_ID`、`APNS_KEY_ID`、アプリのbundle ID、Apple Push Auth Keyが必要です。秘密鍵をソースや通常の環境変数値へ保存せず、Secret Manager等からファイルとしてマウントしてください。
 
 通常起動でDownは実行しません．`migrate down`は業務テーブルとそのデータを削除するため，明示的なロールバック用です．
 

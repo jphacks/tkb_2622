@@ -940,6 +940,25 @@ components:
           title: groups
       title: ListGroupsResponse
       additionalProperties: false
+    identity.v1.APNsEnvironment:
+      type: string
+      title: APNsEnvironment
+      enum:
+        - AP_NS_ENVIRONMENT_UNSPECIFIED
+        - AP_NS_ENVIRONMENT_DEVELOPMENT
+        - AP_NS_ENVIRONMENT_PRODUCTION
+    identity.v1.DeleteNotificationEndpointRequest:
+      type: object
+      title: DeleteNotificationEndpointRequest
+      additionalProperties: false
+    identity.v1.DeleteNotificationEndpointResponse:
+      type: object
+      properties:
+        deleted:
+          type: boolean
+          title: deleted
+      title: DeleteNotificationEndpointResponse
+      additionalProperties: false
     identity.v1.Device:
       type: object
       properties:
@@ -1054,6 +1073,26 @@ components:
             - $ref: '#/components/schemas/identity.v1.Device'
           title: device
       title: RegisterDeviceResponse
+      additionalProperties: false
+    identity.v1.RegisterNotificationEndpointRequest:
+      type: object
+      properties:
+        apnsToken:
+          type: string
+          title: apns_token
+        environment:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.APNsEnvironment'
+          title: environment
+      title: RegisterNotificationEndpointRequest
+      additionalProperties: false
+    identity.v1.RegisterNotificationEndpointResponse:
+      type: object
+      properties:
+        registered:
+          type: boolean
+          title: registered
+      title: RegisterNotificationEndpointResponse
       additionalProperties: false
     identity.v1.RevokeDeviceRequest:
       type: object
@@ -2439,6 +2478,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/group.v1.ListGroupsResponse'
+  /identity.v1.IdentityService/DeleteNotificationEndpoint:
+    post:
+      tags:
+        - IdentityService
+      summary: DeleteNotificationEndpoint
+      operationId: identity.v1.IdentityService.DeleteNotificationEndpoint
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.DeleteNotificationEndpointRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.DeleteNotificationEndpointResponse'
   /identity.v1.IdentityService/EnsureUser:
     post:
       tags:
@@ -2591,6 +2668,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RegisterDeviceResponse'
+  /identity.v1.IdentityService/RegisterNotificationEndpoint:
+    post:
+      tags:
+        - IdentityService
+      summary: RegisterNotificationEndpoint
+      operationId: identity.v1.IdentityService.RegisterNotificationEndpoint
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.RegisterNotificationEndpointRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.RegisterNotificationEndpointResponse'
   /identity.v1.IdentityService/RevokeDevice:
     post:
       tags:

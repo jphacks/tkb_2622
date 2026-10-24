@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	q "github.com/jphacks/tkb_2622/backend/internal/identity/adapter/persistence/sqlc"
@@ -265,6 +266,48 @@ func (r *Repository) RevokeDevice(ctx context.Context, p application.Principal, 
 		return save(ctx, queries, u, "revoke", in.OperationID, h, out)
 	})
 	return
+}
+
+func (r *Repository) RegisterNotificationEndpoint(ctx context.Context, p application.Principal, in application.NotificationEndpointInput) error {
+	return r.transaction(ctx, p, false, func(tx *sql.Tx, queries *q.Queries, u q.AppUser) error {
+		if err := checkSession(ctx, queries, p, u.ID); err != nil {
+			return err
+		}
+		var deviceID uuid.UUID
+		var platform, status string
+		if err := tx.QueryRowContext(ctx, `SELECT id, platform, status FROM app.devices WHERE auth_session_id = $1 AND user_id = $2`, uid(p.SessionID), u.ID).Scan(&deviceID, &platform, &status); err != nil {
+			return translate(err)
+		}
+		if platform != "IOS" || status != "ACTIVE" {
+			return application.ErrForbidden
+		}
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO app.notification_endpoints (device_id, user_id, apns_environment, apns_token)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (device_id) DO UPDATE SET
+				user_id = EXCLUDED.user_id,
+				apns_environment = EXCLUDED.apns_environment,
+				apns_token = EXCLUDED.apns_token,
+				updated_at = now()`, deviceID, u.ID, in.Environment, strings.ToLower(in.APNsToken))
+		return err
+	})
+}
+
+func (r *Repository) DeleteNotificationEndpoint(ctx context.Context, p application.Principal) error {
+	return r.transaction(ctx, p, false, func(tx *sql.Tx, queries *q.Queries, u q.AppUser) error {
+		if err := checkSession(ctx, queries, p, u.ID); err != nil {
+			return err
+		}
+		var platform, status string
+		if err := tx.QueryRowContext(ctx, `SELECT platform, status FROM app.devices WHERE auth_session_id = $1 AND user_id = $2`, uid(p.SessionID), u.ID).Scan(&platform, &status); err != nil {
+			return translate(err)
+		}
+		if platform != "IOS" || status != "ACTIVE" {
+			return application.ErrForbidden
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM app.notification_endpoints WHERE device_id = (SELECT id FROM app.devices WHERE auth_session_id = $1 AND user_id = $2)`, uid(p.SessionID), u.ID)
+		return err
+	})
 }
 func (r *Repository) Actor(ctx context.Context, p application.Principal) (application.Actor, error) {
 	queries := q.New(r.db)

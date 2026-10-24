@@ -73,6 +73,55 @@ func (Platform) EnumDescriptor() ([]byte, []int) {
 	return file_identity_v1_identity_proto_rawDescGZIP(), []int{0}
 }
 
+type APNsEnvironment int32
+
+const (
+	APNsEnvironment_AP_NS_ENVIRONMENT_UNSPECIFIED APNsEnvironment = 0
+	APNsEnvironment_AP_NS_ENVIRONMENT_DEVELOPMENT APNsEnvironment = 1
+	APNsEnvironment_AP_NS_ENVIRONMENT_PRODUCTION  APNsEnvironment = 2
+)
+
+// Enum value maps for APNsEnvironment.
+var (
+	APNsEnvironment_name = map[int32]string{
+		0: "AP_NS_ENVIRONMENT_UNSPECIFIED",
+		1: "AP_NS_ENVIRONMENT_DEVELOPMENT",
+		2: "AP_NS_ENVIRONMENT_PRODUCTION",
+	}
+	APNsEnvironment_value = map[string]int32{
+		"AP_NS_ENVIRONMENT_UNSPECIFIED": 0,
+		"AP_NS_ENVIRONMENT_DEVELOPMENT": 1,
+		"AP_NS_ENVIRONMENT_PRODUCTION":  2,
+	}
+)
+
+func (x APNsEnvironment) Enum() *APNsEnvironment {
+	p := new(APNsEnvironment)
+	*p = x
+	return p
+}
+
+func (x APNsEnvironment) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (APNsEnvironment) Descriptor() protoreflect.EnumDescriptor {
+	return file_identity_v1_identity_proto_enumTypes[1].Descriptor()
+}
+
+func (APNsEnvironment) Type() protoreflect.EnumType {
+	return &file_identity_v1_identity_proto_enumTypes[1]
+}
+
+func (x APNsEnvironment) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use APNsEnvironment.Descriptor instead.
+func (APNsEnvironment) EnumDescriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{1}
+}
+
 type User struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -897,6 +946,182 @@ func (x *RevokeDeviceResponse) GetDevice() *Device {
 	return nil
 }
 
+type RegisterNotificationEndpointRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApnsToken     string                 `protobuf:"bytes,1,opt,name=apns_token,json=apnsToken,proto3" json:"apns_token,omitempty"`
+	Environment   APNsEnvironment        `protobuf:"varint,2,opt,name=environment,proto3,enum=identity.v1.APNsEnvironment" json:"environment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterNotificationEndpointRequest) Reset() {
+	*x = RegisterNotificationEndpointRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterNotificationEndpointRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterNotificationEndpointRequest) ProtoMessage() {}
+
+func (x *RegisterNotificationEndpointRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterNotificationEndpointRequest.ProtoReflect.Descriptor instead.
+func (*RegisterNotificationEndpointRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RegisterNotificationEndpointRequest) GetApnsToken() string {
+	if x != nil {
+		return x.ApnsToken
+	}
+	return ""
+}
+
+func (x *RegisterNotificationEndpointRequest) GetEnvironment() APNsEnvironment {
+	if x != nil {
+		return x.Environment
+	}
+	return APNsEnvironment_AP_NS_ENVIRONMENT_UNSPECIFIED
+}
+
+type RegisterNotificationEndpointResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Registered    bool                   `protobuf:"varint,1,opt,name=registered,proto3" json:"registered,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterNotificationEndpointResponse) Reset() {
+	*x = RegisterNotificationEndpointResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterNotificationEndpointResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterNotificationEndpointResponse) ProtoMessage() {}
+
+func (x *RegisterNotificationEndpointResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterNotificationEndpointResponse.ProtoReflect.Descriptor instead.
+func (*RegisterNotificationEndpointResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *RegisterNotificationEndpointResponse) GetRegistered() bool {
+	if x != nil {
+		return x.Registered
+	}
+	return false
+}
+
+type DeleteNotificationEndpointRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteNotificationEndpointRequest) Reset() {
+	*x = DeleteNotificationEndpointRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteNotificationEndpointRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteNotificationEndpointRequest) ProtoMessage() {}
+
+func (x *DeleteNotificationEndpointRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteNotificationEndpointRequest.ProtoReflect.Descriptor instead.
+func (*DeleteNotificationEndpointRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{18}
+}
+
+type DeleteNotificationEndpointResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deleted       bool                   `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteNotificationEndpointResponse) Reset() {
+	*x = DeleteNotificationEndpointResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteNotificationEndpointResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteNotificationEndpointResponse) ProtoMessage() {}
+
+func (x *DeleteNotificationEndpointResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteNotificationEndpointResponse.ProtoReflect.Descriptor instead.
+func (*DeleteNotificationEndpointResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DeleteNotificationEndpointResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
 var File_identity_v1_identity_proto protoreflect.FileDescriptor
 
 const file_identity_v1_identity_proto_rawDesc = "" +
@@ -951,12 +1176,27 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12)\n" +
 	"\x10expected_version\x18\x03 \x01(\x03R\x0fexpectedVersion\"C\n" +
 	"\x14RevokeDeviceResponse\x12+\n" +
-	"\x06device\x18\x01 \x01(\v2\x13.identity.v1.DeviceR\x06device*`\n" +
+	"\x06device\x18\x01 \x01(\v2\x13.identity.v1.DeviceR\x06device\"\x84\x01\n" +
+	"#RegisterNotificationEndpointRequest\x12\x1d\n" +
+	"\n" +
+	"apns_token\x18\x01 \x01(\tR\tapnsToken\x12>\n" +
+	"\venvironment\x18\x02 \x01(\x0e2\x1c.identity.v1.APNsEnvironmentR\venvironment\"F\n" +
+	"$RegisterNotificationEndpointResponse\x12\x1e\n" +
+	"\n" +
+	"registered\x18\x01 \x01(\bR\n" +
+	"registered\"#\n" +
+	"!DeleteNotificationEndpointRequest\">\n" +
+	"\"DeleteNotificationEndpointResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted*`\n" +
 	"\bPlatform\x12\x18\n" +
 	"\x14PLATFORM_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0ePLATFORM_MACOS\x10\x01\x12\x14\n" +
 	"\x10PLATFORM_WINDOWS\x10\x02\x12\x10\n" +
-	"\fPLATFORM_IOS\x10\x032\xdb\x04\n" +
+	"\fPLATFORM_IOS\x10\x03*y\n" +
+	"\x0fAPNsEnvironment\x12!\n" +
+	"\x1dAP_NS_ENVIRONMENT_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dAP_NS_ENVIRONMENT_DEVELOPMENT\x10\x01\x12 \n" +
+	"\x1cAP_NS_ENVIRONMENT_PRODUCTION\x10\x022\xe0\x06\n" +
 	"\x0fIdentityService\x12M\n" +
 	"\n" +
 	"EnsureUser\x12\x1e.identity.v1.EnsureUserRequest\x1a\x1f.identity.v1.EnsureUserResponse\x12>\n" +
@@ -965,7 +1205,9 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\fUpdateAvatar\x12 .identity.v1.UpdateAvatarRequest\x1a!.identity.v1.UpdateAvatarResponse\x12Y\n" +
 	"\x0eRegisterDevice\x12\".identity.v1.RegisterDeviceRequest\x1a#.identity.v1.RegisterDeviceResponse\x12P\n" +
 	"\vListDevices\x12\x1f.identity.v1.ListDevicesRequest\x1a .identity.v1.ListDevicesResponse\x12S\n" +
-	"\fRevokeDevice\x12 .identity.v1.RevokeDeviceRequest\x1a!.identity.v1.RevokeDeviceResponseB@Z>github.com/jphacks/tkb_2622/backend/gen/identity/v1;identityv1b\x06proto3"
+	"\fRevokeDevice\x12 .identity.v1.RevokeDeviceRequest\x1a!.identity.v1.RevokeDeviceResponse\x12\x83\x01\n" +
+	"\x1cRegisterNotificationEndpoint\x120.identity.v1.RegisterNotificationEndpointRequest\x1a1.identity.v1.RegisterNotificationEndpointResponse\x12}\n" +
+	"\x1aDeleteNotificationEndpoint\x12..identity.v1.DeleteNotificationEndpointRequest\x1a/.identity.v1.DeleteNotificationEndpointResponseB@Z>github.com/jphacks/tkb_2622/backend/gen/identity/v1;identityv1b\x06proto3"
 
 var (
 	file_identity_v1_identity_proto_rawDescOnce sync.Once
@@ -979,56 +1221,66 @@ func file_identity_v1_identity_proto_rawDescGZIP() []byte {
 	return file_identity_v1_identity_proto_rawDescData
 }
 
-var file_identity_v1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_identity_v1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_identity_v1_identity_proto_goTypes = []any{
-	(Platform)(0),                     // 0: identity.v1.Platform
-	(*User)(nil),                      // 1: identity.v1.User
-	(*Device)(nil),                    // 2: identity.v1.Device
-	(*EnsureUserRequest)(nil),         // 3: identity.v1.EnsureUserRequest
-	(*EnsureUserResponse)(nil),        // 4: identity.v1.EnsureUserResponse
-	(*GetMeRequest)(nil),              // 5: identity.v1.GetMeRequest
-	(*GetMeResponse)(nil),             // 6: identity.v1.GetMeResponse
-	(*UpdateDisplayNameRequest)(nil),  // 7: identity.v1.UpdateDisplayNameRequest
-	(*UpdateDisplayNameResponse)(nil), // 8: identity.v1.UpdateDisplayNameResponse
-	(*UpdateAvatarRequest)(nil),       // 9: identity.v1.UpdateAvatarRequest
-	(*UpdateAvatarResponse)(nil),      // 10: identity.v1.UpdateAvatarResponse
-	(*RegisterDeviceRequest)(nil),     // 11: identity.v1.RegisterDeviceRequest
-	(*RegisterDeviceResponse)(nil),    // 12: identity.v1.RegisterDeviceResponse
-	(*ListDevicesRequest)(nil),        // 13: identity.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),       // 14: identity.v1.ListDevicesResponse
-	(*RevokeDeviceRequest)(nil),       // 15: identity.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),      // 16: identity.v1.RevokeDeviceResponse
+	(Platform)(0),                                // 0: identity.v1.Platform
+	(APNsEnvironment)(0),                         // 1: identity.v1.APNsEnvironment
+	(*User)(nil),                                 // 2: identity.v1.User
+	(*Device)(nil),                               // 3: identity.v1.Device
+	(*EnsureUserRequest)(nil),                    // 4: identity.v1.EnsureUserRequest
+	(*EnsureUserResponse)(nil),                   // 5: identity.v1.EnsureUserResponse
+	(*GetMeRequest)(nil),                         // 6: identity.v1.GetMeRequest
+	(*GetMeResponse)(nil),                        // 7: identity.v1.GetMeResponse
+	(*UpdateDisplayNameRequest)(nil),             // 8: identity.v1.UpdateDisplayNameRequest
+	(*UpdateDisplayNameResponse)(nil),            // 9: identity.v1.UpdateDisplayNameResponse
+	(*UpdateAvatarRequest)(nil),                  // 10: identity.v1.UpdateAvatarRequest
+	(*UpdateAvatarResponse)(nil),                 // 11: identity.v1.UpdateAvatarResponse
+	(*RegisterDeviceRequest)(nil),                // 12: identity.v1.RegisterDeviceRequest
+	(*RegisterDeviceResponse)(nil),               // 13: identity.v1.RegisterDeviceResponse
+	(*ListDevicesRequest)(nil),                   // 14: identity.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),                  // 15: identity.v1.ListDevicesResponse
+	(*RevokeDeviceRequest)(nil),                  // 16: identity.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),                 // 17: identity.v1.RevokeDeviceResponse
+	(*RegisterNotificationEndpointRequest)(nil),  // 18: identity.v1.RegisterNotificationEndpointRequest
+	(*RegisterNotificationEndpointResponse)(nil), // 19: identity.v1.RegisterNotificationEndpointResponse
+	(*DeleteNotificationEndpointRequest)(nil),    // 20: identity.v1.DeleteNotificationEndpointRequest
+	(*DeleteNotificationEndpointResponse)(nil),   // 21: identity.v1.DeleteNotificationEndpointResponse
 }
 var file_identity_v1_identity_proto_depIdxs = []int32{
 	0,  // 0: identity.v1.Device.platform:type_name -> identity.v1.Platform
-	1,  // 1: identity.v1.EnsureUserResponse.user:type_name -> identity.v1.User
-	1,  // 2: identity.v1.GetMeResponse.user:type_name -> identity.v1.User
-	1,  // 3: identity.v1.UpdateDisplayNameResponse.user:type_name -> identity.v1.User
-	1,  // 4: identity.v1.UpdateAvatarResponse.user:type_name -> identity.v1.User
+	2,  // 1: identity.v1.EnsureUserResponse.user:type_name -> identity.v1.User
+	2,  // 2: identity.v1.GetMeResponse.user:type_name -> identity.v1.User
+	2,  // 3: identity.v1.UpdateDisplayNameResponse.user:type_name -> identity.v1.User
+	2,  // 4: identity.v1.UpdateAvatarResponse.user:type_name -> identity.v1.User
 	0,  // 5: identity.v1.RegisterDeviceRequest.platform:type_name -> identity.v1.Platform
-	2,  // 6: identity.v1.RegisterDeviceResponse.device:type_name -> identity.v1.Device
-	2,  // 7: identity.v1.ListDevicesResponse.devices:type_name -> identity.v1.Device
-	2,  // 8: identity.v1.RevokeDeviceResponse.device:type_name -> identity.v1.Device
-	3,  // 9: identity.v1.IdentityService.EnsureUser:input_type -> identity.v1.EnsureUserRequest
-	5,  // 10: identity.v1.IdentityService.GetMe:input_type -> identity.v1.GetMeRequest
-	7,  // 11: identity.v1.IdentityService.UpdateDisplayName:input_type -> identity.v1.UpdateDisplayNameRequest
-	9,  // 12: identity.v1.IdentityService.UpdateAvatar:input_type -> identity.v1.UpdateAvatarRequest
-	11, // 13: identity.v1.IdentityService.RegisterDevice:input_type -> identity.v1.RegisterDeviceRequest
-	13, // 14: identity.v1.IdentityService.ListDevices:input_type -> identity.v1.ListDevicesRequest
-	15, // 15: identity.v1.IdentityService.RevokeDevice:input_type -> identity.v1.RevokeDeviceRequest
-	4,  // 16: identity.v1.IdentityService.EnsureUser:output_type -> identity.v1.EnsureUserResponse
-	6,  // 17: identity.v1.IdentityService.GetMe:output_type -> identity.v1.GetMeResponse
-	8,  // 18: identity.v1.IdentityService.UpdateDisplayName:output_type -> identity.v1.UpdateDisplayNameResponse
-	10, // 19: identity.v1.IdentityService.UpdateAvatar:output_type -> identity.v1.UpdateAvatarResponse
-	12, // 20: identity.v1.IdentityService.RegisterDevice:output_type -> identity.v1.RegisterDeviceResponse
-	14, // 21: identity.v1.IdentityService.ListDevices:output_type -> identity.v1.ListDevicesResponse
-	16, // 22: identity.v1.IdentityService.RevokeDevice:output_type -> identity.v1.RevokeDeviceResponse
-	16, // [16:23] is the sub-list for method output_type
-	9,  // [9:16] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	3,  // 6: identity.v1.RegisterDeviceResponse.device:type_name -> identity.v1.Device
+	3,  // 7: identity.v1.ListDevicesResponse.devices:type_name -> identity.v1.Device
+	3,  // 8: identity.v1.RevokeDeviceResponse.device:type_name -> identity.v1.Device
+	1,  // 9: identity.v1.RegisterNotificationEndpointRequest.environment:type_name -> identity.v1.APNsEnvironment
+	4,  // 10: identity.v1.IdentityService.EnsureUser:input_type -> identity.v1.EnsureUserRequest
+	6,  // 11: identity.v1.IdentityService.GetMe:input_type -> identity.v1.GetMeRequest
+	8,  // 12: identity.v1.IdentityService.UpdateDisplayName:input_type -> identity.v1.UpdateDisplayNameRequest
+	10, // 13: identity.v1.IdentityService.UpdateAvatar:input_type -> identity.v1.UpdateAvatarRequest
+	12, // 14: identity.v1.IdentityService.RegisterDevice:input_type -> identity.v1.RegisterDeviceRequest
+	14, // 15: identity.v1.IdentityService.ListDevices:input_type -> identity.v1.ListDevicesRequest
+	16, // 16: identity.v1.IdentityService.RevokeDevice:input_type -> identity.v1.RevokeDeviceRequest
+	18, // 17: identity.v1.IdentityService.RegisterNotificationEndpoint:input_type -> identity.v1.RegisterNotificationEndpointRequest
+	20, // 18: identity.v1.IdentityService.DeleteNotificationEndpoint:input_type -> identity.v1.DeleteNotificationEndpointRequest
+	5,  // 19: identity.v1.IdentityService.EnsureUser:output_type -> identity.v1.EnsureUserResponse
+	7,  // 20: identity.v1.IdentityService.GetMe:output_type -> identity.v1.GetMeResponse
+	9,  // 21: identity.v1.IdentityService.UpdateDisplayName:output_type -> identity.v1.UpdateDisplayNameResponse
+	11, // 22: identity.v1.IdentityService.UpdateAvatar:output_type -> identity.v1.UpdateAvatarResponse
+	13, // 23: identity.v1.IdentityService.RegisterDevice:output_type -> identity.v1.RegisterDeviceResponse
+	15, // 24: identity.v1.IdentityService.ListDevices:output_type -> identity.v1.ListDevicesResponse
+	17, // 25: identity.v1.IdentityService.RevokeDevice:output_type -> identity.v1.RevokeDeviceResponse
+	19, // 26: identity.v1.IdentityService.RegisterNotificationEndpoint:output_type -> identity.v1.RegisterNotificationEndpointResponse
+	21, // 27: identity.v1.IdentityService.DeleteNotificationEndpoint:output_type -> identity.v1.DeleteNotificationEndpointResponse
+	19, // [19:28] is the sub-list for method output_type
+	10, // [10:19] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_identity_v1_identity_proto_init() }
@@ -1041,8 +1293,8 @@ func file_identity_v1_identity_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_identity_v1_identity_proto_rawDesc), len(file_identity_v1_identity_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   16,
+			NumEnums:      2,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

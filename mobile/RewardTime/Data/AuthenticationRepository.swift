@@ -3,6 +3,8 @@ import Supabase
 
 extension Notification.Name {
   static let mobileAuthenticationChanged = Notification.Name("mobile.authentication.changed")
+  static let mobileAPNsTokenReceived = Notification.Name("mobile.apns.token.received")
+  static let mobileAPNsRegistrationFailed = Notification.Name("mobile.apns.registration.failed")
 }
 
 enum MobileAppConfiguration {

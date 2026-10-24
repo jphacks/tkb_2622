@@ -7,10 +7,28 @@ import UserNotifications
 private final class NotificationSettingsViewModel: ObservableObject {
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var isRequesting = false
+    @Published private(set) var apiStatusMessage = "サーバー登録を確認中です。"
 
     func refresh() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
+        if isAllowed {
+            if let token = UserDefaults.standard.string(forKey: "mobile.apns.token"), !token.isEmpty {
+                await register(token: token)
+            } else {
+                UIApplication.shared.registerForRemoteNotifications()
+                apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
+            }
+        } else if authorizationStatus == .denied {
+            do {
+                try await ConfiguredNotificationEndpointRepository().delete()
+                apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
+            } catch {
+                apiStatusMessage = "サーバーの通知先を更新できません。ログイン状態と接続先を確認してください。"
+            }
+        } else {
+            apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
+        }
     }
 
     func requestAuthorization() async {
@@ -19,6 +37,24 @@ private final class NotificationSettingsViewModel: ObservableObject {
         defer { isRequesting = false }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
         await refresh()
+    }
+
+    func register(token: String) async {
+        #if DEBUG
+        let environment = "development"
+        #else
+        let environment = "production"
+        #endif
+        do {
+            try await ConfiguredNotificationEndpointRepository().register(token: token, environment: environment)
+            apiStatusMessage = "通知先をサーバーに登録しました。配信にはサーバー側のAPNs設定が必要です。"
+        } catch {
+            apiStatusMessage = "通知先をサーバーに登録できません。ログイン状態と接続先を確認してください。"
+        }
+    }
+
+    func apnsRegistrationFailed() {
+        apiStatusMessage = "Appleの通知サービスへ登録できません。アプリの署名設定を確認してください。"
     }
 
     var title: String {
@@ -70,7 +106,11 @@ struct NotificationSettingsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
 
-                Text("アプリのお知らせ配信は準備中です。")
+                Text("通知許可とiPhoneの通知先を同期し、グループの作業開始をお知らせします。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
+
+                Text(model.apiStatusMessage)
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
 
@@ -92,11 +132,29 @@ struct NotificationSettingsView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
+                } else if model.isAllowed {
+                    Button {
+                        Task { await model.refresh() }
+                    } label: {
+                        Label("通知先を再同期", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
 
         }
         .task { await model.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsTokenReceived)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await model.register(token: token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsRegistrationFailed)) { _ in
+            model.apnsRegistrationFailed()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await model.refresh() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
         }
