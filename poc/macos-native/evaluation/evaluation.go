@@ -13,7 +13,7 @@ import (
 
 const (
 	// EvaluatorVersion は評価規則の固定バージョンを示す。
-	EvaluatorVersion = "five-class-v1"
+	EvaluatorVersion = "five-class-v2"
 
 	ClassTask              = "T"
 	ClassRelatedTransition = "R"

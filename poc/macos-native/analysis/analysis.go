@@ -421,9 +421,18 @@ func sampleIntervals(left, right observationNode) []model.Interval {
 			continue
 		}
 		idleValues := unknownIdleThresholds()
+		segmentReasons := append([]string{}, reasons...)
 		if idleKnown {
 			midpoint := segmentStart.Add(segmentEnd.Sub(segmentStart) / 2)
 			idleValues = classifyIdleAt(midpoint, origin)
+		} else {
+			idleValues = boundedIdleThresholds(left.snapshot, right.snapshot, segmentEnd)
+			for _, value := range idleValues {
+				if value != nil {
+					segmentReasons = append(segmentReasons, "idle_threshold_bounded_by_elapsed_time")
+					break
+				}
+			}
 		}
 		intervals = append(intervals, model.Interval{
 			StartAt:           segmentStart,
@@ -433,10 +442,41 @@ func sampleIntervals(left, right observationNode) []model.Interval {
 			BrowserDomain:     cloneString(left.snapshot.BrowserDomain),
 			IdleOverThreshold: idleValues,
 			Quality:           qualitySampleEstimate,
-			Reasons:           uniqueSorted(reasons),
+			Reasons:           uniqueSorted(segmentReasons),
 		})
 	}
 	return intervals
+}
+
+// 入力でidle値がリセットされても，左観測から増え得る最大値が猶予未満なら
+// 区間全体の閾値未到達を確認できる。入力時刻の復元や欠測の補完はしない。
+func boundedIdleThresholds(left, right model.Snapshot, end time.Time) map[string]*bool {
+	values := unknownIdleThresholds()
+	if left.IdleSeconds == nil || right.IdleSeconds == nil ||
+		!finite(*left.IdleSeconds) || !finite(*right.IdleSeconds) ||
+		*left.IdleSeconds < 0 || *right.IdleSeconds < 0 ||
+		left.SampleStartedAt.IsZero() || left.IdleObservedAt.IsZero() || right.IdleObservedAt.IsZero() ||
+		left.SampleStartedAt.After(left.IdleObservedAt) ||
+		left.IdleObservedAt.After(left.ObservedAt) ||
+		right.IdleObservedAt.Before(left.IdleObservedAt) || right.IdleObservedAt.After(end) ||
+		end.Before(left.ObservedAt) {
+		return values
+	}
+	// idleの値はIdleObservedAtの記録より前に読むため，取得開始を起点にする。
+	// native時刻のミリ秒精度と数値丸めも安全側へ含める。
+	measurementEarliest := left.SampleStartedAt.Add(-time.Millisecond)
+	rightUpper := math.Nextafter(*left.IdleSeconds+right.IdleObservedAt.Sub(measurementEarliest).Seconds(), math.Inf(1))
+	upper := math.Nextafter(*left.IdleSeconds+end.Sub(measurementEarliest).Seconds(), math.Inf(1))
+	if !finite(upper) || !finite(rightUpper) || *right.IdleSeconds > rightUpper {
+		return values
+	}
+	for _, threshold := range idleThresholds {
+		if upper < float64(threshold) {
+			value := false
+			values[thresholdKey(threshold)] = &value
+		}
+	}
+	return values
 }
 
 func continuousIdleOrigin(left, right model.Snapshot) (time.Time, bool, string) {

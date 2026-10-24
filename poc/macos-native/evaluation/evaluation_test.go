@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"focuspocket/macos-native/analysis"
 	"focuspocket/macos-native/model"
 )
 
@@ -514,5 +515,47 @@ func TestRepeatedShortDistractionsRemainUnknownAndReduceCoverage(t *testing.T) {
 	}
 	if unknown.B != nil || unknown.Q == nil || *unknown.Q != 0 || unknown.WorkRate == nil || *unknown.WorkRate != 0 {
 		t.Fatalf("all unknown metrics not held: %+v", unknown)
+	}
+}
+
+func TestDistractionPersistsAcrossInputResetsInSameContext(t *testing.T) {
+	capture := model.Capture{SchemaVersion: model.SchemaVersion, Source: "macos-native", StartAt: evaluationTime(0), EndAt: evaluationTime(22), PollSeconds: 1}
+	appID, browser, domain := "com.google.Chrome", "Chrome", "example.com"
+	for second := 1; second <= 21; second++ {
+		at := evaluationTime(second)
+		idle := float64((second - 1) % 9)
+		capture.Snapshots = append(capture.Snapshots, model.Snapshot{SchemaVersion: model.SchemaVersion, Source: "macos-native", SampleStartedAt: at.Add(-time.Millisecond * 100), ObservedAt: at, ReceivedAt: at.Add(time.Millisecond * 10), IdleObservedAt: at, IdleSeconds: &idle, AppID: &appID, BrowserName: &browser, BrowserDomain: &domain, BrowserStatus: "ok"})
+	}
+	session := evaluationSession(Rule{AppID: appID, Domain: domain, Class: RuleDistraction})
+	result, err := Evaluate(session, analysis.Analyze(capture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Totals.D != 20 || result.Totals.U != 2 || result.B == nil || *result.B != 0 {
+		t.Fatalf("input resets broke continuous context: %+v", result)
+	}
+	for _, fail := range []struct {
+		name  string
+		alter func(*model.Capture)
+	}{
+		{"failure", func(c *model.Capture) {
+			c.Errors = []model.Failure{{ReceivedAt: evaluationTime(11), Reason: "fixture_failure"}}
+		}},
+		{"domain change", func(c *model.Capture) { other := "other.example"; c.Snapshots[10].BrowserDomain = &other }},
+		{"missing idle", func(c *model.Capture) { c.Snapshots[10].IdleSeconds = nil }},
+		{"stale gap", func(c *model.Capture) { c.Snapshots = append(c.Snapshots[:8:8], c.Snapshots[12:]...) }},
+	} {
+		t.Run(fail.name, func(t *testing.T) {
+			copyCapture := capture
+			copyCapture.Snapshots = append([]model.Snapshot{}, capture.Snapshots...)
+			fail.alter(&copyCapture)
+			changed, err := Evaluate(session, analysis.Analyze(copyCapture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if changed.Totals.D >= 20 || changed.Totals.U <= 2 {
+				t.Fatalf("uncertainty bridged: %+v", changed)
+			}
+		})
 	}
 }

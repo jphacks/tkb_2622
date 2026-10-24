@@ -229,9 +229,12 @@ func TestAnalyzeLeavesIdleUnknownAfterInputResumption(t *testing.T) {
 	second.IdleSeconds = floatPointer(5)
 	result := Analyze(testCapture(100, 110, first, second))
 	interval := intervalAt(t, result, 100, 110)
-	for _, threshold := range idleThresholds {
-		if interval.IdleOverThreshold[thresholdKey(threshold)] != nil {
-			t.Errorf("idle threshold %d was guessed after input resumption: %#v", threshold, interval.IdleOverThreshold)
+	if interval.IdleOverThreshold["60"] != nil {
+		t.Fatal("60-second boundary was guessed across a long-idle reset")
+	}
+	for _, key := range []string{"180", "300"} {
+		if value := interval.IdleOverThreshold[key]; value == nil || *value {
+			t.Fatalf("provable upper bound below %s not retained: %#v", key, interval.IdleOverThreshold)
 		}
 	}
 	if !contains(interval.Reasons, "idle_continuity_unknown") {
@@ -475,5 +478,73 @@ func TestFailureAtIntervalStartIsUnknown(t *testing.T) {
 	a := Analyze(c)
 	if a.Report.SampledSeconds != 0 || a.Report.UnknownSeconds != 10 {
 		t.Fatal("failure boundary accepted as continuous observation")
+	}
+}
+
+func TestIdleResetRetainsOnlyProvableThresholds(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		idle        float64
+		unknownKeys []string
+	}{
+		{"short", 8, nil}, {"at sixty", 59, []string{"60"}},
+		{"at one eighty", 179, []string{"60", "180"}},
+		{"at three hundred", 299, []string{"60", "180", "300"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			left := testSnapshot(100, "com.example.editor", "", "not_applicable", "")
+			right := testSnapshot(101, "com.example.editor", "", "not_applicable", "")
+			left.IdleSeconds = floatPointer(test.idle)
+			right.IdleSeconds = floatPointer(0)
+			result := Analyze(testCapture(100, 101, left, right))
+			interval := intervalAt(t, result, 100, 101)
+			for _, key := range []string{"60", "180", "300"} {
+				unknown := contains(test.unknownKeys, key)
+				value := interval.IdleOverThreshold[key]
+				if unknown && value != nil || !unknown && (value == nil || *value) {
+					t.Fatalf("unexpected threshold %s: %#v", key, interval.IdleOverThreshold)
+				}
+			}
+		})
+	}
+}
+
+func TestIdleBoundRejectsMissingAndContradictoryMeasurements(t *testing.T) {
+	left := testSnapshot(100, "com.example.editor", "", "not_applicable", "")
+	left.IdleSeconds = floatPointer(1)
+	right := testSnapshot(101, "com.example.editor", "", "not_applicable", "")
+	right.IdleSeconds = floatPointer(0)
+	for _, test := range []struct {
+		name   string
+		mutate func(*model.Snapshot)
+	}{
+		{"missing", func(s *model.Snapshot) { s.IdleSeconds = nil }},
+		{"contradictory", func(s *model.Snapshot) { s.IdleSeconds = floatPointer(20) }},
+		{"reversed measurement", func(s *model.Snapshot) { s.IdleObservedAt = testTime(99) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := right
+			test.mutate(&changed)
+			for _, value := range boundedIdleThresholds(left, changed, testTime(101)) {
+				if value != nil {
+					t.Fatal("uncertain measurement received a known threshold")
+				}
+			}
+		})
+	}
+}
+
+func TestIdleBoundIncludesMeasurementLatency(t *testing.T) {
+	left := testSnapshot(100, "com.example.editor", "", "not_applicable", "")
+	left.SampleStartedAt = testTime(99)
+	left.IdleSeconds = floatPointer(58.5)
+	right := testSnapshot(101, "com.example.editor", "", "not_applicable", "")
+	right.IdleSeconds = floatPointer(0)
+	values := boundedIdleThresholds(left, right, testTime(101))
+	if values["60"] != nil {
+		t.Fatal("measurement latency made an uncertain 60-second boundary look known")
+	}
+	if values["180"] == nil || *values["180"] {
+		t.Fatal("a safe 180-second upper bound was lost")
 	}
 }
