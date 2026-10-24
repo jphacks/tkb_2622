@@ -1,23 +1,44 @@
 name: tkb-backend-local
 services:
+  postgres:
+    image: postgres:17.7-bookworm
+    environment:
+      POSTGRES_DB: tkb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local-migration-only
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./dev/postgres/001_roles.sql:/docker-entrypoint-initdb.d/001_roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tkb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   migrate:
     build: .
     image: tkb-backend:local
     command: ["/app/migrate", "up"]
     environment:
-      DB_DRIVER: sqlite
-      SQLITE_PATH: /data/app.db
-    volumes:
-      - sqlite-data:/data
+      MIGRATION_DATABASE_URL: postgres://postgres:local-migration-only@postgres:5432/tkb?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
   api:
     image: tkb-backend:local
     build: .
     environment:
       PORT: "8080"
+      DATABASE_URL: postgres://tkb_app:local-app-only@postgres:5432/tkb?sslmode=disable
+      SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:?Set SUPABASE_JWT_ISSUER}
+      SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
+      AUTH_ALLOW_LOCAL_HTTP: ${AUTH_ALLOW_LOCAL_HTTP:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
 volumes:
-  sqlite-data:
+  postgres-data:
+# The legacy tkb-backend-local_sqlite-data volume is intentionally not removed.

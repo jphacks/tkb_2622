@@ -26,12 +26,12 @@ func run(logger *slog.Logger) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	db, err := database.Open(ctx)
+	db, err := database.OpenURL(ctx, os.Getenv("MIGRATION_DATABASE_URL"))
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrations.Files)
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files)
 	if err != nil {
 		return errors.New("migration provider initialization failed")
 	}
