@@ -88,8 +88,13 @@ struct APIHomeRepository: HomeRepository {
     private let client: ConnectJSONClient
     private let selectedApplicationCount: Int
 
-    init(baseURL: URL, auth: any AccessTokenProviding, selectedApplicationCount: Int) {
-        client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
+    init(
+        baseURL: URL,
+        auth: any AccessTokenProviding,
+        selectedApplicationCount: Int,
+        session: URLSession = .shared
+    ) {
+        client = ConnectJSONClient(baseURL: baseURL, session: session, tokenProvider: auth)
         self.selectedApplicationCount = selectedApplicationCount
     }
 
