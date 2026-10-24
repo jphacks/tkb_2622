@@ -54,7 +54,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
         await refresh(forceRegistration: true, isAuthenticated: isAuthenticated)
     }
 
-    func register(token: String, force: Bool = true, isAuthenticated: Bool) async {
+    func register(token: String, force: Bool = false, isAuthenticated: Bool) async {
         let action = NotificationEndpointSyncPolicy.resolve(
             isAuthenticated: isAuthenticated
                 && MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
@@ -222,19 +222,19 @@ struct NotificationSettingsView: View {
         .task { await model.refresh(isAuthenticated: isAuthenticated) }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsTokenReceived)) { notification in
             guard let token = notification.object as? String else { return }
-            Task { await model.register(token: token, force: true, isAuthenticated: isAuthenticated) }
+            Task { await model.register(token: token, isAuthenticated: isAuthenticated) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsRegistrationFailed)) { _ in
             model.apnsRegistrationFailed()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-            Task { await model.refresh(forceRegistration: true, isAuthenticated: isAuthenticated) }
+            Task { await model.refresh(isAuthenticated: isAuthenticated) }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh(isAuthenticated: isAuthenticated) } }
         }
         .onChange(of: isAuthenticated) { _, authenticated in
-            Task { await model.refresh(forceRegistration: true, isAuthenticated: authenticated) }
+            Task { await model.refresh(isAuthenticated: authenticated) }
         }
         .navigationTitle("通知")
         .navigationBarTitleDisplayMode(.inline)
