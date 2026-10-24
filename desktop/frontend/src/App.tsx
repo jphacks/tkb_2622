@@ -26,6 +26,12 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
     const size = page !== 'session' ? [1080, 780] : showStartup ? [440, active ? 490 : 280] : active ? [360, 500] : [360, 580];
     void import('../wailsjs/runtime/runtime').then(runtime => runtime.WindowSetSize(size[0], size[1]));
   }, [page, showStartup, view.snapshot?.platform, view.snapshot?.session?.status]);
+  useEffect(() => {
+    if (view.snapshot && view.snapshot.settings.tasks.length === 0) {
+      setPage('settings');
+      setShowStartup(false);
+    }
+  }, [view.snapshot?.settings.tasks.length]);
   const { snapshot: state, busy, error } = view;
   if (!state) return <div className="startup-message" role="status"><h1>Focus Link</h1><p>{error || '作業スペースを準備しています…'}</p>{error && <button className="button" onClick={() => void store.connect()}>接続を再試行</button>}</div>;
   if (state.platform === 'unsupported') return <div className="startup-message">このOSは対応していません。</div>;
@@ -50,7 +56,7 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
       }
     }
     return updated;
-  }, onNavigate: (next: 'feedback' | 'history' | 'settings') => setPage(next) };
+  }, requestEmailOTP: (email: string) => store.requestEmailOTP(email), verifyEmailOTP: (email: string, code: string) => store.verifyEmailOTP(email, code), signOut: () => store.signOut(), refreshAccount: () => store.connect(), onNavigate: (next: 'feedback' | 'history' | 'settings') => setPage(next) };
   const active = state.session && ['RUNNING', 'PAUSED'].includes(state.session.status);
   const content = page === 'session' ? (showStartup ? <StartupPage {...props} onLater={() => setShowStartup(false)} onStarted={() => setShowStartup(false)} onResumed={() => setShowStartup(false)} /> : <SessionPage {...props} />) : page === 'feedback' ? <FeedbackPage result={selectedResult ?? state.result} mode={state.mode} /> : page === 'history' ? <HistoryPage history={state.history} onSelect={result => { setSelectedResult(result); setPage('feedback'); }} /> : <SettingsPage {...props} />;
   const openMain = page !== 'session';

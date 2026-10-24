@@ -3,14 +3,24 @@ import type { Command, SessionAction, Snapshot } from '../bridge/types';
 import { clock, duration, minimumDuration, plannedDuration } from '../components/format';
 
 export const statusLabels: Record<string, string> = { RUNNING: '作業中', PAUSED: '一時停止中', FINALIZED: '作業終了', ABORTED: '中止済み', COMPLETED_LOCAL: '終了・同期待ち', ABORTED_LOCAL: '中止・同期待ち' };
-export interface PageProps { state: Snapshot; busy: boolean; execute: (command: Command) => Promise<Snapshot | null>; onNavigate?: (page: 'feedback' | 'history' | 'settings') => void }
+export interface PageProps {
+  state: Snapshot;
+  busy: boolean;
+  execute: (command: Command) => Promise<Snapshot | null>;
+  requestEmailOTP: (email: string) => Promise<Snapshot | null>;
+  verifyEmailOTP: (email: string, code: string) => Promise<Snapshot | null>;
+  signOut: () => Promise<Snapshot | null>;
+  refreshAccount: () => Promise<void>;
+  onNavigate?: (page: 'feedback' | 'history' | 'settings') => void;
+}
 
 export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
   const [name, setName] = useState('');
   const [choosingTask, setChoosingTask] = useState(false);
   const session = state.session;
   const active = session && ['RUNNING', 'PAUSED'].includes(session.status);
-  const task = active ? session.task : state.settings.tasks.find(item => item.id === state.settings.selectedTaskId)!;
+  const task = active ? session.task : state.settings.tasks.find(item => item.id === state.settings.selectedTaskId) ?? state.settings.tasks[0];
+  if (!task) return <section className="session-panel start-panel"><h1>タスクがありません</h1><p>設定から最初のタスクを作成してください。</p><button className="button primary" onClick={() => onNavigate?.('settings')}>設定を開く</button></section>;
   const elapsed = session?.elapsedSeconds ?? 0;
   const canFinish = state.actions.finish.allowed;
   const monitor = state.monitor ?? { state: 'unavailable', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
