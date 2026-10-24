@@ -237,11 +237,7 @@ struct ConfiguredHomeRepository: HomeRepository {
         let apiBaseURLText = defaults.string(forKey: "mobile.api.baseURL") ?? "http://127.0.0.1:8080"
 
         if projectURLText.isEmpty && publishableKey.isEmpty {
-#if DEBUG
-            return try await MockHomeRepository().fetchCurrentSnapshot()
-#else
             throw HomeRepositoryConfigurationError.missingConfiguration
-#endif
         }
 
         guard let projectURL = Self.validatedURL(projectURLText),
@@ -273,7 +269,16 @@ struct ConfiguredHomeRepository: HomeRepository {
     }
 }
 
-private enum HomeRepositoryConfigurationError: Error {
+private enum HomeRepositoryConfigurationError: LocalizedError {
     case missingConfiguration
     case invalidConfiguration
+
+    var errorDescription: String? {
+        switch self {
+        case .missingConfiguration:
+            "設定タブでSupabase Project URL・公開用キー・API URLを設定し、ログインしてください。"
+        case .invalidConfiguration:
+            "設定タブのSupabase接続情報とAPI URLを確認してください。"
+        }
+    }
 }

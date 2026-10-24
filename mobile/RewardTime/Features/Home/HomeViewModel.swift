@@ -6,7 +6,7 @@ final class HomeViewModel: ObservableObject {
     enum State {
         case loading
         case loaded(MobileHomeSnapshot)
-        case failed
+        case failed(String)
     }
 
     @Published private(set) var state: State = .loading
@@ -33,7 +33,8 @@ final class HomeViewModel: ObservableObject {
         do {
             state = .loaded(try await repository.fetchCurrentSnapshot())
         } catch {
-            state = .failed
+            state = .failed((error as? LocalizedError)?.errorDescription
+                ?? "APIへ接続できません。通信状態とAPI設定を確認してください。")
         }
     }
 
@@ -42,6 +43,6 @@ final class HomeViewModel: ObservableObject {
     }
 
     func showFailurePreview() {
-        state = .failed
+        state = .failed("開発用の通信エラー表示です。")
     }
 }

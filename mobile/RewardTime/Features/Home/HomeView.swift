@@ -29,8 +29,8 @@ struct HomeView: View {
                 restrictedAppsCard(snapshot)
                 restrictionStateCard(snapshot)
                 breakAction(snapshot)
-            case .failed:
-                errorCard
+            case .failed(let message):
+                errorCard(message: message)
             }
 
 #if DEBUG
@@ -352,11 +352,11 @@ struct HomeView: View {
         }
     }
 
-    private var errorCard: some View {
+    private func errorCard(message: String) -> some View {
         SurfaceCard {
             Label("状態を読み込めませんでした", systemImage: "wifi.exclamationmark")
                 .font(.headline)
-            Text("接続状態を確認して、もう一度お試しください。")
+            Text(message)
                 .font(.footnote)
                 .foregroundStyle(AppTheme.secondaryInk)
             Button("再読み込み") {
