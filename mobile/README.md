@@ -21,7 +21,7 @@
 
 ## 依存の境界
 
-標準のSwift / SwiftUIとFoundationを使い、外部パッケージを追加しない。
+標準のSwift / SwiftUIとFoundationを基本にする。iOS段階1のメールOTP認証にはSupabase公式Swift SDKを使う。その他のAPI通信は引き続き`URLSession + Codable`とし、追加パッケージを増やさない。
 
 ```text
 SwiftUI画面
@@ -51,9 +51,13 @@ HomeRepository（ホーム情報取得の境界）
 | 13 グループ | `Features/Groups/GroupView.swift`。サンプルメンバーと作業開始履歴を表示。招待・退出は未接続 |
 | 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く通知例。通知送信はしない |
 
-08モックの「作業を終了した後も残高を使える」ように読める箇所は、API仕様に合わせて「一時停止中のみ利用枠を確保できる」表示にしている。終了・中止時は未使用残高を破棄する。09の実ShieldはiOSが表示するOS画面であり、FamilyControls未接続の現状ではアプリから適用できない。Debugビルドから開けるのは静的な見た目のプレビューだけ。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進め、10から11のサンプル表示を開ける。履歴タブは08モック内にタブ表示があるため置いているが、専用モックと履歴APIがないため説明用の空状態にしている。
+08モックの「作業を終了した後も残高を使える」ように読める箇所は、API仕様に合わせて「一時停止中のみ利用枠を確保できる」表示にしている。終了・中止時は未使用残高を破棄する。09の実ShieldはiOSが表示するOS画面であり、FamilyControls未接続の現状ではアプリから適用できない。Debugビルドから開けるのは静的な見た目のプレビューだけ。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進め、10から11のサンプル表示を開ける。同じ選択メニューの「通信エラー」で失敗表示と再読み込み導線を確認できるが、実際の通信は発生しない。履歴タブは08モック内にタブ表示があるため置いているが、専用モックと履歴APIがないため説明用の空状態にしている。
 
-次はAPI仕様で取得契約が確定した範囲から通信実装へ置き換える。現在はヘルスチェック以外の業務APIがなく、認証とproto契約も未確定のため、残高消費、認証、OS制限、通知配信、グループ更新、履歴取得は接続していない。
+backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。Debug設定画面にSupabase Project URL、publishable/anon key、Connect API URLを入力すると、OTP認証後に`EnsureUser`と`GetMe`を呼び出せる。Supabase URL・キー・OTPメール設定、staging JWT検証は利用者のプロジェクト設定が必要で、まだ接続確認していない。Swift DTOのproto JSON対応・更新責任も未決（詳細は[開発フロー](../docs/spec/6.iOSクライアント開発フロー.md)）。そのためホームを含む業務データは引き続き`MockHomeRepository`から表示し、残高消費、OS制限、通知配信、グループ更新、履歴取得は実APIへ接続していない。
+
+認証の確認はSimulatorまたは実機でアプリの「設定」タブを開き、「アカウント接続」にProject URL、公開用キー、Connect API URLを入力する。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可する。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。実機でMac上のAPIに接続する場合は、API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
+
+Debugビルドのホームから「backendヘルスチェック」を開くと、指定URLの`GET /healthz`を確認できる。SimulatorからMac上のローカルbackendを確認する場合は既定値`http://127.0.0.1:8080`を使用する。iPhone実機から確認する場合、backendのComposeはポートを`127.0.0.1`にのみ公開しているため現状のままでは接続できない。Debug構成だけローカルネットワーク接続を許可し、Release構成のATS設定は変更していない。ヘルスチェックは認証や業務データの読み書きを行わず、実API疎通を完了したことにはならない。
 
 ## ソース構成
 
@@ -70,7 +74,7 @@ mobile/
         ├── Home/HomeView.swift, HomeViewModel.swift
         ├── Usage/UsageReservationView.swift
         ├── Restriction/RestrictionShieldPreview.swift
-        ├── Settings/SettingsView.swift
+        ├── Settings/SettingsView.swift, AuthenticationSettingsSection.swift
         ├── Groups/GroupView.swift
         ├── Notifications/NotificationExamplesView.swift
         └── History/HistoryView.swift
@@ -85,6 +89,7 @@ xcodebuild \
   -project mobile/ios-reward-time.xcodeproj \
   -scheme RewardTime \
   -destination 'generic/platform=iOS Simulator' \
+  -clonedSourcePackagesDirPath /private/tmp/tkb2622-supabase-packages \
   -derivedDataPath /private/tmp/tkb2622-mobile-deriveddata \
   CODE_SIGNING_ALLOWED=NO \
   build
@@ -100,4 +105,4 @@ xcodebuild \
 
 ## 未決事項
 
-認証サービス、利用時間の計測・同期、制限モード、解除失敗時の返還、対応OS・配布条件は [`docs/spec/3.API仕様書.md`](../docs/spec/3.API仕様書.md) と要件資料の未決事項に従う。これらをmobile側だけで確定しない。
+認証はiOS段階1でメールOTP・Supabase公式Swift SDKを選択した。OTPテンプレート／SMTP、環境別プロジェクト設定、stagingでのJWT検証、401時の再認証と停止アカウント表示は未確認。利用時間の計測・同期、制限モード、解除失敗時の返還、対応OS・配布条件も [`docs/spec/3.API仕様書.md`](../docs/spec/3.API仕様書.md) と要件資料の未決事項に従う。これらをmobile側だけで確定しない。

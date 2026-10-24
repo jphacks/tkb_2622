@@ -7,6 +7,10 @@ struct SettingsView: View {
         ScreenContainer {
             SampleNotice(title: "設定画面案・端末設定未接続")
 
+            #if DEBUG
+            AuthenticationSettingsSection()
+            #endif
+
             SurfaceCard {
                 sectionTitle("スクリーンタイム", icon: "hourglass")
                 HStack {

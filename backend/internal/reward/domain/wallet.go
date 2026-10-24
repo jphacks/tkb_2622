@@ -3,11 +3,11 @@ package domain
 import "errors"
 
 var (
-	ErrNegativeBalance     = errors.New("reward balance cannot be negative")
-	ErrNegativeCredit      = errors.New("credit seconds cannot be negative")
-	ErrInvalidReservation  = errors.New("reservation seconds must be positive")
+	ErrNegativeBalance    = errors.New("reward balance cannot be negative")
+	ErrNegativeCredit     = errors.New("credit seconds cannot be negative")
+	ErrInvalidReservation = errors.New("reservation seconds must be positive")
 	ErrInsufficientBalance = ErrInsufficient
-	ErrBalanceOverflow     = errors.New("reward balance overflow")
+	ErrBalanceOverflow    = errors.New("reward balance overflow")
 )
 
 // NewWallet restores a wallet from a persisted balance.

@@ -60,12 +60,19 @@ struct HomeView: View {
                 Button("10 一時停止中") { viewModel.showPreview(.pausedSample) }
                 Button("11 小休憩中") { viewModel.showPreview(.releasedSample) }
                 Button("08 セッションなし") { viewModel.showPreview(.noSessionSample) }
+                Button("通信エラー") { viewModel.showFailurePreview() }
             }
             .font(.subheadline.weight(.semibold))
             NavigationLink {
                 RestrictionShieldPreview()
             } label: {
                 Label("09 制限画面のプレビュー", systemImage: "lock.iphone")
+                    .font(.footnote.weight(.medium))
+            }
+            NavigationLink {
+                BackendHealthCheckView()
+            } label: {
+                Label("backendヘルスチェック", systemImage: "network")
                     .font(.footnote.weight(.medium))
             }
         }
