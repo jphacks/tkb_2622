@@ -6,6 +6,7 @@ final class MobileAPISyncCoordinator: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     func synchronize(
+        refreshHomeIfNeeded: Bool = true,
         usage: () async throws -> Void,
         refreshHome: () async throws -> Void
     ) async {
@@ -16,10 +17,12 @@ final class MobileAPISyncCoordinator: ObservableObject {
             firstError = error
         }
 
-        do {
-            try await refreshHome()
-        } catch {
-            if firstError == nil { firstError = error }
+        if refreshHomeIfNeeded {
+            do {
+                try await refreshHome()
+            } catch {
+                if firstError == nil { firstError = error }
+            }
         }
 
         if let firstError {

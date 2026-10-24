@@ -228,6 +228,7 @@ struct RootTabView: View {
   @MainActor
   private func synchronizeUsageGrant() async {
     await apiSync.synchronize(
+      refreshHomeIfNeeded: selectedTab != 0,
       usage: {
         let repository = try ConfiguredUsageGrantRepository()
         try await repository.synchronizeStoredActiveGrantIfPresent()

@@ -30,6 +30,22 @@ final class MobileAPISyncCoordinatorSimulatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.errorMessage, "GetCurrentSession (unavailable)")
     }
+
+    func testSkipsDuplicateRootHomeRefreshWhenHomeViewOwnsRefresh() async {
+        let coordinator = MobileAPISyncCoordinator()
+        var didSyncUsage = false
+        var didRefreshHome = false
+
+        await coordinator.synchronize(refreshHomeIfNeeded: false, usage: {
+            didSyncUsage = true
+        }, refreshHome: {
+            didRefreshHome = true
+        })
+
+        XCTAssertTrue(didSyncUsage)
+        XCTAssertFalse(didRefreshHome)
+        XCTAssertNil(coordinator.errorMessage)
+    }
 }
 
 private enum APISyncTestError: LocalizedError {
