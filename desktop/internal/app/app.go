@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ const (
 
 type App struct {
 	mu                 sync.Mutex
+	startMu            sync.Mutex
 	engine             *session.Engine
 	recorder           *monitor.Recorder
 	store              *stateStore
@@ -243,6 +246,12 @@ func (a *App) CaptureCurrentClassificationCandidate() (monitor.ClassificationCan
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "abortCloudSession" {
+		return a.abortCloudSessionFromUI()
+	}
+	if command.Action == "start" {
+		return a.startSession(command)
+	}
 	if command.Action == "abort" {
 		a.mu.Lock()
 		current := a.engine.Snapshot()
@@ -266,25 +275,17 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 	if command.Action == "saveSettings" {
 		return a.saveTaskSettings(command)
 	}
+	if command.Action == "abort" {
+		if state := a.abortServerSessionIfNeeded(); state != nil {
+			return *state
+		}
+	}
 	now := time.Now()
 	a.mu.Lock()
 	before := a.engine.Snapshot()
-	sessionID := ""
-	if before.Mode == "local-monitor" && command.Action == "start" {
-		generatedSessionID, err := monitor.NewSessionID()
-		if err != nil {
-			a.engine.SetFailure("session_id", "ローカル作業IDを作成できませんでした。", false, now)
-			state := a.engine.Snapshot()
-			a.mu.Unlock()
-			return state
-		}
-		sessionID = generatedSessionID
-	}
-	state := a.engine.ExecuteWithSessionID(command, sessionID, now)
+	state := a.engine.Execute(command, now)
 	if state.Failure == nil && state.Mode == "local-monitor" {
 		switch command.Action {
-		case "start":
-			a.startMonitoring(state, before, now)
 		case "pause":
 			a.pauseMonitoring(now)
 		case "resume":
@@ -304,23 +305,118 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 	return state
 }
 
-func (a *App) confirmAbort() (bool, error) {
-	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
-		Type:          wailsruntime.QuestionDialog,
-		Title:         "作業を中止しますか？",
-		Message:       "計測を停止します。報酬は付与されません。",
-		Buttons:       []string{"中止する", "作業に戻る"},
-		DefaultButton: "作業に戻る",
-		CancelButton:  "作業に戻る",
-	})
-	return result == "中止する", err
+func (a *App) startSession(command session.Command) session.Snapshot {
+	a.startMu.Lock()
+	defer a.startMu.Unlock()
+	if len([]rune(strings.TrimSpace(command.Name))) > 80 {
+		return a.failAction("invalid_input", "作業名は80文字以内で入力してください。", false)
+	}
+
+	now := time.Now()
+	a.mu.Lock()
+	before := a.engine.Snapshot()
+	if !before.Actions["start"].Allowed {
+		state := a.engine.Execute(command, now)
+		a.persistLocked(now)
+		state = a.engine.Snapshot()
+		a.mu.Unlock()
+		a.emitState(state)
+		return state
+	}
+	selected := session.Task{}
+	for _, task := range before.Settings.Tasks {
+		if task.ID == before.Settings.SelectedTaskID {
+			selected = task
+			break
+		}
+	}
+	useCloud := before.Mode == "local-monitor" && before.Account.Status == "signedIn"
+	if useCloud && (selected.ID == "" || selected.Version < 1) {
+		a.engine.SetFailure("task_unavailable", "開始するタスクをサーバーから再読み込みしてください。", true, now)
+		state := a.engine.Snapshot()
+		a.mu.Unlock()
+		a.emitState(state)
+		return state
+	}
+	a.mu.Unlock()
+
+	var cloudSession *cloud.Session
+	sessionID := ""
+	if useCloud {
+		started, err := a.startCloudSession(selected)
+		if err != nil {
+			a.refreshCurrentCloudSession()
+			return a.failAction("session_start", "サーバーで作業を開始できませんでした: "+err.Error(), true)
+		}
+		cloudSession = &started
+		sessionID = started.ID
+	} else {
+		generated, err := monitor.NewSessionID()
+		if err != nil {
+			return a.failAction("session_id", "ローカル作業IDを作成できませんでした。", false)
+		}
+		sessionID = generated
+	}
+
+	now = time.Now()
+	a.mu.Lock()
+	current := a.engine.Snapshot()
+	selectedStillCurrent := current.Settings.SelectedTaskID == selected.ID && reflect.DeepEqual(current.Settings.Classifications, before.Settings.Classifications)
+	if useCloud {
+		selectedStillCurrent = selectedStillCurrent && current.Account.Status == "signedIn"
+		found := false
+		for _, task := range current.Settings.Tasks {
+			if task.ID == selected.ID {
+				selectedStillCurrent = selectedStillCurrent && task.Version == selected.Version
+				found = true
+				break
+			}
+		}
+		selectedStillCurrent = selectedStillCurrent && found
+	}
+	if !current.Actions["start"].Allowed || !selectedStillCurrent {
+		a.mu.Unlock()
+		if cloudSession != nil {
+			if err := a.abortCloudSession(*cloudSession); err != nil {
+				return a.failOrphanedCloudStart(*cloudSession, err)
+			}
+		}
+		return a.failAction("session_start_state_changed", "開始中に状態が変わりました。状態を確認してから再度お試しください。", true)
+	}
+	state := a.engine.ExecuteWithSessionID(command, sessionID, now)
+	var startErr error
+	if state.Failure == nil && state.Mode == "local-monitor" {
+		if cloudSession != nil {
+			task := selected
+			task.Name = cloudSession.TaskSettings.Name
+			task.Category = cloudSession.TaskSettings.Category
+			task.Mode = cloudSession.TaskSettings.Mode
+			task.PlannedSeconds = int(cloudSession.TaskSettings.PlannedSeconds)
+			task.MinimumSeconds = int(cloudSession.TaskSettings.MinimumSeconds)
+			a.engine.SetServerSession(cloudSession.ID, task, cloudSession.Version, now)
+			state = a.engine.Snapshot()
+		}
+		startErr = a.startMonitoring(state, before, now)
+	} else if state.Failure != nil && cloudSession != nil {
+		startErr = errors.New(state.Failure.Message)
+	}
+	a.persistLocked(now)
+	state = a.engine.Snapshot()
+	a.mu.Unlock()
+	if startErr != nil && cloudSession != nil {
+		if err := a.abortCloudSession(*cloudSession); err != nil {
+			return a.failOrphanedCloudStart(*cloudSession, err)
+		}
+	}
+	a.emitState(state)
+	return state
 }
 
-func (a *App) startMonitoring(state, before session.Snapshot, now time.Time) {
+func (a *App) startMonitoring(state, before session.Snapshot, now time.Time) error {
 	if a.recorder == nil || state.Session == nil {
 		a.engine.Restore(before, now)
 		a.engine.SetFailure("monitor_unavailable", "macOS計測ヘルパーを利用できません。", false, now)
-		return
+		return errors.New("macOS計測ヘルパーを利用できません")
 	}
 	status, err := a.recorder.Start(a.context(), state.Session.ID)
 	if err != nil && status.State == "running" {
@@ -334,7 +430,87 @@ func (a *App) startMonitoring(state, before session.Snapshot, now time.Time) {
 		a.engine.Restore(before, now)
 		a.engine.SetMonitor(toSessionMonitor(status), now)
 		a.engine.SetFailure("monitor_start", status.Message, true, now)
+		return err
 	}
+	return nil
+}
+
+func (a *App) failAction(code, message string, retryable bool) session.Snapshot {
+	a.mu.Lock()
+	now := time.Now()
+	a.engine.SetFailure(code, message, retryable, now)
+	a.persistLocked(now)
+	state := a.engine.Snapshot()
+	a.mu.Unlock()
+	a.emitState(state)
+	return state
+}
+
+func (a *App) failOrphanedCloudStart(started cloud.Session, cause error) session.Snapshot {
+	a.mu.Lock()
+	now := time.Now()
+	a.engine.SetCloudSession(&session.CloudSession{
+		ID: started.ID, TaskID: started.TaskID, Name: started.TaskSettings.Name,
+		Status: started.Status, Version: started.Version,
+		OwnedByThisDevice: true,
+		Message:           "このMacで計測を開始できず、サーバー側セッションも中止できませんでした。設定から再接続してください。",
+	}, now)
+	a.engine.SetFailure("session_compensation", "ローカル計測を開始できませんでした。サーバー側の中止にも失敗しました: "+cause.Error(), true, now)
+	a.persistLocked(now)
+	state := a.engine.Snapshot()
+	a.mu.Unlock()
+	a.emitState(state)
+	return state
+}
+
+func (a *App) emitState(state session.Snapshot) {
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
+	}
+}
+
+func (a *App) confirmAbort() (bool, error) {
+	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
+		Type:          wailsruntime.QuestionDialog,
+		Title:         "作業を中止しますか？",
+		Message:       "作業を中止します。未使用の報酬は破棄され、報酬は付与されません。",
+		Buttons:       []string{"中止する", "作業に戻る"},
+		DefaultButton: "作業に戻る",
+		CancelButton:  "作業に戻る",
+	})
+	return result == "中止する", err
+}
+
+func (a *App) abortCloudSessionFromUI() session.Snapshot {
+	state := a.snapshot()
+	if state.CloudSession == nil || !state.CloudSession.OwnedByThisDevice || state.Session != nil && state.Session.ID == state.CloudSession.ID {
+		return a.failAction("cloud_abort_unavailable", "このサーバーセッションはこの操作から中止できません。", false)
+	}
+	confirmed, err := a.confirmAbort()
+	if err != nil {
+		return a.failAction("abort_confirmation", "中止の確認を表示できませんでした。もう一度お試しください。", true)
+	}
+	if !confirmed {
+		return state
+	}
+	current := cloud.Session{
+		ID: state.CloudSession.ID, TaskID: state.CloudSession.TaskID,
+		Status: state.CloudSession.Status, Version: state.CloudSession.Version,
+	}
+	if err := a.abortCloudSession(current); err != nil {
+		a.refreshCurrentCloudSession()
+		return a.failAction("session_abort", "サーバー上の作業を中止できませんでした: "+err.Error(), true)
+	}
+	a.mu.Lock()
+	latest := a.engine.Snapshot()
+	if latest.CloudSession != nil && latest.CloudSession.ID == current.ID {
+		a.engine.SetCloudSession(nil, time.Now())
+		a.persistLocked(time.Now())
+	}
+	state = a.engine.Snapshot()
+	a.mu.Unlock()
+	a.emitState(state)
+	return state
 }
 
 func (a *App) pauseMonitoring(now time.Time) {

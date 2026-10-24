@@ -129,6 +129,31 @@ func (e *Engine) SetMonitor(status MonitorStatus, now time.Time) {
 	e.touch(now)
 }
 
+func (e *Engine) SetServerSession(id string, task Task, version int64, now time.Time) bool {
+	if e.state.Session == nil || e.state.Session.ID != id || version < 0 {
+		return false
+	}
+	e.state.Session.ServerVersion = version
+	if task.ID != "" {
+		e.state.Session.Task = task
+	}
+	if e.state.Session.Name == "" {
+		e.state.Session.Name = task.Name
+	}
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) SetCloudSession(current *CloudSession, now time.Time) {
+	if current == nil {
+		e.state.CloudSession = nil
+	} else {
+		copy := *current
+		e.state.CloudSession = &copy
+	}
+	e.touch(now)
+}
+
 func (e *Engine) SetFailure(code, message string, retryable bool, now time.Time) {
 	e.fail(code, message, retryable)
 	e.touch(now)
@@ -450,16 +475,21 @@ func (e *Engine) updateActions() {
 	s := e.state.Session
 	active := s != nil && (s.Status == "RUNNING" || s.Status == "PAUSED")
 	available := s == nil || terminal(s.Status)
+	cloudManaged := s != nil && s.ServerVersion > 0
+	cloudRecovery := e.state.CloudSession != nil
 	monitorReady := e.state.Mode != "local-monitor" || e.state.Monitor.State == "ready" || e.state.Monitor.State == "finished" || e.state.Monitor.State == "aborted"
 	monitorCanResume := e.state.Mode != "local-monitor" || e.state.Monitor.State == "paused" || e.state.Monitor.State == "ready"
 	storageReady := e.state.Mode != "local-monitor" || e.localStorageReady
 	rules := map[string]bool{
-		"start":  available && monitorReady && storageReady && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
-		"pause":  active && s.Status == "RUNNING",
-		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && (e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
-		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds,
-		"abort":  active,
+		"start":  available && monitorReady && storageReady && !cloudRecovery && e.state.Account.Status != "error" && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
+		"pause":  active && s.Status == "RUNNING" && !cloudManaged,
+		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && !cloudManaged && (e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
+		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds && !cloudManaged,
+		"abort":  active && (e.state.CloudSession == nil || e.state.CloudSession.ID != s.ID || e.state.CloudSession.OwnedByThisDevice),
 		"retry":  e.state.Mode != "local-monitor" && e.state.Sync != "synced",
+	}
+	if !active && cloudRecovery {
+		rules["abort"] = e.state.CloudSession.OwnedByThisDevice
 	}
 	e.state.Actions = map[string]Capability{}
 	for action, allowed := range rules {
@@ -482,6 +512,20 @@ func (e *Engine) updateActions() {
 	if !rules["start"] && e.state.Mode == "local-monitor" && !storageReady {
 		e.state.Actions["start"] = Capability{Reason: "作業状態を保存できません。保存先の権限を確認してください。"}
 	}
+	if !rules["start"] && cloudRecovery {
+		e.state.Actions["start"] = Capability{Reason: "サーバーに未終了の作業があります。状態を確認してから開始してください。"}
+	}
+	if !rules["start"] && e.state.Account.Status == "error" {
+		e.state.Actions["start"] = Capability{Reason: "ログイン状態を確認できません。設定から再接続してください。"}
+	}
+	if cloudManaged && active {
+		message := "ログイン中セッションの一時停止・再開・通常終了は、API接続後に利用できます。中止は利用できます。"
+		for _, action := range []string{"pause", "resume", "finish"} {
+			if !rules[action] {
+				e.state.Actions[action] = Capability{Reason: message}
+			}
+		}
+	}
 	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !storageReady {
 		e.state.Actions["resume"] = Capability{Reason: "作業状態を保存できないため再開できません。保存先の権限を確認してください。"}
 	}
@@ -495,7 +539,7 @@ func (e *Engine) updateActions() {
 	if !rules["start"] && e.state.Permission == "denied" {
 		e.state.Actions["start"] = Capability{Reason: "計測権限が拒否されています。設定を確認してください。"}
 	}
-	if active && !rules["finish"] {
+	if active && !rules["finish"] && !cloudManaged {
 		e.state.Actions["finish"] = Capability{Reason: "最小作業時間に達していません。"}
 	}
 }

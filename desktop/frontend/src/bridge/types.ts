@@ -1,7 +1,8 @@
 export type Platform = 'macos' | 'windows' | 'unsupported';
 export type SessionStatus = 'RUNNING' | 'PAUSED' | 'FINALIZED' | 'ABORTED' | 'COMPLETED_LOCAL' | 'ABORTED_LOCAL';
 export interface Task { id: string; name: string; category?: string; mode?: string; plannedSeconds: number; minimumSeconds: number; version?: number; pendingOperationId?: string; pendingSettingsHash?: string }
-export interface WorkSession { id: string; name: string; status: SessionStatus; task: Task; classifications?: Classification[]; rulesVersion?: string; elapsedSeconds: number; evaluation: 'pending' | 'complete' | 'failed' }
+export interface WorkSession { id: string; name: string; status: SessionStatus; task: Task; serverVersion?: number; classifications?: Classification[]; rulesVersion?: string; elapsedSeconds: number; evaluation: 'pending' | 'complete' | 'failed' }
+export interface CloudSession { id: string; taskId: string; name: string; status: string; version: number; ownedByThisDevice: boolean; message: string }
 export interface Capability { allowed: boolean; reason: string }
 export interface Failure { code: string; message: string; retryable: boolean }
 export interface AccountState { status: 'unconfigured' | 'storageUnavailable' | 'signedOut' | 'otpPending' | 'signedIn' | 'error' | 'demo'; email: string; deviceRegistered: boolean; message: string }
@@ -13,7 +14,7 @@ export interface Result { sessionId: string; name: string; status: SessionStatus
 export type SessionAction = 'start' | 'pause' | 'resume' | 'finish' | 'abort' | 'retry';
 export interface Snapshot {
   revision: number; platform: Platform; mode: 'demo' | 'local-monitor'; updatedAt: string;
-  session: WorkSession | null; balanceSeconds: number | null;
+  session: WorkSession | null; cloudSession?: CloudSession | null; balanceSeconds: number | null;
   sync: 'synced' | 'pending' | 'failed'; permission: 'unknown' | 'denied'; online: boolean;
   monitor?: MonitorStatus;
   account?: AccountState;
@@ -23,6 +24,7 @@ export interface Snapshot {
 }
 export type Command =
   | { action: SessionAction; name?: string }
+  | { action: 'abortCloudSession' }
   | { action: 'scenario'; scenarioId: string }
   | { action: 'connection' }
   | { action: 'saveTask'; task: Task }

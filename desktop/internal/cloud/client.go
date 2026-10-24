@@ -37,6 +37,7 @@ type AuthSession struct {
 	RefreshToken        string    `json:"refreshToken"`
 	ExpiresAt           time.Time `json:"expiresAt"`
 	Email               string    `json:"email"`
+	PCDeviceID          string    `json:"pcDeviceId"`
 	EnsureOperationID   string    `json:"ensureOperationId"`
 	RegistrationID      string    `json:"registrationId"`
 	RegisterOperationID string    `json:"registerOperationId"`
@@ -54,6 +55,15 @@ type Task struct {
 	ID       string
 	Settings TaskSettings
 	Version  int64
+}
+
+type Session struct {
+	ID           string
+	DeviceID     string
+	TaskID       string
+	TaskSettings TaskSettings
+	Status       string
+	Version      int64
 }
 
 type Client struct {
@@ -236,10 +246,10 @@ func (c *Client) request(ctx context.Context, method string, endpoint *url.URL, 
 
 func responseError(status int, data []byte) error {
 	var apiError struct {
-		Code              string `json:"code"`
-		Message           string `json:"message"`
-		MessageShort      string `json:"msg"`
-		ErrorDescription  string `json:"error_description"`
+		Code             string `json:"code"`
+		Message          string `json:"message"`
+		MessageShort     string `json:"msg"`
+		ErrorDescription string `json:"error_description"`
 	}
 	_ = json.Unmarshal(data, &apiError)
 	message := strings.TrimSpace(apiError.Message)
@@ -314,19 +324,27 @@ func (c *Client) EnsureUser(ctx context.Context, session AuthSession) error {
 	return c.Connect(ctx, "identity.v1.IdentityService/EnsureUser", session.AccessToken, map[string]string{"operationId": session.EnsureOperationID}, &response)
 }
 
-func (c *Client) RegisterPCDevice(ctx context.Context, session AuthSession, platform, name string) error {
+func (c *Client) RegisterPCDevice(ctx context.Context, session AuthSession, platform, name string) (string, error) {
 	var response struct {
-		Device json.RawMessage `json:"device"`
+		Device struct {
+			ID string `json:"id"`
+		} `json:"device"`
 	}
 	platformName := map[string]string{"MACOS": "PLATFORM_MACOS", "WINDOWS": "PLATFORM_WINDOWS"}[platform]
 	if platformName == "" {
-		return errors.New("unsupported PC platform")
+		return "", errors.New("unsupported PC platform")
 	}
 	input := map[string]string{
 		"operationId": session.RegisterOperationID, "registrationId": session.RegistrationID,
 		"platform": platformName, "name": name,
 	}
-	return c.Connect(ctx, "identity.v1.IdentityService/RegisterDevice", session.AccessToken, input, &response)
+	if err := c.Connect(ctx, "identity.v1.IdentityService/RegisterDevice", session.AccessToken, input, &response); err != nil {
+		return "", err
+	}
+	if response.Device.ID == "" {
+		return "", errors.New("PC端末登録APIから端末IDが返りませんでした")
+	}
+	return response.Device.ID, nil
 }
 
 func (c *Client) ListTasks(ctx context.Context, session AuthSession) ([]Task, error) {
@@ -378,4 +396,92 @@ func (c *Client) UpdateTask(ctx context.Context, session AuthSession, taskID str
 		return Task{}, err
 	}
 	return taskFromMessage(response.Task), nil
+}
+
+type sessionMessage struct {
+	ID           string              `json:"id"`
+	DeviceID     string              `json:"deviceId"`
+	TaskID       string              `json:"taskId"`
+	TaskSnapshot taskSettingsMessage `json:"taskSnapshot"`
+	Status       string              `json:"status"`
+	Version      protoInt64          `json:"version"`
+}
+
+func sessionFromMessage(message sessionMessage) Session {
+	return Session{
+		ID: message.ID, DeviceID: message.DeviceID, TaskID: message.TaskID,
+		TaskSettings: TaskSettings{
+			Name:           message.TaskSnapshot.Name,
+			Category:       strings.TrimPrefix(message.TaskSnapshot.Category, "TASK_CATEGORY_"),
+			Mode:           strings.TrimPrefix(message.TaskSnapshot.Mode, "FOCUS_MODE_"),
+			PlannedSeconds: int64(message.TaskSnapshot.PlannedSeconds),
+			MinimumSeconds: int64(message.TaskSnapshot.MinimumSeconds),
+		},
+		Status: strings.TrimPrefix(message.Status, "SESSION_STATUS_"), Version: int64(message.Version),
+	}
+}
+
+func (c *Client) GetCurrentSession(ctx context.Context, session AuthSession) (*Session, error) {
+	var response struct {
+		Session *sessionMessage `json:"session"`
+	}
+	if err := c.Connect(ctx, "focus.v1.FocusService/GetCurrentSession", session.AccessToken, struct{}{}, &response); err != nil {
+		return nil, err
+	}
+	if response.Session == nil {
+		return nil, nil
+	}
+	current := sessionFromMessage(*response.Session)
+	if current.ID == "" || current.DeviceID == "" || current.TaskID == "" || current.Version < 1 || (current.Status != "RUNNING" && current.Status != "PAUSED") {
+		return nil, errors.New("APIから有効な未終了セッションが返りませんでした")
+	}
+	return &current, nil
+}
+
+func (c *Client) StartSession(ctx context.Context, session AuthSession, operationID string, task Task) (Session, error) {
+	if operationID == "" || task.ID == "" || task.Version < 1 {
+		return Session{}, errors.New("開始するタスクを再読み込みしてください")
+	}
+	var response struct {
+		Session sessionMessage `json:"session"`
+	}
+	input := map[string]any{
+		"operationId": operationID, "taskId": task.ID, "taskVersion": protoInt64(task.Version),
+	}
+	if err := c.Connect(ctx, "focus.v1.FocusService/StartSession", session.AccessToken, input, &response); err != nil {
+		message := strings.ToLower(err.Error())
+		if strings.Contains(message, "register an iphone as the restriction target first") {
+			return Session{}, errors.New("作業を開始するには、先にiPhoneを制限対象として登録してください")
+		}
+		if strings.Contains(message, "enable the restriction policy on the iphone first") {
+			return Session{}, errors.New("作業を開始するには、iPhoneで利用制限を有効にしてください")
+		}
+		return Session{}, err
+	}
+	started := sessionFromMessage(response.Session)
+	if started.ID == "" || started.DeviceID == "" || started.TaskID != task.ID || started.Version < 1 || started.Status != "RUNNING" {
+		return Session{}, errors.New("APIから有効な開始済みセッションが返りませんでした")
+	}
+	return started, nil
+}
+
+func (c *Client) AbortSession(ctx context.Context, session AuthSession, operationID, sessionID string, expectedVersion int64, endedAt time.Time) error {
+	if operationID == "" || sessionID == "" || expectedVersion < 1 {
+		return errors.New("中止するセッションを確認できません")
+	}
+	input := map[string]any{
+		"operationId": operationID, "sessionId": sessionID,
+		"expectedVersion": protoInt64(expectedVersion), "endedAt": endedAt.UTC().Format(time.RFC3339Nano),
+		"lastSeq": protoInt64(0),
+	}
+	var response struct {
+		Session sessionMessage `json:"session"`
+	}
+	if err := c.Connect(ctx, "focus.v1.FocusService/AbortSession", session.AccessToken, input, &response); err != nil {
+		return err
+	}
+	if response.Session.ID != sessionID || strings.TrimPrefix(response.Session.Status, "SESSION_STATUS_") != "ABORTED" {
+		return errors.New("APIでセッション中止を確認できませんでした")
+	}
+	return nil
 }

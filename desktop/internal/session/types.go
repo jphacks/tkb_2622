@@ -17,10 +17,21 @@ type WorkSession struct {
 	Name            string           `json:"name"`
 	Status          string           `json:"status"`
 	Task            Task             `json:"task"`
+	ServerVersion   int64            `json:"serverVersion,omitempty"`
 	Classifications []Classification `json:"classifications,omitempty"`
 	RulesVersion    string           `json:"rulesVersion,omitempty"`
 	ElapsedSeconds  int              `json:"elapsedSeconds"`
 	Evaluation      string           `json:"evaluation"`
+}
+
+type CloudSession struct {
+	ID                string `json:"id"`
+	TaskID            string `json:"taskId"`
+	Name              string `json:"name"`
+	Status            string `json:"status"`
+	Version           int64  `json:"version"`
+	OwnedByThisDevice bool   `json:"ownedByThisDevice"`
+	Message           string `json:"message"`
 }
 
 type Capability struct {
@@ -81,6 +92,7 @@ type Snapshot struct {
 	Mode                 string                `json:"mode"`
 	UpdatedAt            string                `json:"updatedAt"`
 	Session              *WorkSession          `json:"session"`
+	CloudSession         *CloudSession         `json:"cloudSession,omitempty"`
 	BalanceSeconds       *int                  `json:"balanceSeconds"`
 	Sync                 string                `json:"sync"`
 	Permission           string                `json:"permission"`
