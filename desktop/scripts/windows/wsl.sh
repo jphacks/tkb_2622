@@ -19,7 +19,9 @@ if [[ -z "${WIN_DESKTOP_DIR:-}" ]]; then
 	WIN_DESKTOP_DIR="$(wslpath -u "$local_app_data")/tkb_2622/desktop"
 fi
 
-# Windows 側で生成・インストールされるものは同期しない（--delete でも消さない）
+# Windows 側で生成・インストールされるものは同期しない（--delete でも消さない）．
+# P（protect）は削除だけを止める．wails がビルド中に作る *.syso や初回に作る build/windows/ を
+# 同期の --delete で消すとコンパイルが失敗するため保護し，リポジトリにある場合は通常どおり同期する．
 sync_to_windows() {
 	rsync -rlt --delete \
 		--exclude '/frontend/node_modules/' \
@@ -27,6 +29,8 @@ sync_to_windows() {
 		--exclude '/frontend/wailsjs/' \
 		--exclude '/frontend/package.json.md5' \
 		--exclude '/build/bin/' \
+		--filter 'P /*.syso' \
+		--filter 'P /build/windows/' \
 		"$DESKTOP_DIR/" "$WIN_DESKTOP_DIR/"
 }
 
