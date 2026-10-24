@@ -4,14 +4,19 @@ struct MobileGroup: Decodable, Identifiable {
     struct Member: Decodable {
         let isCurrentUser: Bool
         let displayName: String
+        let avatarID: String
         let joinedAt: GroupProtoTimestamp?
 
-        private enum CodingKeys: String, CodingKey { case isCurrentUser, displayName, joinedAt }
+        private enum CodingKeys: String, CodingKey {
+            case isCurrentUser, displayName, joinedAt
+            case avatarID = "avatarId"
+        }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             isCurrentUser = try container.decodeIfPresent(Bool.self, forKey: .isCurrentUser) ?? false
             displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "メンバー"
+            avatarID = try container.decodeIfPresent(String.self, forKey: .avatarID) ?? ProfileAvatar.defaultAvatar.rawValue
             joinedAt = try container.decodeIfPresent(GroupProtoTimestamp.self, forKey: .joinedAt)
         }
     }

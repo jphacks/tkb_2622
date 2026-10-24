@@ -20,6 +20,9 @@ struct AuthenticationSettingsSection: View {
   @State private var authenticatedEmail: String?
   @State private var identity: MobileIdentity?
   @State private var displayNameDraft = ""
+  @State private var avatarSelection = ProfileAvatar.defaultAvatar.rawValue
+  @State private var hasPendingAvatarChoice = false
+  @State private var isShowingAvatarPicker = false
   @State private var message: String?
   @State private var isError = false
 
@@ -64,6 +67,15 @@ struct AuthenticationSettingsSection: View {
           .foregroundStyle(.red)
         }
       #endif
+
+      if identity == nil && !showsHeading {
+        Label("プロフィールアイコン", systemImage: "person.crop.circle")
+          .font(.subheadline.weight(.semibold))
+        ProfileAvatarPicker(selection: $avatarSelection)
+        Text("選んだアイコンは登録時に保存され、ログイン後も変更できます。")
+          .font(.caption)
+          .foregroundStyle(AppTheme.secondaryInk)
+      }
 
       if let identity {
         identityView(identity)
@@ -139,6 +151,13 @@ struct AuthenticationSettingsSection: View {
     .onChange(of: identity?.displayName) { _, newValue in
       if let newValue { displayNameDraft = newValue }
     }
+    .onChange(of: identity?.avatarID) { _, newValue in
+      guard let newValue, !hasPendingAvatarChoice else { return }
+      avatarSelection = newValue
+    }
+    .onChange(of: avatarSelection) { _, newValue in
+      hasPendingAvatarChoice = identity?.avatarID != newValue
+    }
   }
 
   @ViewBuilder
@@ -147,6 +166,25 @@ struct AuthenticationSettingsSection: View {
       Label("ログイン済み", systemImage: "checkmark.circle.fill")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(AppTheme.teal)
+      HStack(spacing: 10) {
+        ProfileAvatarImage(avatarID: identity.avatarID, size: 48)
+        Text("プロフィールアイコン")
+          .font(.caption.weight(.semibold))
+        Spacer()
+        Button(isShowingAvatarPicker ? "閉じる" : "変更") {
+          isShowingAvatarPicker.toggle()
+          if !isShowingAvatarPicker { avatarSelection = identity.avatarID }
+        }
+        .font(.caption.weight(.semibold))
+      }
+      if isShowingAvatarPicker {
+        ProfileAvatarPicker(selection: $avatarSelection)
+        Button("アイコンを保存") {
+          Task { await saveAvatar() }
+        }
+        .buttonStyle(.bordered)
+        .disabled(isWorking || !hasPendingAvatarChoice)
+      }
       Text("グループに表示する名前")
         .font(.caption.weight(.semibold))
       TextField("1〜30文字", text: $displayNameDraft)
@@ -317,10 +355,15 @@ struct AuthenticationSettingsSection: View {
 
     let repository = IdentityAPIRepository(
       baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"), auth: service)
-    let currentIdentity = try await repository.ensureUserAndFetchCurrentUser(
+    var currentIdentity = try await repository.ensureUserAndFetchCurrentUser(
       operationID: operationID)
     defaults.removeObject(forKey: operationKey)
+    if hasPendingAvatarChoice && currentIdentity.avatarID != avatarSelection {
+      currentIdentity = try await repository.updateAvatar(avatarSelection)
+    }
+    hasPendingAvatarChoice = false
     identity = currentIdentity
+    avatarSelection = currentIdentity.avatarID
     #if DEBUG
       setMessage("Supabase Auth、EnsureUser、GetMeを確認しました。", error: false)
     #else
@@ -357,6 +400,35 @@ struct AuthenticationSettingsSection: View {
       setMessage("表示名を保存しました。グループメンバーに表示されます。", error: false)
     } catch {
       setMessage("表示名を保存できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
+    }
+  }
+
+  @MainActor
+  private func saveAvatar() async {
+    guard let service = auth ?? makeAuthService(),
+      let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL
+    else {
+      setMessage("アイコンを保存できません。ログイン状態とAPI設定を確認してください。", error: true)
+      return
+    }
+    guard ProfileAvatar(rawValue: avatarSelection) != nil else {
+      setMessage("このアイコンは選択できません。", error: true)
+      return
+    }
+    isWorking = true
+    defer { isWorking = false }
+    do {
+      let repository = IdentityAPIRepository(
+        baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"), auth: service)
+      let updatedIdentity = try await repository.updateAvatar(avatarSelection)
+      identity = updatedIdentity
+      avatarSelection = updatedIdentity.avatarID
+      hasPendingAvatarChoice = false
+      isShowingAvatarPicker = false
+      onAuthenticationChanged()
+      setMessage("アイコンを保存しました。グループメンバーに表示されます。", error: false)
+    } catch {
+      setMessage("アイコンを保存できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
     }
   }
 
