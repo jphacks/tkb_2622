@@ -7,6 +7,7 @@
 - Desktop設定画面がiPhone連携を固定で「未接続」と表示する誤表示を、API認証状態とiPhone状態報告の表示へ分離した。Push通知とiOS制限適用は別の未受入機能として表示する。
 - APNs token callbackが通知許可を固定で許可済みとしていたため、通知拒否時にもendpoint登録へ進み得た。callback時に通知許可状態を再取得し、拒否ならendpoint削除、未決なら登録を待つ。policyのhost testsとSimulator regression testで拒否／許可状態を検証した。
 - HomeではDesktopのsession開始・終了と3本の並行読取が重なった際に、一時的なsession ID不一致を検出すると3 APIを1回だけ再取得する。修正前red／修正後greenのSimulatorテストで、2回目の整合取得と各APIの再要求を確認した。再取得後も不一致なら従来どおりエラーを返す。
+- 2026-10-25 設定タブの連続API同期：画面表示・前景復帰・認証変更・Screen Time状態変更の同期要求が同じ内容でも、同期中ならもう一度同期するフラグへ変換されていた。要求内容（認証状態・user ID・端末制限設定）をキーに重複をまとめ、通信中に内容が変わった場合は最後の要求だけを続けて実行するgateを追加。Simulator回帰テストは重複破棄と最新要求の保持を確認し、iPhone 17 / iOS 27.0の全58 unit testsと全3 UI testsがpass。ログイン済みの実backendで設定画面を開いた際のRPC回数は未確認。通知ボタン後の再起動クラッシュは別件として再現・原因とも未確認。
 
 ## 目的
 
@@ -79,6 +80,8 @@
 | --- | --- | --- |
 | 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。過去のregister要求ログは9件あったが、失敗記録はなく成否を断定できなかった。呼び出し元ではAPNs token callback・認証変更・認証状態変更が`force=true`で登録gateの成功済み抑止を迂回していた。未ログインでもrefreshやcallbackがendpoint APIを呼ぶ経路は別途修正済み。通知許可拒否時に使う`DeleteNotificationEndpoint`は、backend handlerがDB上の対象件数にかかわらず`deleted:true`を返すため、重複解除は`not_found`原因ではない。自動通知は通常の登録gateを通り、通知許可後または明示的な「通知先を再同期」操作だけ強制登録するよう変更。host testが成功後の重複抑止・明示再同期・失敗後retry、Simulator testがDevice先行登録・endpoint `not_found`／Device `internal`保持を検証。画面はAPIのLocalizedError（Connect code含む）を表示し、通知許可済みなら手動再同期を提供する（コード照合、UI testなし）。旧not_foundとDevice未登録経路の同一性、過去エラーの再発は未確認。次回再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
 | 設定タブ再表示時の未ログイン端末APIエラー | 設定画面の`.task`・前景復帰・Screen Time設定変更が、local-only中も`RegisterDevice`／制限ポリシー同期を開始しうる。認証なしの`ConnectJSONClient`はAPI送信前にtoken欠落エラーを返す | `AuthenticatedAPISyncFlow`を端末設定同期前に通し、未ログイン時は要求を実行しない。host testでsigned-out時0件、authenticated時1件のoperationを確認 |
+| 設定タブを開くと何度もリロードするように見える | 初期表示・画面復帰・認証状態／Screen Time状態変更が重なって同じ設定API同期を要求し、進行中の要求を無条件に再同期へ変換していた | 要求キーで同じ同期をまとめ、内容が変わった時だけ最新状態を1回同期。Simulator gate test・ローカル利用時に設定タブが開くUI testと全58 unit tests／全3 UI testsがpass。ログイン済み実backendの通信回数と実機表示は未確認 |
+| 通知ボタン操作後の再起動でアプリが落ちる | Simulatorのlocal-onlyで通知画面を開くUI testは通過したが、報告された再起動後クラッシュは実機ログがなく再現できていない | 実機のクラッシュレポートまたは再現条件を採取し、通知設定画面の`.task`・認証／scene変更・token callbackのどれが発火したか照合する |
 | 起動時に期限切れsession refreshが失敗すると歓迎画面へ戻る | `RootTabView.hasAuthenticatedSession()`が`try? await auth.accessToken()`でrefreshの通信エラーを握りつぶし、保存sessionが残る一時的な通信障害も未ログインとして解決していた | session取得失敗を認証失敗と区別し、再試行可能な`identitySyncRequired`へ進める。認証を後回しにしたlocal-only状態は優先して保つ。host tests 2件とSimulatorで通信断時もrefresh tokenが保存されたsessionを保持し、retry stateを解決するテストを確認。実Supabaseをオフラインにした起動E2Eは未確認 |
 | アイコン／表示名／初回identity同期APIが失敗しても、どのRPCか分からない | `UpdateAvatar`・`UpdateDisplayName`・`EnsureUser`・`GetMe`のRepository成功契約はSimulatorで確認済みだったが、失敗時はConnect codeだけでRPC名が表示されなかった。過去にアイコン保存で404が報告されたものの、同時刻のbackend error logがなく原因は特定できていない | 各Identity RPC失敗にservice/methodを付ける。Simulatorで`UpdateAvatar`の`not_found`、`UpdateDisplayName`の`internal`、`EnsureUser`／`GetMe`の失敗経路を確認。実backendにrouteがあるか・404が再発するかは認証付き実API待ち |
 | 端末設定APIの`not_found`／`internal`が一般的な同期失敗だけに見える | 接続エラーのコードは表示していたが、端末登録・ポリシー読込・更新のどのRPCが失敗したか画面から分からなかった | `RegisterDevice`・`GetRestrictionPolicy`・`UpdateRestrictionPolicy`の失敗にRPC名を付ける。SimulatorでRegisterDevice／GetRestrictionPolicy／UpdateRestrictionPolicyの`internal`を確認し、`aborted`時のrevision再取得も維持。実API失敗の再発は未確認 |

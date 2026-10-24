@@ -29,4 +29,48 @@ final class AuthenticationEntryUITests: XCTestCase {
       XCTAssertFalse(developerSettings.exists)
     #endif
   }
+
+  func testNotificationToolbarOpensSettingsInLocalOnlyMode() {
+    let app = XCUIApplication()
+    app.launchArguments = [
+      "-mobile.auth.loginDeferred", "NO",
+      "-mobile.supabase.projectURL", "",
+      "-mobile.supabase.publishableKey", "",
+      "-mobile.auth.lastEmail", "",
+    ]
+    app.launch()
+
+    let continueButton = app.buttons["continueWithoutLogin"]
+    XCTAssertTrue(continueButton.waitForExistence(timeout: 10))
+    continueButton.tap()
+
+    let notificationButton = app.buttons["notificationToolbarButton"]
+    XCTAssertTrue(notificationButton.waitForExistence(timeout: 10))
+    notificationButton.tap()
+
+    XCTAssertTrue(app.navigationBars["通知"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["通知先をサーバーと同期するにはログインしてください。"].exists)
+  }
+
+  func testSettingsTabOpensInLocalOnlyMode() {
+    let app = XCUIApplication()
+    app.launchArguments = [
+      "-mobile.auth.loginDeferred", "NO",
+      "-mobile.supabase.projectURL", "",
+      "-mobile.supabase.publishableKey", "",
+      "-mobile.auth.lastEmail", "",
+    ]
+    app.launch()
+
+    let continueButton = app.buttons["continueWithoutLogin"]
+    XCTAssertTrue(continueButton.waitForExistence(timeout: 10))
+    continueButton.tap()
+
+    let settingsTab = app.tabBars.buttons["設定"]
+    XCTAssertTrue(settingsTab.waitForExistence(timeout: 10))
+    settingsTab.tap()
+
+    XCTAssertTrue(app.navigationBars["設定"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.staticTexts["制限モード"].exists)
+  }
 }

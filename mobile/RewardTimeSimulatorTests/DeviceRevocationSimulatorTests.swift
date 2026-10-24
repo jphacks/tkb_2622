@@ -320,6 +320,47 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
+    func testDeviceSettingsSyncGateCoalescesSameRequestAndKeepsLatestChangedRequest() {
+        let first = DeviceSettingsSyncRequestKey(
+            isAuthenticated: true,
+            authenticatedUserID: "user-1",
+            settings: DeviceRestrictionSettings(
+                enabled: false,
+                targetMode: "TARGET_MODE_SELECTED_APPS",
+                configured: false,
+                deviceConfigVersion: 1
+            )
+        )
+        let changed = DeviceSettingsSyncRequestKey(
+            isAuthenticated: true,
+            authenticatedUserID: "user-1",
+            settings: DeviceRestrictionSettings(
+                enabled: true,
+                targetMode: "TARGET_MODE_DEVICE_WIDE",
+                configured: true,
+                deviceConfigVersion: 2
+            )
+        )
+        let latest = DeviceSettingsSyncRequestKey(
+            isAuthenticated: true,
+            authenticatedUserID: "user-2",
+            settings: DeviceRestrictionSettings(
+                enabled: true,
+                targetMode: "TARGET_MODE_DEVICE_WIDE",
+                configured: true,
+                deviceConfigVersion: 2
+            )
+        )
+        var gate = DeviceSettingsSyncGate()
+
+        XCTAssertTrue(gate.begin(first))
+        XCTAssertFalse(gate.begin(first), "The same view refresh must not trigger a duplicate API sync")
+        XCTAssertFalse(gate.begin(changed))
+        XCTAssertFalse(gate.begin(latest))
+        XCTAssertEqual(gate.finish(), latest)
+        XCTAssertNil(gate.finish())
+    }
+
     @MainActor
     func testGroupWorkStartPollingUsesActionableConnectErrorMessage() async throws {
         let repository = WorkStartFailureGroupRepository(

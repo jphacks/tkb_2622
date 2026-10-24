@@ -8,7 +8,7 @@ struct SettingsView: View {
     @State private var isFamilyActivityPickerPresented = false
     @State private var isPickingAlwaysAllowedApps = false
     @State private var isSyncingDeviceSettings = false
-    @State private var needsDeviceSettingsSync = false
+    @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncError: String?
 
@@ -255,28 +255,32 @@ struct SettingsView: View {
 
     @MainActor
     private func syncDeviceSettings() async {
-        guard !isSyncingDeviceSettings else {
-            needsDeviceSettingsSync = true
-            return
-        }
+        let authenticatedUserID = MobileAppConfiguration.makeAuthService()?.authenticatedUserID
+        let request = DeviceSettingsSyncRequestKey(
+            isAuthenticated: isAuthenticated && authenticatedUserID != nil,
+            authenticatedUserID: authenticatedUserID,
+            settings: screenTime.backendRestrictionSettings
+        )
+        guard deviceSettingsSyncGate.begin(request) else { return }
+
         isSyncingDeviceSettings = true
         defer { isSyncingDeviceSettings = false }
 
-        repeat {
-            needsDeviceSettingsSync = false
-            await performDeviceSettingsSync()
-        } while needsDeviceSettingsSync
+        var requestToRun: DeviceSettingsSyncRequestKey? = request
+        while let currentRequest = requestToRun {
+            await performDeviceSettingsSync(for: currentRequest)
+            requestToRun = deviceSettingsSyncGate.finish()
+        }
     }
 
     @MainActor
-    private func performDeviceSettingsSync() async {
-        let hasCurrentAuthUser = MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil
+    private func performDeviceSettingsSync(for request: DeviceSettingsSyncRequestKey) async {
         do {
             try await AuthenticatedAPISyncFlow.run(
-                isAuthenticated: isAuthenticated && hasCurrentAuthUser
+                isAuthenticated: request.isAuthenticated
             ) {
                 _ = try await ConfiguredDeviceSettingsRepository().sync(
-                    settings: screenTime.backendRestrictionSettings
+                    settings: request.settings
                 )
             }
             deviceSyncError = nil

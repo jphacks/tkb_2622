@@ -1,11 +1,42 @@
 import Foundation
 import UIKit
 
-struct DeviceRestrictionSettings {
+struct DeviceRestrictionSettings: Equatable {
     let enabled: Bool
     let targetMode: String
     let configured: Bool
     let deviceConfigVersion: Int64
+}
+
+struct DeviceSettingsSyncRequestKey: Equatable {
+    let isAuthenticated: Bool
+    let authenticatedUserID: String?
+    let settings: DeviceRestrictionSettings
+}
+
+struct DeviceSettingsSyncGate {
+    private(set) var activeRequest: DeviceSettingsSyncRequestKey?
+    private var pendingRequest: DeviceSettingsSyncRequestKey?
+
+    mutating func begin(_ request: DeviceSettingsSyncRequestKey) -> Bool {
+        guard let activeRequest else {
+            self.activeRequest = request
+            return true
+        }
+
+        if request == activeRequest {
+            pendingRequest = nil
+        } else if request != pendingRequest {
+            pendingRequest = request
+        }
+        return false
+    }
+
+    mutating func finish() -> DeviceSettingsSyncRequestKey? {
+        activeRequest = pendingRequest
+        pendingRequest = nil
+        return activeRequest
+    }
 }
 
 struct SyncedDevicePolicy {
