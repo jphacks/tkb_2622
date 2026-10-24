@@ -116,6 +116,32 @@ func NewSessionID() (string, error) {
 
 func (r *Recorder) Status() Status { return r.status }
 
+// RestoreSession attaches the recorder to a persisted session without restarting capture.
+func (r *Recorder) RestoreSession(sessionID string, previous Status) error {
+	if !validSessionID(sessionID) {
+		return errors.New("invalid session id")
+	}
+	configDirectory, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("user config directory unavailable: %w", err)
+	}
+	dataDirectory := filepath.Join(configDirectory, "Focus Link", "sessions")
+	filePath := filepath.Join(dataDirectory, sessionID+".jsonl")
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("session capture could not be opened: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("session capture is not a regular file")
+	}
+	r.dataDir = dataDirectory
+	r.sessionID = sessionID
+	r.filePath = filePath
+	previous.State = "paused"
+	r.status = previous
+	return nil
+}
+
 func (r *Recorder) Start(ctx context.Context, sessionID string) (Status, error) {
 	if !validSessionID(sessionID) {
 		return r.fail(errors.New("invalid session id"))

@@ -89,6 +89,14 @@ func New() *Host {
 						app.stateLoaded = false
 						engine.SetLocalStorageReady(false, now)
 						engine.SetFailure("local_state_invalid", "前回の作業状態を復元できませんでした。保存ファイルを確認してください。", false, now)
+					} else if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
+						if err := app.recorder.RestoreSession(snapshot.Session.ID, toMonitorStatus(currentMonitor)); err != nil {
+							monitorStatus := currentMonitor
+							monitorStatus.State = "error"
+							monitorStatus.Message = "前回のローカル計測記録を復元できませんでした。"
+							engine.SetMonitor(monitorStatus, now)
+							engine.SetFailure("local_capture_restore", monitorStatus.Message, true, now)
+						}
 					} else if app.recorder.Status().State == "unavailable" {
 						monitorStatus := engine.Snapshot().Monitor
 						monitorStatus.State = "unavailable"
