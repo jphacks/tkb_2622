@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5/pgconn"
 	v1 "github.com/jphacks/tkb_2622/backend/gen/identity/v1"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/application"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/domain"
@@ -72,6 +75,24 @@ func rpcError(err error) error {
 		message = "request timed out"
 	}
 	return connect.NewError(code, errors.New(message))
+}
+
+func logInternalNotificationError(operation string, err error) {
+	for _, known := range []error{
+		application.ErrUnauthenticated, application.ErrForbidden, application.ErrNotFound,
+		application.ErrInvalid, application.ErrConflict, application.ErrPrecondition,
+		context.Canceled, context.DeadlineExceeded,
+	} {
+		if errors.Is(err, known) {
+			return
+		}
+	}
+	attrs := []any{"operation", operation, "error_type", fmt.Sprintf("%T", err)}
+	var databaseError *pgconn.PgError
+	if errors.As(err, &databaseError) {
+		attrs = append(attrs, "sql_state", databaseError.Code, "constraint", databaseError.ConstraintName, "table", databaseError.TableName)
+	}
+	slog.Error("notification endpoint API operation failed", attrs...)
 }
 func user(u domain.User) *v1.User {
 	return &v1.User{Id: u.ID, Status: u.Status, CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano), DisplayName: u.DisplayName, AvatarId: u.AvatarID}
@@ -154,6 +175,7 @@ func (h *Handler) RegisterNotificationEndpoint(ctx context.Context, req *connect
 		return nil, rpcError(application.ErrInvalid)
 	}
 	if err := h.service.RegisterNotificationEndpoint(ctx, principal(ctx), application.NotificationEndpointInput{APNsToken: req.Msg.ApnsToken, Environment: environment, RegistrationID: req.Msg.RegistrationId}); err != nil {
+		logInternalNotificationError("register", err)
 		return nil, rpcError(err)
 	}
 	return connect.NewResponse(&v1.RegisterNotificationEndpointResponse{Registered: true}), nil
@@ -161,6 +183,7 @@ func (h *Handler) RegisterNotificationEndpoint(ctx context.Context, req *connect
 
 func (h *Handler) DeleteNotificationEndpoint(ctx context.Context, req *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
 	if err := h.service.DeleteNotificationEndpoint(ctx, principal(ctx), req.Msg.RegistrationId); err != nil {
+		logInternalNotificationError("delete", err)
 		return nil, rpcError(err)
 	}
 	return connect.NewResponse(&v1.DeleteNotificationEndpointResponse{Deleted: true}), nil
