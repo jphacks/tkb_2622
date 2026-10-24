@@ -3,6 +3,7 @@ import SwiftUI
 struct RootTabView: View {
   @Environment(\.scenePhase) private var scenePhase
   @StateObject private var screenTime = MobileScreenTimeController()
+  @StateObject private var usageGrantSync = UsageGrantSyncCoordinator()
   @AppStorage("mobile.auth.loginDeferred") private var loginDeferred = false
   @State private var selectedTab = 0
   @State private var pendingInvitationToken: String?
@@ -81,7 +82,9 @@ struct RootTabView: View {
           screenTime: screenTime,
           isAuthenticated: isAuthenticated,
           isVisible: selectedTab == 0,
-          requestSignIn: showWelcome
+          requestSignIn: showWelcome,
+          usageSyncError: usageGrantSync.errorMessage,
+          retryUsageSync: { await synchronizeUsageGrant() }
         )
           .toolbar { NotificationToolbarButton(isAuthenticated: isAuthenticated) }
       }
@@ -224,8 +227,9 @@ struct RootTabView: View {
 
   @MainActor
   private func synchronizeUsageGrant() async {
-    if let repository = try? ConfiguredUsageGrantRepository() {
-      await repository.synchronizeStoredActiveGrantIfPresent()
+    await usageGrantSync.synchronize {
+      let repository = try ConfiguredUsageGrantRepository()
+      try await repository.synchronizeStoredActiveGrantIfPresent()
     }
     guard let snapshot = try? await ConfiguredHomeRepository().fetchCurrentSnapshot() else {
       return

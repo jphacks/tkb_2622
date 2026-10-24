@@ -10,24 +10,33 @@ struct HomeView: View {
   private let isAuthenticated: Bool
   private let isVisible: Bool
   private let requestSignIn: () -> Void
+  private let usageSyncError: String?
+  private let retryUsageSync: () async -> Void
 
   init(
     repository: any HomeRepository = ConfiguredHomeRepository(),
     screenTime: MobileScreenTimeController,
     isAuthenticated: Bool = true,
     isVisible: Bool = true,
-    requestSignIn: @escaping () -> Void = {}
+    requestSignIn: @escaping () -> Void = {},
+    usageSyncError: String? = nil,
+    retryUsageSync: @escaping () async -> Void = {}
   ) {
     _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
     _screenTime = ObservedObject(wrappedValue: screenTime)
     self.isAuthenticated = isAuthenticated
     self.isVisible = isVisible
     self.requestSignIn = requestSignIn
+    self.usageSyncError = usageSyncError
+    self.retryUsageSync = retryUsageSync
   }
 
   var body: some View {
     ScreenContainer {
       if isAuthenticated {
+        if let usageSyncError {
+          usageSyncWarning(usageSyncError)
+        }
         switch viewModel.state {
         case .loading:
           ProgressView("状態を読み込み中…")
@@ -162,6 +171,24 @@ struct HomeView: View {
         .foregroundStyle(AppTheme.secondaryInk)
       Button("再試行") { Task { await refreshAndReconcile() } }
         .buttonStyle(.bordered)
+    }
+  }
+
+  private func usageSyncWarning(_ message: String) -> some View {
+    SurfaceCard {
+      Label("利用状況をサーバーへ同期できませんでした", systemImage: "exclamationmark.triangle.fill")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.red)
+      Text("この端末の計測記録を消さずに再試行できます。")
+        .font(.footnote)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Text(message)
+        .font(.caption)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Button("利用状況を再同期") {
+        Task { await retryUsageSync() }
+      }
+      .buttonStyle(.bordered)
     }
   }
 

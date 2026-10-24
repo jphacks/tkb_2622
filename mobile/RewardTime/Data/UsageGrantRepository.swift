@@ -308,10 +308,12 @@ struct ConfiguredUsageGrantRepository {
         )
     }
 
-    func synchronizeStoredActiveGrantIfPresent() async {
-        guard let grantID = ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID"),
+    func synchronizeStoredActiveGrantIfPresent(
+        shared: UserDefaults = ScreenTimeSharedStorage.defaults
+    ) async throws {
+        guard let grantID = shared.string(forKey: "mobile.usage.activeGrantID"),
               !grantID.isEmpty else { return }
-        _ = try? await synchronizeActiveGrant(grantID: grantID)
+        _ = try await synchronizeActiveGrant(grantID: grantID)
     }
 
     func reportUsage(

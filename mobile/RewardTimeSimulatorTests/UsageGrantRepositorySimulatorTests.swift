@@ -166,6 +166,24 @@ final class UsageGrantRepositorySimulatorTests: XCTestCase {
         }
     }
 
+    func testStoredActiveGrantSyncPropagatesFailureForHomeStatus() async {
+        let sharedSuite = "UsageGrantSyncFailure.\(UUID().uuidString)"
+        let shared = UserDefaults(suiteName: sharedSuite)!
+        defer { shared.removePersistentDomain(forName: sharedSuite) }
+        shared.set("grant-1", forKey: "mobile.usage.activeGrantID")
+        UsageGrantRepositoryURLProtocol.handler = { _ in
+            (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            try await repository().synchronizeStoredActiveGrantIfPresent(shared: shared)
+            XCTFail("Expected stored grant sync error to reach the caller")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/GetUsageGrant"))
+        }
+    }
+
     func testGetGrantFailureIncludesFailingOperation() async {
         UsageGrantRepositoryURLProtocol.handler = { _ in
             (404, #"{"code":"not_found","message":"grant missing"}"#)
