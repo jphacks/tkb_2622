@@ -134,13 +134,25 @@ struct ConfiguredHistoryRepository: HistoryRepository {
         )
     }
 
+    init(client: ConnectJSONClient) {
+        self.client = client
+    }
+
     func fetchWorkHistory(pageToken: String = "") async throws -> HistoryPage<WorkHistoryItem> {
-        let response: WorkResponse = try await client.call(
-            service: "focus.v1.FocusService",
-            method: "ListSessions",
-            requestBody: PageRequest(pageToken: pageToken),
-            responseType: WorkResponse.self
-        )
+        let response: WorkResponse
+        do {
+            response = try await client.call(
+                service: "focus.v1.FocusService",
+                method: "ListSessions",
+                requestBody: PageRequest(pageToken: pageToken),
+                responseType: WorkResponse.self
+            )
+        } catch {
+            throw HistoryRepositoryError.requestFailed(
+                operation: "focus.v1.FocusService/ListSessions",
+                underlying: error
+            )
+        }
         return HistoryPage(
             items: response.entries.map { entry in
                 WorkHistoryItem(
@@ -161,12 +173,20 @@ struct ConfiguredHistoryRepository: HistoryRepository {
     }
 
     func fetchRewardHistory(pageToken: String = "") async throws -> HistoryPage<RewardHistoryItem> {
-        let response: TransactionsResponse = try await client.call(
-            service: "reward.v1.RewardService",
-            method: "ListTransactions",
-            requestBody: PageRequest(pageToken: pageToken),
-            responseType: TransactionsResponse.self
-        )
+        let response: TransactionsResponse
+        do {
+            response = try await client.call(
+                service: "reward.v1.RewardService",
+                method: "ListTransactions",
+                requestBody: PageRequest(pageToken: pageToken),
+                responseType: TransactionsResponse.self
+            )
+        } catch {
+            throw HistoryRepositoryError.requestFailed(
+                operation: "reward.v1.RewardService/ListTransactions",
+                underlying: error
+            )
+        }
         return HistoryPage(
             items: response.transactions.map {
                 RewardHistoryItem(
@@ -231,8 +251,16 @@ private struct ProtoTimestamp: Decodable {
 
 enum HistoryRepositoryError: Error, LocalizedError {
     case invalidConfiguration
+    case requestFailed(operation: String, underlying: Error)
 
     var errorDescription: String? {
-        "Supabaseへのログイン状態とAPI設定を確認してください。"
+        switch self {
+        case .invalidConfiguration:
+            return "Supabaseへのログイン状態とAPI設定を確認してください。"
+        case .requestFailed(let operation, let underlying):
+            let detail = (underlying as? LocalizedError)?.errorDescription
+                ?? underlying.localizedDescription
+            return "\(detail) (API: \(operation))"
+        }
     }
 }

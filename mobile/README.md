@@ -83,7 +83,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で39件が通過し、Device失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 39件、ログイン画面UI testをDebug／Release各1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
+Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で40件が通過し、Device失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、HistoryのRPC名付きエラー・一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 40件、ログイン画面UI testをDebug／Release各1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
 
 ## ソース構成
 
@@ -140,7 +140,7 @@ mobile/build-release-simulator.sh
 - XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。各画面のSwiftUI Previewでも状態を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
-- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止の43件のユニットテストはSwift Packageで実行する。transport testsはBearer認証、Connect code、401／403、plain HTTP 404、REST Connect error、token欠落、通信断、timeout、JSON decode failureをmacOS host上で確認する。これらはiOS Simulator XCTestではなく、アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。Supabase SDK refresh testはSimulator上のstub応答を使用し、実Supabase接続は確認しない。
+- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止の45件のユニットテストはSwift Packageで実行する。transport testsはBearer認証、Connect code、401／403、plain HTTP 404、REST Connect error、token欠落、通信断、timeout、JSON decode failureをmacOS host上で確認する。これらはiOS Simulator XCTestではなく、アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。Supabase SDK refresh testはSimulator上のstub応答を使用し、実Supabase接続は確認しない。
 
   ```sh
   swift test --package-path mobile/RewardTimeTests
