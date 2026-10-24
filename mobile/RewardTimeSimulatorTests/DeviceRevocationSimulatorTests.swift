@@ -180,6 +180,22 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testGroupWorkStartPollingUsesActionableConnectErrorMessage() async throws {
+        let repository = WorkStartFailureGroupRepository(
+            group: try JSONDecoder().decode(
+                MobileGroup.self,
+                from: Data(#"{"id":"group-1","name":"test","members":[]}"#.utf8)
+            )
+        )
+        let viewModel = GroupViewModel(repository: repository)
+
+        await viewModel.load()
+        await viewModel.refreshWorkStarts()
+
+        XCTAssertTrue(viewModel.workStartError?.contains("再ログイン") == true)
+    }
+
     private func repository() -> ConfiguredDeviceRevocationRepository {
         ConfiguredDeviceRevocationRepository(defaults: defaults)
     }
@@ -218,6 +234,23 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
 
 private struct SimulatorTestTokenProvider: AccessTokenProviding {
     func accessToken() async throws -> String? { "simulator-test-access-token" }
+}
+
+private struct WorkStartFailureGroupRepository: GroupRepository {
+    let group: MobileGroup
+
+    func fetchGroups() async throws -> [MobileGroup] { [group] }
+    func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
+        throw ConnectJSONClient.ClientError.connect(code: "unauthenticated")
+    }
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup { group }
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
+        throw ConnectJSONClient.ClientError.connect(code: "unimplemented")
+    }
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup {
+        group
+    }
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool { false }
 }
 
 private final class DeviceRevocationURLProtocol: URLProtocol {

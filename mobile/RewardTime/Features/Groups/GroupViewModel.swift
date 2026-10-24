@@ -60,8 +60,7 @@ final class GroupViewModel: ObservableObject {
                 .sorted { $0.startedAt.date > $1.startedAt.date }
                 .prefix(30))
         } catch {
-            workStartError = (error as? LocalizedError)?.errorDescription
-                ?? "作業開始フィードを更新できませんでした。"
+            workStartError = GroupAPIErrorMessage.describe(error)
         }
     }
 
