@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var screenTime: MobileScreenTimeController
     @State private var isFamilyActivityPickerPresented = false
+    @State private var isPickingAlwaysAllowedApps = false
     @State private var isSyncingDeviceSettings = false
     @State private var needsDeviceSettingsSync = false
     @State private var hasOpenUsageGrant = false
@@ -113,6 +114,7 @@ struct SettingsView: View {
                             .foregroundStyle(AppTheme.primary)
                     }
                     Button {
+                        isPickingAlwaysAllowedApps = false
                         isFamilyActivityPickerPresented = true
                     } label: {
                         Label("アプリを選ぶ", systemImage: "plus.app")
@@ -137,6 +139,28 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(AppTheme.secondaryInk)
                     }
+                } else {
+                    Divider()
+                    sectionTitle("常時許可するアプリ", icon: "checkmark.shield")
+                    Text("標準アプリを常時許可するには、ここで選択してください。Safariは選ばないでください。")
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                    HStack {
+                        Text("選択中のアプリ")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("\(screenTime.alwaysAllowedSelection.applicationTokens.count)個")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.primary)
+                    }
+                    Button {
+                        isPickingAlwaysAllowedApps = true
+                        isFamilyActivityPickerPresented = true
+                    } label: {
+                        Label("常時許可するアプリを選ぶ", systemImage: "checkmark.app")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
                 }
                 modeButton(.entireDevice)
 
@@ -223,8 +247,21 @@ struct SettingsView: View {
             }
         }
         .familyActivityPicker(
+            headerText: isPickingAlwaysAllowedApps ? "常時許可するアプリを選択" : "制限するアプリを選択",
+            footerText: isPickingAlwaysAllowedApps ? "常時許可するApple標準アプリを選びます。Safariは選択しないでください。" : nil,
             isPresented: $isFamilyActivityPickerPresented,
-            selection: $screenTime.selection
+            selection: Binding(
+                get: {
+                    isPickingAlwaysAllowedApps ? screenTime.alwaysAllowedSelection : screenTime.selection
+                },
+                set: { newSelection in
+                    if isPickingAlwaysAllowedApps {
+                        screenTime.alwaysAllowedSelection = newSelection
+                    } else {
+                        screenTime.selection = newSelection
+                    }
+                }
+            )
         )
         .task { await syncDeviceSettings() }
         .onChange(of: screenTime.deviceConfigVersion) { _, _ in

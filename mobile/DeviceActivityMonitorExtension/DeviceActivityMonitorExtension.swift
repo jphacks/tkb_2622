@@ -6,6 +6,7 @@ import ManagedSettings
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private let appGroup = "group.com.example.tkb2622.mobile"
     private let selectionKey = "mobile.screenTime.selection"
+    private let alwaysAllowedSelectionKey = "mobile.screenTime.alwaysAllowedSelection"
     private let restrictionModeKey = "mobile.screenTime.restrictionMode"
 
     override func eventDidReachThreshold(
@@ -46,7 +47,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let mode = defaults.string(forKey: restrictionModeKey) ?? "selectedApplications"
         if mode == "entireDevice" {
             store.shield.applications = nil
-            store.shield.applicationCategories = .all()
+            store.shield.applicationCategories = .all(except: Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey))
             defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
             return
         }
@@ -63,6 +64,14 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         store.shield.applicationCategories = nil
         store.shield.applications = selection.applicationTokens
         defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
+    }
+
+    private static func alwaysAllowedTokens(from defaults: UserDefaults, key: String) -> Set<ApplicationToken> {
+        guard let data = defaults.data(forKey: key),
+              let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) else {
+            return []
+        }
+        return selection.applicationTokens
     }
 
     private static func reportedSeconds(from eventName: String) -> Int? {
