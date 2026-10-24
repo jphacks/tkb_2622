@@ -59,10 +59,9 @@ final class NotificationEndpointRepositorySimulatorTests: XCTestCase {
                 client: client()
             )
             XCTFail("Endpoint registration must not run after device registration fails")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "internal")
         } catch {
-            XCTFail("Expected the device registration Connect error, got \(error)")
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RegisterDevice"))
         }
 
         XCTAssertEqual(methods.values, ["RegisterDevice"])
@@ -87,10 +86,9 @@ final class NotificationEndpointRepositorySimulatorTests: XCTestCase {
                 client: client()
             )
             XCTFail("The endpoint registration Connect error must be returned")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "not_found")
         } catch {
-            XCTFail("Expected the endpoint Connect error, got \(error)")
+            XCTAssertTrue(error.localizedDescription.contains("(not_found)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RegisterNotificationEndpoint"))
         }
 
         XCTAssertEqual(methods.values, ["RegisterDevice", "RegisterNotificationEndpoint"])
