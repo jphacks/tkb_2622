@@ -82,6 +82,11 @@
 				TargetAttributes = {
 					A1524E1A308BB54700AB2DCC = {
 						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.FamilyControls = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -251,6 +256,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = tkb_2622_app/tkb_2622_app.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TB44XF3XG5;
@@ -283,6 +289,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = tkb_2622_app/tkb_2622_app.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = TB44XF3XG5;

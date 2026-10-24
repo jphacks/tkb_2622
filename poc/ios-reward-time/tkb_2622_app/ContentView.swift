@@ -1,16 +1,21 @@
 import SwiftUI
+import FamilyControls
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store: RewardStore
+    @StateObject private var screenTime: ScreenTimePrototype
     @State private var minutesInput = ""
+    @State private var isFamilyActivityPickerPresented = false
 
     init() {
         _store = StateObject(wrappedValue: RewardStore(repository: UserDefaultsRewardRepository()))
+        _screenTime = StateObject(wrappedValue: ScreenTimePrototype())
     }
 
     init(store: RewardStore) {
         _store = StateObject(wrappedValue: store)
+        _screenTime = StateObject(wrappedValue: ScreenTimePrototype())
     }
 
     var body: some View {
@@ -24,7 +29,7 @@ struct ContentView: View {
                     }
 
                     Section("利用状態") {
-                        Text("PoC表示のみ（実際のアプリ制限は未接続）")
+                        Text("報酬の期限とアプリ制限は未連動です。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
 
@@ -59,6 +64,54 @@ struct ContentView: View {
                         .disabled(store.isLoading)
                         .accessibilityIdentifier("redeemReward")
                     }
+
+                    Section("アプリ制限の技術検証") {
+                        Text("本人認可と選択したアプリへの制限を実機で確認します。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        LabeledContent("Family Controls") {
+                            Text(screenTime.authorizationStatusLabel)
+                        }
+
+                        Button("本人利用の認可を要求") {
+                            Task {
+                                await screenTime.requestAuthorization()
+                            }
+                        }
+                        .disabled(screenTime.isRequestingAuthorization)
+
+                        Button("制限するアプリを選択") {
+                            isFamilyActivityPickerPresented = true
+                        }
+                        .disabled(!screenTime.isAuthorized)
+
+                        Text("選択中: \(screenTime.selectedApplicationCount) 個のアプリ")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Button("選択したアプリを制限") {
+                            screenTime.applyShield()
+                        }
+                        .disabled(!screenTime.canApplyShield)
+
+                        Button("このPoCの制限を解除", role: .destructive) {
+                            screenTime.clearShield()
+                        }
+                        .disabled(!screenTime.isAuthorized)
+
+                        if let message = screenTime.statusMessage {
+                            Text(message)
+                                .font(.footnote)
+                                .accessibilityIdentifier("screenTimeStatus")
+                        }
+
+                        if let errorMessage = screenTime.errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 }
                 .overlay {
                     if store.isLoading {
@@ -73,10 +126,15 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            screenTime.refreshAuthorizationStatus()
             Task {
                 await store.load()
             }
         }
+        .familyActivityPicker(
+            isPresented: $isFamilyActivityPickerPresented,
+            selection: $screenTime.selection
+        )
         .alert("操作できません", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.clearError() } }
