@@ -13,7 +13,7 @@
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。監査で、設定画面からの認証状態変更通知がsessionの有無だけでauthenticatedへ切り替える経路を発見したため、通知後もRoot側で同期を再実行するよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のresolver testはあるが、SwiftUI rootの通知連携と実backend復旧はSimulator受け入れ待ち。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート／順序・Home更新失敗の10件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート／順序・Home更新失敗の10件が通過した。これはSimulator内でのXCTest実行ではない。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -23,7 +23,7 @@
 | Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | RPC名とproto JSON DTO、REST response項目をGo handlerと静的照合し一致。過去の`internal`／`not_found`は現在再現せず、画面・認証付き実API成功は未確認 |
 | History | Focus `ListSessions`、Reward `ListTransactions` | response DTO（entries/session/reward, transactions）・ProtoJSON int64・timestamp・page tokenをproto／Go handlerと照合し一致。ViewModelは両方の初回取得が成功してから更新し、失敗時は前回値とstale表示を保つ。片方だけの失敗・実API pagingは未確認 |
 | 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
-| 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
+| 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | RPC名、ProtoJSON int64 string、request／response fieldsをprotoと照合し一致。Reserve operation IDとpending usage reportはlocal保存し、transport失敗後の同一要求再送を行う。OS monitor・応答喪失・プロセス再起動を含む実機E2Eは未確認 |
 | 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | 重複登録抑止に加え、endpoint要求の前に同じregistration IDで`RegisterDevice`を実行する順序を追加。旧SQLSTATE 2201B制約障害とは別に、Device未登録時はbackendがnot_foundを返す経路を確認。認証付き実API往復は未確認 |
 
 ### 既知のエラー報告と再現状況
@@ -106,8 +106,8 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 ## 完了条件
 
 - 優先API経路の一覧と、それぞれの成功・失敗表示・retry方針が記録されている。
-- 見つかったAPI不具合に再現性のあるSimulator testがあり、修正後に通る。
-- iOS Simulator Debug buildが通る。
+- 見つかったAPI不具合に再現性のある自動テストがあり、修正後に通る。テストがmacOS hostかiOS Simulatorかを結果に明記する。
+- iOS Simulator Debug buildが通る。Simulator上の画面・認証・API受け入れ確認は、自動build／host testとは別に記録する。
 - 実機／APNsなどSimulatorで証明できない範囲を明記し、未解決エラーをコードと再現手順つきで残す。
 - 関連ドキュメントが実装と一致し、コミットがローカルブランチにある。pushはしない。
 
