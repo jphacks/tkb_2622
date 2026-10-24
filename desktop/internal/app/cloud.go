@@ -170,7 +170,7 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	a.persistLocked(time.Now())
 	a.mu.Unlock()
 	if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
-		a.markActivitySyncPending()
+		a.markActivitySyncPending(err)
 	}
 	currentSession, err := a.cloudClient.GetCurrentSession(ctx, *current)
 	if err != nil {
@@ -179,16 +179,16 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	local := a.snapshot()
 	if currentSession != nil && local.Session != nil && local.Session.ID == currentSession.ID && local.Session.ServerVersion > 0 {
 		if err := a.ensureActivitySyncStateLocked(currentSession.ID, currentSession.AcceptedThroughSeq); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		} else if currentSession.Status == "RUNNING" && local.Session.Status == "PAUSED" {
 			pausedAt := time.Now()
 			if err := a.queueCloudOperationLocked("pause", pausedAt, nil); err != nil {
-				a.markActivitySyncPending()
+				a.markActivitySyncPending(err)
 			} else if err := a.prepareActivitySyncLocked(pausedAt, true); err != nil {
-				a.markActivitySyncPending()
+				a.markActivitySyncPending(err)
 			} else {
 				if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
-					a.markActivitySyncPending()
+					a.markActivitySyncPending(err)
 				}
 			}
 			currentSession, err = a.cloudClient.GetCurrentSession(ctx, *current)

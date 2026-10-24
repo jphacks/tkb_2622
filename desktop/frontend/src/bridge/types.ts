@@ -26,6 +26,7 @@ export interface Snapshot {
 }
 export type Command =
   | { action: SessionAction; name?: string }
+  | { action: 'retryCloudSync' }
   | { action: 'abortCloudSession' }
   | { action: 'scenario'; scenarioId: string }
   | { action: 'connection' }
