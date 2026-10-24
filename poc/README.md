@@ -69,3 +69,50 @@ xcrun simctl install "$SIMULATOR_UDID" \
 
 xcrun simctl launch "$SIMULATOR_UDID" com.example.tkb-2622-app
 ```
+
+## VS Codeから接続したiPhoneでビルド・起動する
+
+Family Controlsの認可やShield動作はiPhone実機で確認する。iPhoneをMacへ接続し、ロックを解除して信頼済みにする。Xcodeの **Signing & Capabilities** で開発用のTeamが設定されていることを確認する。Simulator用コマンドと異なり、実機用ビルドでは署名を無効にしない。
+
+### 1. 接続状態と実機UDIDを確認
+
+```sh
+xcrun devicectl list devices
+```
+
+一覧で接続したiPhoneのUDIDを確認し、次の変数に設定する。デバイス名を指定してもよい。
+
+```sh
+DEVICE_UDID="iPhoneのUDID"
+APP_BUNDLE_ID="com.example.tkb-2622-app"
+```
+
+UDIDは実際の一覧に表示された値へ置き換える。Bundle IdentifierをXcodeで変更した場合は、`APP_BUNDLE_ID`も同じ値にする。
+
+### 2. 署名付きで実機用ビルド
+
+```sh
+xcodebuild \
+  -project poc/ios-reward-time/tkb_2622_app.xcodeproj \
+  -scheme tkb_2622_app \
+  -destination "platform=iOS,id=${DEVICE_UDID}" \
+  -configuration Debug \
+  -derivedDataPath /private/tmp/tkb2622-device-deriveddata \
+  build
+```
+
+`BUILD SUCCEEDED` と表示されることを確認する。署名やFamily Controls entitlementで失敗した場合は、Xcodeで **Signing & Capabilities** のTeamとエラーを確認する。
+
+### 3. iPhoneへインストールして起動
+
+```sh
+xcrun devicectl device install app \
+  --device "$DEVICE_UDID" \
+  /private/tmp/tkb2622-device-deriveddata/Build/Products/Debug-iphoneos/tkb_2622_app.app
+
+xcrun devicectl device process launch \
+  --device "$DEVICE_UDID" \
+  "$APP_BUNDLE_ID"
+```
+
+初回はXcodeがiPhoneの開発サポート情報を準備するため、Devices and Simulatorsに準備中と表示されることがある。iPhoneを接続・ロック解除したまま完了を待ってからビルドする。Family Controls (Development) の表示に配布向けentitlement申請の警告が併記される場合、それは配布時の要件であり、開発用の実機検証とは区別する。
