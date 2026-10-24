@@ -1,5 +1,11 @@
 # Mobile APIエラー安定化 作業リスト
 
+## デモ直前の連携優先項目（2026-10-25追記）
+
+- P0: DesktopとiPhoneが同じSupabase project・Connect API環境・メールアカウントでログインし、Desktopの作業状態がiPhone Homeへ反映される実機E2Eを行う。Desktopから開始／一時停止／再開／終了し、通信断からの復帰も確認する。詳細な判定順は[Desktop・iPhone連携仕様](../spec/8.desktop-mobile連携の現状と課題.md#11-デモで最優先に成立させること)を参照。
+- コード調査では両端末のbackend経由の読書きと30秒ポーリングを確認したが、実機E2Eは未実施。同期できない場合はAuth session、`EnsureUser`／`GetMe`、接続環境、RPC応答、画面反映の境界を特定して修正する。
+- Desktop設定画面がiPhone連携を固定で「未接続」と表示する誤表示を、API認証状態とiPhone状態報告の表示へ分離した。Push通知とiOS制限適用は別の未受入機能として表示する。
+
 ## 目的
 
 時間が限られているため、mobileのAPIエラーを優先して再現・修正する。ユニットテストとSimulator向けXCTestを実行し、仕様・調査結果・未決事項をこの資料と関連資料へ反映する。
