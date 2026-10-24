@@ -5,20 +5,22 @@ final class AuthenticatedAPISyncFlowTests: XCTestCase {
     func testDoesNotRunAPISyncWhenSignedOut() async throws {
         var requestCount = 0
 
-        try await AuthenticatedAPISyncFlow.run(isAuthenticated: false) {
+        let didRun = try await AuthenticatedAPISyncFlow.run(isAuthenticated: false) {
             requestCount += 1
         }
 
+        XCTAssertFalse(didRun)
         XCTAssertEqual(requestCount, 0)
     }
 
     func testRunsAPISyncWhenAuthenticated() async throws {
         var requestCount = 0
 
-        try await AuthenticatedAPISyncFlow.run(isAuthenticated: true) {
+        let didRun = try await AuthenticatedAPISyncFlow.run(isAuthenticated: true) {
             requestCount += 1
         }
 
+        XCTAssertTrue(didRun)
         XCTAssertEqual(requestCount, 1)
     }
 }

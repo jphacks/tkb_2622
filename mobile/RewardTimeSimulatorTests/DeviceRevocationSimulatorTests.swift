@@ -194,13 +194,14 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
-    func testLocalOnlyStateSkipsAuthenticatedSettingsAPIRequest() async throws {
+    func testLocalOnlyStateSkipsAuthenticatedSettingsAndSessionRestoreRequests() async throws {
         var requestCount = 0
 
-        try await AuthenticatedAPISyncFlow.run(isAuthenticated: false) {
+        let didRun = try await AuthenticatedAPISyncFlow.run(isAuthenticated: false) {
             requestCount += 1
         }
 
+        XCTAssertFalse(didRun)
         XCTAssertEqual(requestCount, 0)
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(

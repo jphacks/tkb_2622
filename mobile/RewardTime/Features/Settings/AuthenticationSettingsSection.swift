@@ -4,6 +4,7 @@ import SwiftUI
 struct AuthenticationSettingsSection: View {
   var showsHeading = true
   var showsDeveloperConfiguration = false
+  var allowsAutomaticAPISync = true
   var onAuthenticationChanged: () -> Void = {}
   @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
   @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
@@ -312,7 +313,6 @@ struct AuthenticationSettingsSection: View {
         email = sessionEmail
         lastEmail = sessionEmail
       }
-      onAuthenticationChanged()
     } catch {
       setMessage(
         "保存済みのSupabaseログインを確認できませんでした: \(AuthenticationErrorMessage.describe(error))",
@@ -321,7 +321,17 @@ struct AuthenticationSettingsSection: View {
       return
     }
     do {
-      try await loadBusinessIdentity(using: service)
+      let didSync = try await AuthenticatedAPISyncFlow.run(
+        isAuthenticated: allowsAutomaticAPISync
+      ) {
+        try await loadBusinessIdentity(using: service)
+      }
+      if !didSync {
+        setMessage(
+          "保存済みのログインはありますが、サーバー同期は端末内利用中のため停止しています。",
+          error: false
+        )
+      }
     } catch {
       setMessage(
         "Supabaseログインは保存されていますが、backendのEnsureUser／GetMeに失敗しました: \(AuthenticationErrorMessage.describe(error))",

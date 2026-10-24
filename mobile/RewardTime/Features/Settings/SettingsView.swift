@@ -19,7 +19,10 @@ struct SettingsView: View {
 
     var body: some View {
         ScreenContainer {
-            AuthenticationSettingsSection(showsDeveloperConfiguration: true) {
+            AuthenticationSettingsSection(
+                showsDeveloperConfiguration: true,
+                allowsAutomaticAPISync: isAuthenticated
+            ) {
                 NotificationCenter.default.post(name: .mobileAuthenticationChanged, object: nil)
                 Task { await syncDeviceSettings() }
             }
