@@ -11,6 +11,16 @@ struct MobileHomeSnapshot {
     let restrictedApplicationCount: Int?
     let lastSyncedAt: Date
     let isSampleData: Bool
+    let sessionID: String?
+    let sessionVersion: Int64?
+    let restrictionDeviceID: String?
+    let restrictionControlRevision: Int64
+    let restrictionAppliedRevision: Int64
+    let restrictionShieldStatus: String
+    let restrictionPermissionStatus: String
+    let activeGrantID: String?
+    let activeGrantReservedSeconds: Int?
+    let activeGrantStatus: String?
 
     static let workingSample = MobileHomeSnapshot(
         sessionStatus: .working,
@@ -22,7 +32,17 @@ struct MobileHomeSnapshot {
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
         restrictedApplicationCount: nil,
         lastSyncedAt: .now,
-        isSampleData: true
+        isSampleData: true,
+        sessionID: nil,
+        sessionVersion: nil,
+        restrictionDeviceID: nil,
+        restrictionControlRevision: 0,
+        restrictionAppliedRevision: 0,
+        restrictionShieldStatus: "SHIELD_STATUS_SHIELDED",
+        restrictionPermissionStatus: "PERMISSION_STATUS_GRANTED",
+        activeGrantID: nil,
+        activeGrantReservedSeconds: nil,
+        activeGrantStatus: nil
     )
 
     static let pausedSample = MobileHomeSnapshot(
@@ -35,7 +55,17 @@ struct MobileHomeSnapshot {
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
         restrictedApplicationCount: nil,
         lastSyncedAt: .now,
-        isSampleData: true
+        isSampleData: true,
+        sessionID: "sample-paused-session",
+        sessionVersion: 1,
+        restrictionDeviceID: nil,
+        restrictionControlRevision: 0,
+        restrictionAppliedRevision: 0,
+        restrictionShieldStatus: "SHIELD_STATUS_SHIELDED",
+        restrictionPermissionStatus: "PERMISSION_STATUS_GRANTED",
+        activeGrantID: nil,
+        activeGrantReservedSeconds: nil,
+        activeGrantStatus: nil
     )
 
     static let releasedSample = MobileHomeSnapshot(
@@ -48,7 +78,17 @@ struct MobileHomeSnapshot {
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
         restrictedApplicationCount: nil,
         lastSyncedAt: .now,
-        isSampleData: true
+        isSampleData: true,
+        sessionID: "sample-released-session",
+        sessionVersion: 1,
+        restrictionDeviceID: nil,
+        restrictionControlRevision: 0,
+        restrictionAppliedRevision: 0,
+        restrictionShieldStatus: "SHIELD_STATUS_UNSHIELDED",
+        restrictionPermissionStatus: "PERMISSION_STATUS_GRANTED",
+        activeGrantID: nil,
+        activeGrantReservedSeconds: nil,
+        activeGrantStatus: nil
     )
 
     static let noSessionSample = MobileHomeSnapshot(
@@ -61,7 +101,17 @@ struct MobileHomeSnapshot {
         restrictedApps: [],
         restrictedApplicationCount: nil,
         lastSyncedAt: .now,
-        isSampleData: true
+        isSampleData: true,
+        sessionID: nil,
+        sessionVersion: nil,
+        restrictionDeviceID: nil,
+        restrictionControlRevision: 0,
+        restrictionAppliedRevision: 0,
+        restrictionShieldStatus: "SHIELD_STATUS_UNSHIELDED",
+        restrictionPermissionStatus: "PERMISSION_STATUS_GRANTED",
+        activeGrantID: nil,
+        activeGrantReservedSeconds: nil,
+        activeGrantStatus: nil
     )
 }
 

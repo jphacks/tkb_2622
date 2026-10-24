@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: HomeViewModel
     @ObservedObject private var screenTime: MobileScreenTimeController
 
@@ -52,12 +53,22 @@ struct HomeView: View {
         }
         .task {
             if case .loading = viewModel.state {
-                await viewModel.load()
+                await loadAndReconcile()
             }
         }
         .refreshable {
-            await viewModel.load()
+            await loadAndReconcile()
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await loadAndReconcile() } }
+        }
+    }
+
+    @MainActor
+    private func loadAndReconcile() async {
+        await viewModel.load()
+        guard case .loaded(let snapshot) = viewModel.state else { return }
+        await screenTime.reconcileServerRestriction(snapshot)
     }
 
 #if DEBUG
@@ -298,16 +309,35 @@ struct HomeView: View {
     @ViewBuilder
     private func breakAction(_ snapshot: MobileHomeSnapshot) -> some View {
         if snapshot.sessionStatus == .paused {
-            NavigationLink {
-                UsageReservationView(balanceMinutes: snapshot.rewardBalanceMinutes)
-            } label: {
-                Label("残高を使う", systemImage: "cup.and.saucer.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 52)
+            if let grantID = snapshot.activeGrantID,
+               let reservedSeconds = snapshot.activeGrantReservedSeconds,
+               ["GRANT_STATUS_RESERVED", "GRANT_STATUS_ACTIVATED"].contains(snapshot.activeGrantStatus ?? "") {
+                NavigationLink {
+                    ActiveUsageView(grantID: grantID, reservedSeconds: Int64(reservedSeconds))
+                } label: {
+                    Label("利用中の枠を確認", systemImage: "timer")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primary)
+            } else {
+                NavigationLink {
+                    UsageReservationView(
+                        balanceMinutes: snapshot.rewardBalanceMinutes,
+                        sessionID: snapshot.sessionID ?? "",
+                        sessionVersion: snapshot.sessionVersion ?? 0,
+                        screenTime: screenTime
+                    )
+                } label: {
+                    Label("残高を使う", systemImage: "cup.and.saucer.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primary)
+                .disabled(snapshot.rewardBalanceMinutes <= 0)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.primary)
-            .disabled(snapshot.rewardBalanceMinutes <= 0)
         } else {
             Label {
                 Text(snapshot.sessionStatus == .working

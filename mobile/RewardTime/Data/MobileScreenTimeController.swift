@@ -34,21 +34,43 @@ final class MobileScreenTimeController: ObservableObject {
     init(
         authorizationCenter: AuthorizationCenter = .shared,
         settingsStore: ManagedSettingsStore = ManagedSettingsStore(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults? = nil
     ) {
         self.authorizationCenter = authorizationCenter
         self.settingsStore = settingsStore
-        self.defaults = defaults
+        let resolvedDefaults = defaults ?? ScreenTimeSharedStorage.defaults
+        let selectionKey = "mobile.screenTime.selection"
+        let selectionConfiguredKey = "mobile.screenTime.selectionConfigured"
+        let restrictionModeKey = "mobile.screenTime.restrictionMode"
+        let deviceConfigVersionKey = "mobile.screenTime.deviceConfigVersion"
+        if defaults == nil,
+           resolvedDefaults.data(forKey: selectionKey) == nil,
+           let legacySelection = UserDefaults.standard.data(forKey: selectionKey) {
+            resolvedDefaults.set(legacySelection, forKey: selectionKey)
+            resolvedDefaults.set(
+                UserDefaults.standard.bool(forKey: selectionConfiguredKey),
+                forKey: selectionConfiguredKey
+            )
+            resolvedDefaults.set(
+                UserDefaults.standard.string(forKey: restrictionModeKey),
+                forKey: restrictionModeKey
+            )
+            resolvedDefaults.set(
+                UserDefaults.standard.integer(forKey: deviceConfigVersionKey),
+                forKey: deviceConfigVersionKey
+            )
+        }
+        self.defaults = resolvedDefaults
         authorizationStatus = authorizationCenter.authorizationStatus
-        let storedSelection = defaults.data(forKey: selectionDefaultsKey)
+        let storedSelection = resolvedDefaults.data(forKey: selectionDefaultsKey)
             .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
             ?? FamilyActivitySelection()
         selection = storedSelection
-        hasSelectionBeenConfigured = defaults.bool(forKey: selectionConfiguredDefaultsKey)
+        hasSelectionBeenConfigured = resolvedDefaults.bool(forKey: selectionConfiguredDefaultsKey)
             || !storedSelection.applicationTokens.isEmpty
-        restrictionMode = defaults.string(forKey: restrictionModeDefaultsKey)
+        restrictionMode = resolvedDefaults.string(forKey: restrictionModeDefaultsKey)
             .flatMap(LocalRestrictionMode.init(rawValue:)) ?? .selectedApplications
-        deviceConfigVersion = Int64(defaults.integer(forKey: deviceConfigVersionDefaultsKey))
+        deviceConfigVersion = Int64(resolvedDefaults.integer(forKey: deviceConfigVersionDefaultsKey))
         appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
     }
 
@@ -135,10 +157,12 @@ final class MobileScreenTimeController: ObservableObject {
         }
     }
 
-    func applyRestriction() {
+    @discardableResult
+    func applyRestriction() -> Bool {
         guard applyRestrictionUnavailableReason == nil else {
             errorMessage = applyRestrictionUnavailableReason
-            return
+            ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_ERROR", forKey: "mobile.usage.localShieldStatus")
+            return false
         }
         switch restrictionMode {
         case .selectedApplications:
@@ -149,16 +173,113 @@ final class MobileScreenTimeController: ObservableObject {
             settingsStore.shield.applicationCategories = .all()
         }
         appliedRestrictionMode = restrictionMode
+        ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
         errorMessage = nil
         statusMessage = "\(restrictionMode.appliedDescription)をiPhoneに設定しました。対象アプリを開いてShield画面が表示されるか確認してください。"
+        return true
     }
 
-    func clearRestriction() {
+    @discardableResult
+    func clearRestriction() -> Bool {
         settingsStore.shield.applications = nil
         settingsStore.shield.applicationCategories = nil
         appliedRestrictionMode = nil
+        ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_UNSHIELDED", forKey: "mobile.usage.localShieldStatus")
         errorMessage = nil
         statusMessage = "このアプリが設定したShieldを解除しました。"
+        return true
+    }
+
+    func reconcileServerRestriction(_ snapshot: MobileHomeSnapshot) async {
+        guard !snapshot.isSampleData else { return }
+        refreshAuthorizationStatus()
+
+        let shared = ScreenTimeSharedStorage.defaults
+        var status = "SHIELD_STATUS_UNKNOWN"
+        var failureReason = ""
+        var grantID = ""
+
+        switch snapshot.desiredRestriction {
+        case .shielded:
+            if applyRestriction() {
+                status = "SHIELD_STATUS_SHIELDED"
+            } else {
+                status = "SHIELD_STATUS_ERROR"
+                failureReason = errorMessage ?? "Screen Timeの制限を適用できませんでした。"
+            }
+        case .timedUnlock:
+            guard let activeGrantID = snapshot.activeGrantID,
+                  ["GRANT_STATUS_RESERVED", "GRANT_STATUS_ACTIVATED"].contains(snapshot.activeGrantStatus ?? "") else {
+                if applyRestriction() {
+                    status = "SHIELD_STATUS_SHIELDED"
+                    failureReason = "有効な利用枠が見つからないため、制限を維持しました。"
+                } else {
+                    status = "SHIELD_STATUS_ERROR"
+                    failureReason = errorMessage ?? "利用枠が見つからず、制限も適用できませんでした。"
+                }
+                break
+            }
+
+            grantID = activeGrantID
+            let grantFinished = shared.string(forKey: "mobile.usage.completedGrantID") == activeGrantID
+                || shared.bool(forKey: "mobile.usage.monitorIntervalEnded")
+            if grantFinished {
+                if applyRestriction() {
+                    status = "SHIELD_STATUS_SHIELDED"
+                } else {
+                    status = "SHIELD_STATUS_ERROR"
+                    failureReason = errorMessage ?? "利用枠終了後の制限を適用できませんでした。"
+                }
+            } else if DeviceActivityUsageMonitor().isMonitoring {
+                if clearRestriction() {
+                    status = "SHIELD_STATUS_UNSHIELDED"
+                }
+            } else {
+                if applyRestriction() {
+                    status = "SHIELD_STATUS_ERROR"
+                    failureReason = "利用時間の監視が停止していたため、制限を維持しました。"
+                    shared.set(status, forKey: "mobile.usage.localShieldStatus")
+                } else {
+                    status = "SHIELD_STATUS_ERROR"
+                    failureReason = errorMessage ?? "利用時間の監視停止後に制限を適用できませんでした。"
+                }
+            }
+        case .unrestricted, .sessionEnded:
+            if clearRestriction() {
+                status = "SHIELD_STATUS_UNSHIELDED"
+            }
+        case .unknown:
+            return
+        }
+
+        guard let deviceID = snapshot.restrictionDeviceID else { return }
+        let permissionStatus = isAuthorized
+            ? "PERMISSION_STATUS_GRANTED"
+            : (authorizationStatus == .denied ? "PERMISSION_STATUS_DENIED" : "PERMISSION_STATUS_NOT_DETERMINED")
+        let serverAlreadyMatches = snapshot.restrictionAppliedRevision >= snapshot.restrictionControlRevision
+            && snapshot.restrictionShieldStatus == status
+            && snapshot.restrictionPermissionStatus == permissionStatus
+        guard !serverAlreadyMatches else { return }
+
+        let operationKey = "mobile.restriction.reportOperation.\(snapshot.restrictionControlRevision).\(status)"
+        let operationID = shared.string(forKey: operationKey) ?? UUID().uuidString.lowercased()
+        shared.set(operationID, forKey: operationKey)
+        do {
+            let repository = try ConfiguredUsageGrantRepository()
+            try await repository.reportRestrictionState(
+                operationID: operationID,
+                deviceID: deviceID,
+                controlRevision: snapshot.restrictionControlRevision,
+                grantID: status == "SHIELD_STATUS_UNSHIELDED" ? grantID : "",
+                shieldStatus: status,
+                permissionStatus: permissionStatus,
+                failureReason: failureReason
+            )
+            shared.removeObject(forKey: operationKey)
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "制限の適用状態をbackendへ報告できませんでした。"
+        }
     }
 
     private func saveSelection() {

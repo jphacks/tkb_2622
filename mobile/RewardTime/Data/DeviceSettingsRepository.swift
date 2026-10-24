@@ -96,6 +96,7 @@ struct ConfiguredDeviceSettingsRepository {
             registrationID: registrationID,
             deviceName: deviceName
         )
+        defaults.set(device.id, forKey: "mobile.device.id")
 
         let currentPolicy = try await currentPolicy(client: client, deviceID: device.id)
         if let currentPolicy,

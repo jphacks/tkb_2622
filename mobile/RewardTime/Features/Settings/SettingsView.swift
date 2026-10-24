@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var screenTime: MobileScreenTimeController
     @State private var isFamilyActivityPickerPresented = false
     @State private var isSyncingDeviceSettings = false
+    @State private var hasOpenUsageGrant = false
     @State private var deviceSyncStatus = "未同期"
     @State private var deviceSyncError: String?
 
@@ -118,7 +119,7 @@ struct SettingsView: View {
                         Label("アプリを選ぶ", systemImage: "plus.app")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!screenTime.isAuthorized)
+                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
 
                     if !screenTime.selection.applicationTokens.isEmpty {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
@@ -154,6 +155,13 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.primary)
+                .disabled(hasOpenUsageGrant)
+
+                if hasOpenUsageGrant {
+                    Text("利用枠を使用中です。作業を再開して利用枠を閉じるまで制限設定は変更できません。")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
 
                 if let reason = screenTime.applyRestrictionUnavailableReason {
                     Label(reason, systemImage: "info.circle")
@@ -165,7 +173,7 @@ struct SettingsView: View {
                 Button("このアプリの制限を解除", role: .destructive) {
                     screenTime.clearRestriction()
                 }
-                .disabled(screenTime.appliedRestrictionMode == nil)
+                .disabled(screenTime.appliedRestrictionMode == nil || hasOpenUsageGrant)
 
                 Text("適用後、対象アプリを開いてiOSのShield画面が出ることを確認してください。解除ボタンからいつでも戻せます。")
                     .font(.caption)
@@ -204,19 +212,25 @@ struct SettingsView: View {
         }
         .navigationTitle("設定")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { screenTime.refreshAuthorizationStatus() }
-        .onChange(of: scenePhase) { phase in
-            if phase == .active { screenTime.refreshAuthorizationStatus() }
+        .onAppear {
+            screenTime.refreshAuthorizationStatus()
+            refreshOpenUsageGrant()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                screenTime.refreshAuthorizationStatus()
+                refreshOpenUsageGrant()
+            }
         }
         .familyActivityPicker(
             isPresented: $isFamilyActivityPickerPresented,
             selection: $screenTime.selection
         )
         .task { await syncDeviceSettings() }
-        .onChange(of: screenTime.deviceConfigVersion) { _ in
+        .onChange(of: screenTime.deviceConfigVersion) { _, _ in
             Task { await syncDeviceSettings() }
         }
-        .onChange(of: screenTime.authorizationStatusLabel) { _ in
+        .onChange(of: screenTime.authorizationStatusLabel) { _, _ in
             Task { await syncDeviceSettings() }
         }
     }
@@ -224,6 +238,11 @@ struct SettingsView: View {
     private func sectionTitle(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.subheadline.weight(.bold))
+    }
+
+    private func refreshOpenUsageGrant() {
+        hasOpenUsageGrant = ScreenTimeSharedStorage.defaults
+            .string(forKey: "mobile.usage.activeGrantID") != nil
     }
 
     @MainActor
@@ -268,6 +287,7 @@ struct SettingsView: View {
             modeOption(title: mode.title, detail: mode.detail, isSelected: screenTime.restrictionMode == mode)
         }
         .buttonStyle(.plain)
+        .disabled(hasOpenUsageGrant)
         .accessibilityIdentifier("restrictionMode_\(mode.rawValue)")
     }
 

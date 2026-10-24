@@ -11,6 +11,7 @@ struct APIHomeRepository: HomeRepository {
     private struct SessionDTO: Decodable {
         let id: String
         let status: String
+        let version: ProtoJSONInt64?
         let taskSnapshot: TaskSettingsDTO?
         let durations: DurationsDTO?
     }
@@ -47,18 +48,22 @@ struct APIHomeRepository: HomeRepository {
 
     private struct RestrictionStateDTO: Decodable {
         let sessionId: String
+        let deviceId: String
         let controlRevision: ProtoJSONInt64
         let desiredMode: String
         let appliedRevision: ProtoJSONInt64
         let shieldStatus: String
+        let permissionStatus: String
+        let activeGrant: UsageGrantDTO?
 
         private enum CodingKeys: String, CodingKey {
-            case sessionId, controlRevision, desiredMode, appliedRevision, shieldStatus
+            case sessionId, deviceId, controlRevision, desiredMode, appliedRevision, shieldStatus, permissionStatus, activeGrant
         }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId) ?? ""
+            deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId) ?? ""
             controlRevision = try container.decodeIfPresent(ProtoJSONInt64.self, forKey: .controlRevision)
                 ?? ProtoJSONInt64(value: 0)
             desiredMode = try container.decodeIfPresent(String.self, forKey: .desiredMode)
@@ -67,7 +72,16 @@ struct APIHomeRepository: HomeRepository {
                 ?? ProtoJSONInt64(value: 0)
             shieldStatus = try container.decodeIfPresent(String.self, forKey: .shieldStatus)
                 ?? "SHIELD_STATUS_UNSPECIFIED"
+            permissionStatus = try container.decodeIfPresent(String.self, forKey: .permissionStatus)
+                ?? "PERMISSION_STATUS_UNSPECIFIED"
+            activeGrant = try container.decodeIfPresent(UsageGrantDTO.self, forKey: .activeGrant)
         }
+    }
+
+    private struct UsageGrantDTO: Decodable {
+        let id: String
+        let reservedSeconds: ProtoJSONInt64
+        let status: String
     }
 
     private let client: ConnectJSONClient
@@ -124,7 +138,17 @@ struct APIHomeRepository: HomeRepository {
             restrictedApps: [],
             restrictedApplicationCount: selectedApplicationCount,
             lastSyncedAt: .now,
-            isSampleData: false
+            isSampleData: false,
+            sessionID: session?.id,
+            sessionVersion: session?.version?.value,
+            restrictionDeviceID: restriction.deviceId.isEmpty ? nil : restriction.deviceId,
+            restrictionControlRevision: restriction.controlRevision.value,
+            restrictionAppliedRevision: restriction.appliedRevision.value,
+            restrictionShieldStatus: restriction.shieldStatus,
+            restrictionPermissionStatus: restriction.permissionStatus,
+            activeGrantID: restriction.activeGrant?.id,
+            activeGrantReservedSeconds: restriction.activeGrant.map { Int($0.reservedSeconds.value) },
+            activeGrantStatus: restriction.activeGrant?.status
         )
     }
 
