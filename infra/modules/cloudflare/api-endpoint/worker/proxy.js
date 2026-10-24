@@ -11,9 +11,12 @@ const MAX_AUTHORIZATION_LENGTH = 16 * 1024;
 const BEARER = /^Bearer [A-Za-z0-9._~+/=-]+$/;
 const ORIGIN_AUTH_HEADER = "X-Origin-Auth";
 
+// Cloud Run は末尾が z のパス（/healthz 等）を予約しておりコンテナへ届かないため，backend の /health へ転送する
+const ORIGIN_PATHS = { "/healthz": "/health" };
+
 // 既存クライアント（iOS の ConnectJSONClient，desktop の cloud/client.go）が使う形だけを許可する
 const ROUTES = [
-  { method: "GET", path: (p) => p === "/healthz" },
+  { method: "GET", path: (p) => p === "/healthz" || p === "/health" },
   { method: "POST", path: (p) => CONNECT_PATH.test(p), auth: true, jsonBody: true },
   { method: "GET", path: (p) => p === "/v1/group/work-starts", auth: true },
 ];
@@ -61,7 +64,7 @@ export default {
       }
     }
 
-    const target = new URL(url.pathname + url.search, env.ORIGIN_URL);
+    const target = new URL((ORIGIN_PATHS[url.pathname] ?? url.pathname) + url.search, env.ORIGIN_URL);
     const headers = new Headers(request.headers);
     headers.set(ORIGIN_AUTH_HEADER, env.ORIGIN_AUTH_TOKEN);
     headers.set("X-Forwarded-Host", url.host);

@@ -65,10 +65,17 @@ test("正しい RPC は共有シークレットを付けて Cloud Run へ転送�
   assert.equal(forwarded.init.redirect, "manual");
 });
 
-test("GET /healthz は認証なしで転送する", async () => {
+test("GET /healthz は認証なしで Cloud Run の /health へ転送する（Cloud Run は末尾 z のパスを予約しているため）", async () => {
   const response = await worker.fetch(new Request(`${BASE}/healthz`), env);
   assert.equal(response.status, 200);
+  assert.equal(forwarded.url, "https://tkb-dev-api-xxxx.a.run.app/health");
   assert.equal(forwarded.init.headers.get("X-Origin-Auth"), TOKEN);
+});
+
+test("GET /health もそのまま転送する", async () => {
+  const response = await worker.fetch(new Request(`${BASE}/health`), env);
+  assert.equal(response.status, 200);
+  assert.equal(forwarded.url, "https://tkb-dev-api-xxxx.a.run.app/health");
 });
 
 test("GET /v1/group/work-starts は Bearer があればクエリ付きで転送する", async () => {
