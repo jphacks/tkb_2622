@@ -245,6 +245,10 @@ struct IdentityAPIRepository {
     client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
   }
 
+  init(client: ConnectJSONClient) {
+    self.client = client
+  }
+
   func ensureUserAndFetchCurrentUser(operationID: String) async throws -> MobileIdentity {
     let _: EnsureUserResponse = try await client.call(
       service: "identity.v1.IdentityService",
