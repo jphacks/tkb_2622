@@ -21,6 +21,7 @@ service FocusService {
   rpc AbortSession(AbortSessionRequest) returns (AbortSessionResponse);
   rpc GetCurrentSession(GetCurrentSessionRequest) returns (GetCurrentSessionResponse);
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc GetSessionOperation(GetSessionOperationRequest) returns (GetSessionOperationResponse);
 }
 
@@ -227,6 +228,18 @@ message GetSessionRequest { string session_id = 1; }
 message GetSessionResponse {
   Session session = 1;
   reward.v1.RewardSummary reward = 2;
+}
+message SessionHistoryEntry {
+  Session session = 1;
+  reward.v1.RewardSummary reward = 2;
+}
+message ListSessionsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+message ListSessionsResponse {
+  repeated SessionHistoryEntry entries = 1;
+  string next_page_token = 2;
 }
 enum OperationKind {
   OPERATION_KIND_UNSPECIFIED = 0;

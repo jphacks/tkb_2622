@@ -5,6 +5,7 @@ package application
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -56,6 +57,14 @@ type TaskPage struct {
 	Tasks []Task
 	Next  string
 }
+type SessionPage struct {
+	Sessions []Session
+	Next     string
+}
+type sessionCursor struct {
+	StartedAt time.Time `json:"started_at"`
+	ID        string    `json:"id"`
+}
 
 // Repository is implemented on the DB or on a transaction. Methods return ErrNotFound for missing rows.
 type Repository interface {
@@ -65,6 +74,7 @@ type Repository interface {
 	ListTasks(ctx context.Context, userID, after string, limit int) ([]Task, error)
 	CreateSession(ctx context.Context, s Session) error
 	GetSession(ctx context.Context, userID, sessionID string) (Session, error)
+	ListSessions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]Session, error)
 	CurrentSession(ctx context.Context, userID string) (Session, error)
 	// UpdateSession saves s if the stored row still has prevVersion and prevAcceptedSeq.
 	UpdateSession(ctx context.Context, s Session, prevVersion, prevAcceptedSeq int64) error
@@ -217,6 +227,39 @@ func (s *Service) GetSession(ctx context.Context, a Actor, sessionID string) (Se
 		return Session{}, ErrInvalid
 	}
 	return s.store.Reader().GetSession(ctx, a.UserID, sessionID)
+}
+
+// ListSessions returns the caller's sessions newest first. Page tokens are opaque cursors.
+func (s *Service) ListSessions(ctx context.Context, a Actor, token string, size int) (SessionPage, error) {
+	if size < 0 || size > 100 {
+		return SessionPage{}, ErrInvalid
+	}
+	if size == 0 {
+		size = 20
+	}
+	var cursor sessionCursor
+	if token != "" {
+		encoded, err := base64.RawURLEncoding.DecodeString(token)
+		if err != nil || json.Unmarshal(encoded, &cursor) != nil || !ValidID(cursor.ID) || cursor.StartedAt.IsZero() {
+			return SessionPage{}, ErrInvalid
+		}
+		cursor.StartedAt = cursor.StartedAt.UTC()
+	}
+	sessions, err := s.store.Reader().ListSessions(ctx, a.UserID, cursor.StartedAt, cursor.ID, size+1)
+	if err != nil {
+		return SessionPage{}, err
+	}
+	page := SessionPage{Sessions: sessions}
+	if len(sessions) > size {
+		page.Sessions = sessions[:size]
+		last := page.Sessions[len(page.Sessions)-1]
+		encoded, err := json.Marshal(sessionCursor{StartedAt: last.StartedAt, ID: last.ID})
+		if err != nil {
+			return SessionPage{}, err
+		}
+		page.Next = base64.RawURLEncoding.EncodeToString(encoded)
+	}
+	return page, nil
 }
 
 var sessionKinds = map[string]bool{"start": true, "pause": true, "resume": true, "finish": true, "abort": true}

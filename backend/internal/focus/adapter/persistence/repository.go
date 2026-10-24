@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +26,12 @@ func (s *Store) InUserTx(ctx context.Context, userID string, fn func(application
 func (s *Store) Reader() application.Repository { return New(s.db) }
 
 // Repository works on a *sql.DB or on the *sql.Tx of a workflow transaction.
-type Repository struct{ q *q.Queries }
+type Repository struct {
+	q  *q.Queries
+	db q.DBTX
+}
 
-func New(db q.DBTX) *Repository { return &Repository{q: q.New(db)} }
+func New(db q.DBTX) *Repository { return &Repository{q: q.New(db), db: db} }
 
 func uid(s string) uuid.UUID { return uuid.MustParse(s) }
 func translate(err error) error {
@@ -107,6 +111,36 @@ func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error 
 func (r *Repository) GetSession(ctx context.Context, userID, sessionID string) (domain.Session, error) {
 	row, err := r.q.GetSession(ctx, q.GetSessionParams{UserID: uid(userID), ID: uid(sessionID)})
 	return asSession(row), translate(err)
+}
+func (r *Repository) ListSessions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]domain.Session, error) {
+	query := `SELECT * FROM app.work_sessions WHERE user_id = $1 AND status IN ('FINALIZED', 'ABORTED')`
+	args := []any{uid(userID)}
+	if !before.IsZero() {
+		query += ` AND (started_at, id) < ($2, $3)`
+		args = append(args, before, uid(beforeID))
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(` ORDER BY started_at DESC, id DESC LIMIT $%d`, len(args))
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Session, 0, limit)
+	for rows.Next() {
+		var row q.AppWorkSession
+		if err := rows.Scan(
+			&row.ID, &row.UserID, &row.DeviceID, &row.TaskID, &row.TaskName, &row.Category, &row.Mode,
+			&row.PlannedSeconds, &row.MinimumSeconds, &row.Status, &row.Version, &row.StartedAt,
+			&row.RunningSince, &row.ServerActiveMillis, &row.PausedAt, &row.EndedAt, &row.AcceptedSeq,
+			&row.LastSegmentEnd, &row.TaskMillis, &row.RelatedMillis, &row.DistractionMillis,
+			&row.UnknownMillis, &row.IdleMillis, &row.FinalSegments,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, asSession(row))
+	}
+	return out, rows.Err()
 }
 func (r *Repository) CurrentSession(ctx context.Context, userID string) (domain.Session, error) {
 	row, err := r.q.CurrentSession(ctx, uid(userID))

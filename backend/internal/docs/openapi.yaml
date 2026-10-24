@@ -404,6 +404,31 @@ components:
           title: task
       title: GetTaskResponse
       additionalProperties: false
+    focus.v1.ListSessionsRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListSessionsRequest
+      additionalProperties: false
+    focus.v1.ListSessionsResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.SessionHistoryEntry'
+          title: entries
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListSessionsResponse
+      additionalProperties: false
     focus.v1.ListTasksRequest:
       type: object
       properties:
@@ -585,6 +610,19 @@ components:
           format: double
           description: Wrate = (T + R) / E. Unset when E is 0.
       title: Session
+      additionalProperties: false
+    focus.v1.SessionHistoryEntry:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        reward:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardSummary'
+          title: reward
+      title: SessionHistoryEntry
       additionalProperties: false
     focus.v1.SessionStatus:
       type: string
@@ -1448,6 +1486,31 @@ components:
           title: balance
       title: GetBalanceResponse
       additionalProperties: false
+    reward.v1.ListTransactionsRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListTransactionsRequest
+      additionalProperties: false
+    reward.v1.ListTransactionsResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/reward.v1.RewardTransaction'
+          title: transactions
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListTransactionsResponse
+      additionalProperties: false
     reward.v1.RewardBalance:
       type: object
       properties:
@@ -1488,6 +1551,32 @@ components:
       title: RewardSummary
       additionalProperties: false
       description: Earned, spent and discarded seconds of one session. Spending arrives with the Restriction API.
+    reward.v1.RewardTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        sessionId:
+          type: string
+          title: session_id
+        type:
+          type: string
+          title: type
+        amountSeconds:
+          type: string
+          title: amount_seconds
+          format: int64
+        balanceAfter:
+          type: string
+          title: balance_after
+          format: int64
+        occurredAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: occurred_at
+      title: RewardTransaction
+      additionalProperties: false
 paths:
   /focus.v1.FocusService/AbortSession:
     post:
@@ -1755,6 +1844,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.GetTaskResponse'
+  /focus.v1.FocusService/ListSessions:
+    post:
+      tags:
+        - FocusService
+      summary: ListSessions
+      operationId: focus.v1.FocusService.ListSessions
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.ListSessionsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.ListSessionsResponse'
   /focus.v1.FocusService/ListTasks:
     post:
       tags:
@@ -2558,6 +2685,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/reward.v1.GetBalanceResponse'
+  /reward.v1.RewardService/ListTransactions:
+    post:
+      tags:
+        - RewardService
+      summary: ListTransactions
+      operationId: reward.v1.RewardService.ListTransactions
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/reward.v1.ListTransactionsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/reward.v1.ListTransactionsResponse'
 tags:
   - name: RewardService
   - name: RestrictionService

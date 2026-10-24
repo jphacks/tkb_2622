@@ -272,6 +272,28 @@ func (h *Handler) GetSession(ctx context.Context, req *connect.Request[v1.GetSes
 	}
 	return connect.NewResponse(&v1.GetSessionResponse{Session: session(d.Session), Reward: &rewardv1.RewardSummary{EarnedSeconds: d.Reward.EarnedSeconds, SpentSeconds: d.Reward.SpentSeconds, DiscardedSeconds: d.Reward.DiscardedSeconds}}), nil
 }
+func (h *Handler) ListSessions(ctx context.Context, req *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
+	a, err := h.resolve(ctx)
+	if err != nil {
+		return nil, rpcError(err)
+	}
+	page, err := h.service.ListSessions(ctx, a, req.Msg.PageToken, int(req.Msg.PageSize))
+	if err != nil {
+		return nil, rpcError(err)
+	}
+	res := &v1.ListSessionsResponse{Entries: make([]*v1.SessionHistoryEntry, 0, len(page.Sessions)), NextPageToken: page.Next}
+	for _, s := range page.Sessions {
+		d, err := h.sessions.Detail(ctx, a, s.ID)
+		if err != nil {
+			return nil, rpcError(err)
+		}
+		res.Entries = append(res.Entries, &v1.SessionHistoryEntry{
+			Session: session(d.Session),
+			Reward:  &rewardv1.RewardSummary{EarnedSeconds: d.Reward.EarnedSeconds, SpentSeconds: d.Reward.SpentSeconds, DiscardedSeconds: d.Reward.DiscardedSeconds},
+		})
+	}
+	return connect.NewResponse(res), nil
+}
 func (h *Handler) GetSessionOperation(ctx context.Context, req *connect.Request[v1.GetSessionOperationRequest]) (*connect.Response[v1.GetSessionOperationResponse], error) {
 	a, err := h.resolve(ctx)
 	if err != nil {
