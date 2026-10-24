@@ -18,11 +18,13 @@ private final class HistoryViewModel: ObservableObject {
     @Published private(set) var nextWorkPageToken = ""
     @Published private(set) var nextRewardPageToken = ""
     @Published private(set) var didLoad = false
+    @Published private(set) var isShowingStaleSnapshot = false
 
     private var repository: (any HistoryRepository)?
 
     func load() async {
         guard !isLoading else { return }
+        let hadLoadedSnapshot = didLoad
         isLoading = true
         errorMessage = nil
         defer {
@@ -40,7 +42,9 @@ private final class HistoryViewModel: ObservableObject {
             nextWorkPageToken = work.nextPageToken
             rewardItems = rewards.items
             nextRewardPageToken = rewards.nextPageToken
+            isShowingStaleSnapshot = false
         } catch {
+            isShowingStaleSnapshot = hadLoadedSnapshot && (!workItems.isEmpty || !rewardItems.isEmpty)
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "履歴を読み込めませんでした。接続状態を確認してください。"
         }
@@ -94,6 +98,11 @@ struct HistoryView: View {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(AppTheme.secondaryInk)
+                    if model.isShowingStaleSnapshot {
+                        Text("前回読み込んだ履歴を表示しています。最新の状態ではない可能性があります。")
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
                     Button("再読み込み") { Task { await model.load() } }
                         .buttonStyle(.borderedProminent)
                         .tint(AppTheme.primary)
