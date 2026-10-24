@@ -177,7 +177,8 @@ struct ConfiguredUsageGrantRepository {
         grantID: String = "",
         shieldStatus: String,
         permissionStatus: String,
-        failureReason: String = ""
+        failureReason: String = "",
+        appliedAt: Date = Date()
     ) async throws {
         let _: ReportStateResponse = try await client.call(
             service: "restriction.v1.RestrictionService",
@@ -188,7 +189,7 @@ struct ConfiguredUsageGrantRepository {
                 controlRevision: String(controlRevision),
                 grantId: grantID,
                 shieldStatus: shieldStatus,
-                appliedAt: Self.timestamp(Date()),
+                appliedAt: Self.timestamp(appliedAt),
                 permissionStatus: permissionStatus,
                 failureReason: failureReason
             ),

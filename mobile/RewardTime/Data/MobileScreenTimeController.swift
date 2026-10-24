@@ -259,23 +259,56 @@ final class MobileScreenTimeController: ObservableObject {
         let serverAlreadyMatches = snapshot.restrictionAppliedRevision >= snapshot.restrictionControlRevision
             && snapshot.restrictionShieldStatus == status
             && snapshot.restrictionPermissionStatus == permissionStatus
-        guard !serverAlreadyMatches else { return }
-
         let operationKey = "mobile.restriction.reportOperation.\(snapshot.restrictionControlRevision).\(status)"
-        let operationID = shared.string(forKey: operationKey) ?? UUID().uuidString.lowercased()
-        shared.set(operationID, forKey: operationKey)
+        let appliedAtKey = "\(operationKey).appliedAt"
+        let requestFingerprintKey = "\(operationKey).requestFingerprint"
+        if serverAlreadyMatches {
+            shared.removeObject(forKey: operationKey)
+            shared.removeObject(forKey: appliedAtKey)
+            shared.removeObject(forKey: requestFingerprintKey)
+            return
+        }
+
+        let grantID = status == "SHIELD_STATUS_UNSHIELDED" ? grantID : ""
+        let requestFingerprint = [
+            deviceID,
+            String(snapshot.restrictionControlRevision),
+            grantID,
+            status,
+            permissionStatus,
+            failureReason
+        ].joined(separator: "\u{1f}")
+        let hasMatchingPendingRequest = shared.string(forKey: requestFingerprintKey) == requestFingerprint
+            && shared.object(forKey: appliedAtKey) as? Date != nil
+        let operationID: String
+        let appliedAt: Date
+        if hasMatchingPendingRequest,
+           let pendingOperationID = shared.string(forKey: operationKey),
+           let pendingAppliedAt = shared.object(forKey: appliedAtKey) as? Date {
+            operationID = pendingOperationID
+            appliedAt = pendingAppliedAt
+        } else {
+            operationID = UUID().uuidString.lowercased()
+            appliedAt = Date()
+            shared.set(operationID, forKey: operationKey)
+            shared.set(appliedAt, forKey: appliedAtKey)
+            shared.set(requestFingerprint, forKey: requestFingerprintKey)
+        }
         do {
             let repository = try ConfiguredUsageGrantRepository()
             try await repository.reportRestrictionState(
                 operationID: operationID,
                 deviceID: deviceID,
                 controlRevision: snapshot.restrictionControlRevision,
-                grantID: status == "SHIELD_STATUS_UNSHIELDED" ? grantID : "",
+                grantID: grantID,
                 shieldStatus: status,
                 permissionStatus: permissionStatus,
-                failureReason: failureReason
+                failureReason: failureReason,
+                appliedAt: appliedAt
             )
             shared.removeObject(forKey: operationKey)
+            shared.removeObject(forKey: appliedAtKey)
+            shared.removeObject(forKey: requestFingerprintKey)
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "制限の適用状態をbackendへ報告できませんでした。"
