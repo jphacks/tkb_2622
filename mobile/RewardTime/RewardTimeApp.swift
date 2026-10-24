@@ -4,7 +4,7 @@ import SwiftUI
 struct RewardTimeApp: App {
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            RootTabView()
         }
     }
 }

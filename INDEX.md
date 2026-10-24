@@ -8,7 +8,7 @@
 | --- | --- |
 | [backend/](backend/) | Go APIの最小実装。Userテーブル，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-| [mobile/](mobile/) | SwiftUI本番アプリ用。現時点では実装未着手。[開発の進め方](mobile/README.md)を参照 |
+| [mobile/](mobile/) | SwiftUIアプリの画面モック実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | インフラ構成の管理用 |
 | [poc/](poc/) | 必要な機能の PoC 用。[iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |

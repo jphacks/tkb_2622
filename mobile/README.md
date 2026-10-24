@@ -37,9 +37,21 @@ HomeRepository（ホーム情報取得の境界）
 
 ## 現在の実装
 
-`ios-reward-time.xcodeproj` にSwiftUIアプリの土台を作成し、`HomeRepository` の仮データ実装を通してiPhone作業中ホームを表示する。作業状態・報酬残高・iPhone制限状態・最終更新時刻は表示専用で、操作による残高変更や制限解除は行わない。画面には仮データであることを明示する。SwiftUI Previewでは作業中・一時停止中・小休憩中・セッションなしの表示を確認できる。
+`ios-reward-time.xcodeproj` にSwiftUIアプリを作成し、モック08〜14に対応する画面を配置した。値は仮データで、画面にはサンプルであることを表示する。
 
-最初のコード単位はここまでとし、次はAPI仕様で必要な取得契約が確定した範囲から通信実装へ置き換える。残高消費、認証、FamilyControls、通知、グループ、履歴はこの段階に含めない。
+| モック | 実装場所・現在の動作 |
+| --- | --- |
+| 08 作業中ホーム | `Features/Home/HomeView.swift`。計測時間、最小時間までの残り、報酬残高、制限対象アプリ、適用状態を表示。小休憩へ進めるのは一時停止中だけ |
+| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビューのみ。OSのShield表示・アプリ制限は行わない。Debugビルドのホームから開ける |
+| 10 残高を使う | `Features/Usage/UsageReservationView.swift`。時間を選べるが、確保API未接続のため残高は変更しない |
+| 11 利用中 | 同ファイルの `ActiveUsageView`。モック値の表示のみ。残り時間の計測・再制限は行わない |
+| 12 設定 | `Features/Settings/SettingsView.swift`。許可・制限モード・アプリ選択・端末情報を表示。端末設定を変える操作は未接続 |
+| 13 グループ | `Features/Groups/GroupView.swift`。サンプルメンバーと作業開始履歴を表示。招待・退出は未接続 |
+| 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く通知例。通知送信はしない |
+
+08モックの「作業を終了した後も残高を使える」ように読める箇所は、API仕様に合わせて「一時停止中のみ利用枠を確保できる」表示にしている。終了・中止時は未使用残高を破棄する。09の実ShieldはiOSが表示するOS画面であり、FamilyControls未接続の現状ではアプリから適用できない。Debugビルドから開けるのは静的な見た目のプレビューだけ。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進め、10から11のサンプル表示を開ける。履歴タブは08モック内にタブ表示があるため置いているが、専用モックと履歴APIがないため説明用の空状態にしている。
+
+次はAPI仕様で取得契約が確定した範囲から通信実装へ置き換える。現在はヘルスチェック以外の業務APIがなく、認証とproto契約も未確定のため、残高消費、認証、OS制限、通知配信、グループ更新、履歴取得は接続していない。
 
 ## ソース構成
 
@@ -50,9 +62,16 @@ mobile/
     ├── RewardTimeApp.swift
     ├── Domain/MobileHomeSnapshot.swift
     ├── Data/HomeRepository.swift
-    └── Features/Home/
-        ├── HomeView.swift
-        └── HomeViewModel.swift
+    └── Features/
+        ├── RootTabView.swift
+        ├── Shared/AppTheme.swift
+        ├── Home/HomeView.swift, HomeViewModel.swift
+        ├── Usage/UsageReservationView.swift
+        ├── Restriction/RestrictionShieldPreview.swift
+        ├── Settings/SettingsView.swift
+        ├── Groups/GroupView.swift
+        ├── Notifications/NotificationExamplesView.swift
+        └── History/HistoryView.swift
 ```
 
 ## ビルドと起動
@@ -73,9 +92,8 @@ xcodebuild \
 
 ## 確認方法
 
-- XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。
+- XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。各画面のSwiftUI Previewでも状態を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
-- iOS Simulatorで起動し、仮データ表示と状態カードを確認する。Simulatorが使えない場合はXcodeのエラーを記録し、CLIビルドまで確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
 
 ## 未決事項

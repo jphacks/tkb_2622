@@ -13,6 +13,11 @@ final class HomeViewModel: ObservableObject {
 
     private let repository: any HomeRepository
 
+    var lastUpdatedTime: String {
+        guard case .loaded(let snapshot) = state else { return "未同期" }
+        return snapshot.lastSyncedAt.formatted(date: .omitted, time: .shortened)
+    }
+
     init(repository: any HomeRepository) {
         self.repository = repository
     }
@@ -25,5 +30,9 @@ final class HomeViewModel: ObservableObject {
         } catch {
             state = .failed
         }
+    }
+
+    func showPreview(_ snapshot: MobileHomeSnapshot) {
+        state = .loaded(snapshot)
     }
 }
