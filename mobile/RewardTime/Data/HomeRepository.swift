@@ -5,12 +5,13 @@ protocol HomeRepository {
 }
 
 struct MockHomeRepository: HomeRepository {
+    private let snapshot: MobileHomeSnapshot
+
+    init(snapshot: MobileHomeSnapshot = .workingSample) {
+        self.snapshot = snapshot
+    }
+
     func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
-        MobileHomeSnapshot(
-            sessionStatus: .working,
-            rewardBalanceMinutes: 42,
-            restrictionStatus: .restricted,
-            lastSyncedAt: .now
-        )
+        snapshot
     }
 }

@@ -111,6 +111,10 @@ struct HomeView: View {
                 .foregroundStyle(.secondary)
 
             switch snapshot.restrictionStatus {
+            case .unrestricted:
+                Label("制限解除済み", systemImage: "lock.open")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.secondary)
             case .restricted:
                 Label("制限中", systemImage: "lock.fill")
                     .font(.title3.weight(.semibold))
@@ -210,6 +214,15 @@ struct HomeView: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        HomeView()
+        Group {
+            HomeView(repository: MockHomeRepository(snapshot: .workingSample))
+                .previewDisplayName("作業中・制限中")
+            HomeView(repository: MockHomeRepository(snapshot: .pausedSample))
+                .previewDisplayName("一時停止中")
+            HomeView(repository: MockHomeRepository(snapshot: .releasedSample))
+                .previewDisplayName("小休憩中")
+            HomeView(repository: MockHomeRepository(snapshot: .noSessionSample))
+                .previewDisplayName("セッションなし")
+        }
     }
 }
