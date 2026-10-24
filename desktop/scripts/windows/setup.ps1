@@ -36,6 +36,8 @@ function Test-NodeVersion {
 }
 
 Assert-WindowsCheckout
+# WSL から起動した PowerShell は WSL 起動時点の PATH を引き継ぐため，インストール済みのツールが見えないことがある
+Update-SessionPath
 
 # ---------- Go ----------
 if (-not (Test-Command 'go')) {

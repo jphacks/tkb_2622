@@ -3,6 +3,8 @@
 . (Join-Path $PSScriptRoot 'common.ps1')
 
 Assert-WindowsCheckout
+# WSL から起動した PowerShell は WSL 起動時点の PATH を引き継ぐため，インストール済みのツールが見えないことがある
+Update-SessionPath
 
 if (-not (Test-Command 'go')) {
     throw 'Go がありません．先に make setup-win を実行してください．'
