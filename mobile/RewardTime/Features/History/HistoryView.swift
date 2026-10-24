@@ -48,7 +48,8 @@ private final class HistoryViewModel: ObservableObject {
 
     func loadMore() async {
         guard !isLoadingMore else { return }
-        let token = section == .work ? nextWorkPageToken : nextRewardPageToken
+        let requestedSection = section
+        let token = requestedSection == .work ? nextWorkPageToken : nextRewardPageToken
         guard !token.isEmpty else { return }
         isLoadingMore = true
         errorMessage = nil
@@ -57,7 +58,7 @@ private final class HistoryViewModel: ObservableObject {
         do {
             let repository = try self.repository ?? ConfiguredHistoryRepository()
             self.repository = repository
-            switch section {
+            switch requestedSection {
             case .work:
                 let page = try await repository.fetchWorkHistory(pageToken: token)
                 workItems.append(contentsOf: page.items)
