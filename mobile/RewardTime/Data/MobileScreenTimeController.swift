@@ -16,8 +16,10 @@ final class MobileScreenTimeController: ObservableObject {
         didSet {
             defaults.set(restrictionMode.rawValue, forKey: restrictionModeDefaultsKey)
             errorMessage = nil
+            if oldValue != restrictionMode { advanceDeviceConfigVersion() }
         }
     }
+    @Published private(set) var deviceConfigVersion: Int64
     @Published private(set) var appliedRestrictionMode: LocalRestrictionMode?
 
     private let authorizationCenter: AuthorizationCenter
@@ -26,6 +28,7 @@ final class MobileScreenTimeController: ObservableObject {
     private let selectionDefaultsKey = "mobile.screenTime.selection"
     private let selectionConfiguredDefaultsKey = "mobile.screenTime.selectionConfigured"
     private let restrictionModeDefaultsKey = "mobile.screenTime.restrictionMode"
+    private let deviceConfigVersionDefaultsKey = "mobile.screenTime.deviceConfigVersion"
     @Published private(set) var hasSelectionBeenConfigured: Bool
 
     init(
@@ -45,7 +48,24 @@ final class MobileScreenTimeController: ObservableObject {
             || !storedSelection.applicationTokens.isEmpty
         restrictionMode = defaults.string(forKey: restrictionModeDefaultsKey)
             .flatMap(LocalRestrictionMode.init(rawValue:)) ?? .selectedApplications
+        deviceConfigVersion = Int64(defaults.integer(forKey: deviceConfigVersionDefaultsKey))
         appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
+    }
+
+    var backendRestrictionSettings: DeviceRestrictionSettings {
+        let configured: Bool
+        switch restrictionMode {
+        case .selectedApplications:
+            configured = isAuthorized && selectedApplicationCount > 0 && !hasUnsupportedTargets
+        case .entireDevice:
+            configured = isAuthorized
+        }
+        return DeviceRestrictionSettings(
+            enabled: configured,
+            targetMode: restrictionMode == .selectedApplications ? "TARGET_MODE_SELECTED_APPS" : "TARGET_MODE_DEVICE_WIDE",
+            configured: configured,
+            deviceConfigVersion: deviceConfigVersion
+        )
     }
 
     var isAuthorized: Bool {
@@ -143,13 +163,20 @@ final class MobileScreenTimeController: ObservableObject {
 
     private func saveSelection() {
         do {
-            defaults.set(try JSONEncoder().encode(selection), forKey: selectionDefaultsKey)
+            let data = try JSONEncoder().encode(selection)
+            if defaults.data(forKey: selectionDefaultsKey) != data { advanceDeviceConfigVersion() }
+            defaults.set(data, forKey: selectionDefaultsKey)
             defaults.set(true, forKey: selectionConfiguredDefaultsKey)
             hasSelectionBeenConfigured = true
             errorMessage = nil
         } catch {
             errorMessage = "選択したアプリをこの端末に保存できませんでした。"
         }
+    }
+
+    private func advanceDeviceConfigVersion() {
+        deviceConfigVersion += 1
+        defaults.set(Int(deviceConfigVersion), forKey: deviceConfigVersionDefaultsKey)
     }
 
     private static func readAppliedMode(from store: ManagedSettingsStore) -> LocalRestrictionMode? {

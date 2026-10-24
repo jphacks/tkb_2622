@@ -5,11 +5,16 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var screenTime: MobileScreenTimeController
     @State private var isFamilyActivityPickerPresented = false
+    @State private var isSyncingDeviceSettings = false
+    @State private var deviceSyncStatus = "未同期"
+    @State private var deviceSyncError: String?
 
     var body: some View {
         ScreenContainer {
             #if DEBUG
-            AuthenticationSettingsSection()
+            AuthenticationSettingsSection {
+                Task { await syncDeviceSettings() }
+            }
             #endif
 
             SurfaceCard {
@@ -61,6 +66,32 @@ struct SettingsView: View {
                 Text("選択したアプリはこのiPhoneに保存します。セッションに応じた自動制限は、バックエンド連携後に有効になります。")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
+
+                HStack {
+                    Label("backend設定同期", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption.weight(.medium))
+                    Spacer()
+                    Text(deviceSyncStatus)
+                        .font(.caption)
+                        .foregroundStyle(deviceSyncError == nil ? AppTheme.secondaryInk : .red)
+                }
+                if let deviceSyncError {
+                    Text(deviceSyncError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button {
+                    Task { await syncDeviceSettings() }
+                } label: {
+                    Label(
+                        isSyncingDeviceSettings ? "端末・設定を同期中…" : "端末と制限設定をbackendへ同期",
+                        systemImage: "arrow.up.circle"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSyncingDeviceSettings)
             }
 
             SurfaceCard {
@@ -166,9 +197,9 @@ struct SettingsView: View {
 
             SurfaceCard {
                 sectionTitle("端末", icon: "iphone.and.arrow.forward")
-                deviceRow(name: "この iPhone", state: "端末登録未接続")
+                deviceRow(name: "この iPhone", state: deviceSyncStatus)
                 Divider()
-                deviceRow(name: "MacBook Air", state: "登録状態は未取得")
+                deviceRow(name: "MacBook Air", state: "このiPhoneからは未取得")
             }
         }
         .navigationTitle("設定")
@@ -181,11 +212,53 @@ struct SettingsView: View {
             isPresented: $isFamilyActivityPickerPresented,
             selection: $screenTime.selection
         )
+        .task { await syncDeviceSettings() }
+        .onChange(of: screenTime.deviceConfigVersion) { _ in
+            Task { await syncDeviceSettings() }
+        }
+        .onChange(of: screenTime.authorizationStatusLabel) { _ in
+            Task { await syncDeviceSettings() }
+        }
     }
 
     private func sectionTitle(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.subheadline.weight(.bold))
+    }
+
+    @MainActor
+    private func syncDeviceSettings() async {
+        guard !isSyncingDeviceSettings else { return }
+        isSyncingDeviceSettings = true
+        defer { isSyncingDeviceSettings = false }
+        do {
+            let synced = try await ConfiguredDeviceSettingsRepository().sync(
+                settings: screenTime.backendRestrictionSettings
+            )
+            deviceSyncStatus = "登録済み・設定 v\(synced.policyVersion)・\(policyStatusLabel(synced.policyStatus))"
+            deviceSyncError = nil
+        } catch DeviceSettingsRepositoryError.missingConfiguration {
+            deviceSyncStatus = "未ログイン"
+            deviceSyncError = "アカウント接続後に同期できます。"
+        } catch DeviceSettingsRepositoryError.invalidConfiguration {
+            deviceSyncStatus = "設定エラー"
+            deviceSyncError = "Supabase URL・公開用キー・API URLを確認してください。"
+        } catch let error as LocalizedError {
+            deviceSyncStatus = "同期できません"
+            deviceSyncError = error.errorDescription ?? "API接続とログイン状態を確認してください。"
+        } catch {
+            deviceSyncStatus = "同期できません"
+            deviceSyncError = "API接続とログイン状態を確認してください。"
+        }
+    }
+
+    private func policyStatusLabel(_ status: String) -> String {
+        switch status {
+        case "POLICY_STATUS_ENABLED": "有効"
+        case "POLICY_STATUS_DISABLED": "無効"
+        case "POLICY_STATUS_PERMISSION_REQUIRED": "端末の権限報告待ち"
+        default: "状態未確定"
+        }
     }
 
     private func modeButton(_ mode: LocalRestrictionMode) -> some View {

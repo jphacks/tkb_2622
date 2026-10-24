@@ -2,6 +2,7 @@ import SwiftUI
 import Supabase
 
 struct AuthenticationSettingsSection: View {
+    var onAuthenticationChanged: () -> Void = {}
     @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
     @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
     @AppStorage("mobile.api.baseURL") private var apiBaseURLText = "http://127.0.0.1:8080"
@@ -245,6 +246,7 @@ struct AuthenticationSettingsSection: View {
         defaults.removeObject(forKey: operationKey)
         identity = currentIdentity
         setMessage("Supabase Auth、EnsureUser、GetMeを確認しました。", error: false)
+        onAuthenticationChanged()
     }
 
     @MainActor
