@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,10 +81,47 @@ func (s *stateStore) LoadActivitySyncState() (activitySyncState, bool, error) {
 	if err := decoder.Decode(&state); err != nil {
 		return activitySyncState{}, false, fmt.Errorf("activity outbox is invalid: %w", err)
 	}
+	if normalizeActivitySyncIDs(&state) {
+		if err := s.SaveActivitySyncState(state); err != nil {
+			return activitySyncState{}, false, err
+		}
+	}
 	if err := validateActivitySyncState(state); err != nil {
 		return activitySyncState{}, false, err
 	}
 	return state, true, nil
+}
+
+// normalizeActivitySyncIDs upgrades IDs written by earlier Desktop builds. Those builds
+// stored UUID bytes without separators, which the backend correctly rejects as invalid IDs.
+func normalizeActivitySyncIDs(state *activitySyncState) bool {
+	changed := false
+	for index := range state.Items {
+		item := &state.Items[index]
+		if item.Batch != nil {
+			if id, ok := canonicalUUID(item.Batch.BatchID); ok {
+				item.Batch.BatchID = id
+				changed = true
+			}
+		}
+		if item.Operation != nil {
+			if id, ok := canonicalUUID(item.Operation.ID); ok {
+				item.Operation.ID = id
+				changed = true
+			}
+		}
+	}
+	return changed
+}
+
+func canonicalUUID(id string) (string, bool) {
+	if len(id) != 32 {
+		return id, false
+	}
+	if _, err := hex.DecodeString(id); err != nil {
+		return id, false
+	}
+	return id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:], true
 }
 
 func (s *stateStore) SaveActivitySyncState(state activitySyncState) error {

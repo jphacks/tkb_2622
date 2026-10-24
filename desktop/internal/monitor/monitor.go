@@ -120,7 +120,10 @@ func NewSessionID() (string, error) {
 	if _, err := rand.Read(value[:]); err != nil {
 		return "", fmt.Errorf("session id generation failed: %w", err)
 	}
-	return hex.EncodeToString(value[:]), nil
+	value[6] = (value[6] & 0x0f) | 0x40
+	value[8] = (value[8] & 0x3f) | 0x80
+	encoded := hex.EncodeToString(value[:])
+	return fmt.Sprintf("%s-%s-%s-%s-%s", encoded[:8], encoded[8:12], encoded[12:16], encoded[16:20], encoded[20:]), nil
 }
 
 func (r *Recorder) Status() Status { return r.status }

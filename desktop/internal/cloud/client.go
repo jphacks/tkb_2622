@@ -264,7 +264,10 @@ func (c *Client) authRequest(ctx context.Context, method, path string, input, ou
 func (c *Client) Connect(ctx context.Context, method, accessToken string, input, output any) error {
 	endpoint := *c.base
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/" + method
-	return c.request(ctx, http.MethodPost, &endpoint, input, output, false, accessToken)
+	if err := c.request(ctx, http.MethodPost, &endpoint, input, output, false, accessToken); err != nil {
+		return fmt.Errorf("%s: %w", method, err)
+	}
+	return nil
 }
 
 func (c *Client) request(ctx context.Context, method string, endpoint *url.URL, input, output any, auth bool, accessToken string) error {
