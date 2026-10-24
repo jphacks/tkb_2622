@@ -10,10 +10,10 @@
 
 - `RootTabView`は保存済みSupabase sessionを復元し、有効なら起動時のログイン画面を省略する。sessionがなく、ログインを後回しにした記録もなければ歓迎／ログイン画面を出す。
 - Mobile／DesktopともメールOTPを使い、Mobileは新規Auth user作成を許可する。OTP成功後、Mobileは`EnsureUser`と`GetMe`を呼び、Desktopも認証後に業務Userの確認を行う。同じSupabase project・backend環境・アカウントであれば同じsubjectから同じ業務Userへ対応する設計で、端末ペアリングコードはない。
-- Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
+- Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。Releaseは`Release.xcconfig`とgit ignore対象の`Release.local.xcconfig`を使い、`build-release-simulator.sh`が設定値・HTTPS・生成Info.plistへの注入を検証する。URLのxcconfigコメント化を検知して直したうえで、架空値によるRelease Simulator buildとplist照合に成功した。実環境値を含むlocal config、CI設定、実機Archive／認証接続は未確認。通常利用者へ入力させないUI経路はある。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - ログイン導線を実装と照合：初回未ログインは歓迎画面内にメールOTP欄を表示し、未登録メールはAuth user作成を許可、既存メールは同じOTP導線で認証する。Simulator testでMobileが`create_user: true`の共通OTP routeを使い、`/verify`へ`type: email`を送りsessionを保存することを確認した。保存sessionはKeychain経由で復元し、期限切れならSupabase SDKがrefresh tokenを使い新sessionを保存することもstub HTTP responseで確認した。`EnsureUser`／`GetMe`成功後にAPI利用へ入る。Desktop側も`/otp`へ`create_user: true`を送り、`/verify`後に`EnsureUser`を呼ぶ。同じSupabase project・backendならメールOTP後に同じ業務Userへ対応する。初回画面UI testはDebug／Releaseで追加済みだが、実Supabaseのメール送信／OTP検証、OTP認証後の画面遷移、新規／既存Authおよび両クライアント同時ログインの実E2Eは未確認。
-- 接続値の手入力：Mobile Debugの歓迎画面には折りたたみ式「開発者向け接続設定」が表示される。Releaseではこの欄を表示せず、Info.plistからBuild Settings値を読むが、Xcode projectには値を注入する`.xcconfig`／CI設定がない。Desktopは`FOCUS_LINK_*`環境変数を起動時に読む。したがって「一般利用者が接続値を手入力せず使える」配布経路は未完成。環境別の公開値をReleaseビルドへ注入し、Mobile／Desktop配布版で値を要求されないことを受け入れ確認する必要がある。secret／service-role keyは配布しない。
+- 接続値の手入力：Mobile Debugの歓迎画面には折りたたみ式「開発者向け接続設定」が表示される。Releaseではこの欄を表示せず、Info.plistへビルド時に注入する。local xcconfigと、設定の検査・Release Simulator build・Info.plist照合を行うscriptを追加した。実環境値を含むlocal config／CI設定／実機Archiveは未確認。Desktopは`FOCUS_LINK_*`環境変数を起動時に読むため、Desktop配布時の値注入は未整備。利用者向け配布経路の受け入れは未完了。secret／service-role keyは配布しない。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。設定画面からの認証状態変更後もRoot側で業務User同期を実行する。業務User同期失敗後に選んだlocal-only状態は再起動・前景復帰時に維持し、同期を明示的に再開するまで認証済みAPIへ進まない。さらに、期限切れsession refreshの通信失敗を「未ログイン」と誤判定して歓迎画面へ戻す問題を修正した。状態resolverのhost testsは5件、local-only時の同期抑止はSimulator testで確認。SwiftUI root／Supabase／Connect APIの実backend復旧は未確認。
 - Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・認証済みAPI gate・通知の未ログイン判定／登録ゲート／順序・Home更新失敗・Device失効・Group APIエラー表示・端末設定APIエラー表示・利用枠再試行分類・transportの401／403／HTTP 404／REST Connect error／通信断／timeout／JSON decode errorの43件が通過した。iPhone 17 Simulator (iOS 27.0) では既存Repository／ViewModel／auth contractの38件に加え、UI testで初回ログイン画面のメール欄・ログイン後回し・接続値未設定時の送信無効を検証する。UI testはDebugで開発者向け設定欄の表示、Releaseでその欄がないことも確認し、2026-10-25に両構成各1件と既存38件が通過した。OTPとrefreshの応答はstubであり、実Supabaseや実backendへの認証付き往復を証明しない。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
 - モック経路の静的確認：`MockHomeRepository`とsample snapshotの参照箇所は`HomeView_Previews`だけ。実アプリのHomeは`ConfiguredHomeRepository`からAPI repositoryを作り、API設定が不足・不正ならsampleデータへ切り替えずエラーを返す。モック表示が実機に出る問題は現ソースからは確認されなかった。
@@ -29,7 +29,7 @@
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | RPC名、ProtoJSON int64 string、request／response fieldsをprotoと照合し一致。Simulatorで4 Repository methodのroute、Bearer header、request/response DTO、operation `SUCCEEDED`／`NOT_FOUND`解釈とReserveの`not_found` code保持を確認。Reserve operation IDとpending usage reportはlocal保存する。曖昧なHTTP 5xx／Connect `internal`／不正応答ではoperation IDとmonitorを保持し同じ要求を再送、明確な拒否と事前設定エラーは解除する。OS monitor・応答喪失・プロセス再起動を含む実機E2Eは未確認 |
 | 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | endpoint要求前に同じregistration IDで`RegisterDevice`を実行し、Rootの業務認証状態とSupabase sessionの両方を満たす場合だけ同期する。Repository経由でDevice先行登録、Device失敗時のendpoint要求抑止、endpointの`not_found`保持をSimulator testで確認。ログアウト／local-onlyではAPIを呼ばずログインを案内。APNs token callback・認証通知・ログイン状態変更は成功済み登録の重複抑止を尊重する。通知許可後と明示的な再同期操作では強制登録する。旧SQLSTATE 2201B制約障害とは別に、過去のDevice未登録経路とnot_foundの同一性は未確定。認証付き実API往復は未確認 |
 
-認証入口をコードとSimulator UI testで照合した結果、初回未ログインでログインを後回しにしていない場合は歓迎／ログイン画面を表示し、保存済みsessionがある場合は通常この画面を省略する。メールOTPの送信は新規Auth user作成を許可しているため、新規／既存メールの入口は共通である。OTP成功だけでAPI利用状態にせず、`EnsureUser`と`GetMe`が成功してから認証済み状態にする。UI testは初回画面と接続値未設定時の送信無効を確認し、Releaseでは接続値入力欄が出ないことを確認した。Release用URL・publishable key・API URLの`.xcconfig`／CI注入はまだない。Desktopも同じSupabase project・backend環境・メールOTP accountを使う構成で、ペアリングコードはない。従って、利用者が接続キーを入力しなくてよい**配布版**はまだ完成していない。新規／既存メールを用いた両アプリの実環境E2Eも未確認。
+認証入口をコードとSimulator UI testで照合した結果、初回未ログインでログインを後回しにしていない場合は歓迎／ログイン画面を表示し、保存済みsessionがある場合は通常この画面を省略する。メールOTPの送信は新規Auth user作成を許可しているため、新規／既存メールの入口は共通である。OTP成功だけでAPI利用状態にせず、`EnsureUser`と`GetMe`が成功してから認証済み状態にする。UI testは初回画面と接続値未設定時の送信無効を確認し、Releaseでは接続値入力欄が出ないことを確認した。Release Simulator向けxcconfig注入・検証scriptを追加したが、実際のRelease値を使うbuild／CI／実機配布は未確認。Desktopも同じSupabase project・backend環境・メールOTP accountを使う構成で、ペアリングコードはない。従って、利用者が接続キーを入力しなくてよい**配布版**はまだ完成していない。新規／既存メールを用いた両アプリの実環境E2Eも未確認。
 
 ユーザー受け入れ時には「初回はログイン画面」「session復元済みの既存利用者はログイン画面を省略」「新規・既存メールとも同じOTP導線」「MobileとDesktopは同一Supabase／backend環境の同一アカウントで連携」「一般利用者は公開接続値を入力しない」を個別に確認する。初回画面とDebug／Releaseでの接続値入力欄の表示差はSimulator UI testで確認した。新規／既存メールでのAuth実接続とMobile・Desktopを並行した同一業務Userの確認、配布構成の接続値自動設定は未完了。Debugは開発者向けに手入力設定を提供する。
 
@@ -41,7 +41,7 @@
 | 既存利用者の再起動 | 保存sessionをKeychainから復元できればログイン画面を省略。期限切れsession refreshと一時的refresh失敗の状態保持はstub testで確認 | 実Supabase sessionで再起動・期限切れ更新・通信復帰を確認 |
 | 新規／既存メール | Mobile／DesktopともメールOTPの新規作成を許可し、既存Auth userも同じOTP経路を使う実装 | 新規メールと既存メールを各1つ使い、両アプリで認証・EnsureUser/GetMeまで成功することを確認 |
 | DesktopとMobileのユーザー対応 | 同一Supabase project・同一backend環境ならJWT subjectに対応する業務Userを共有する設計。端末ペアリングコードはない | DesktopとiPhoneで同一アカウントへログインし、同一ユーザーの作業状態・残高を相互に確認。別アカウントの分離も確認 |
-| 接続値を利用者に入力させない | Release UIに接続値入力欄はない。Debugのみ開発者設定が表示される | 現行Xcode projectにはMobile Release用`.xcconfig`／CI注入とDesktop配布用環境設定がなく、配布成果物の環境設定は未完成。設定済み配布版で入力なし起動を確認 |
+| 接続値を利用者に入力させない | Release UIに接続値入力欄はない。Debugのみ開発者設定が表示される。xcconfig・Release Simulator build／Info.plist検証scriptを追加 | 実環境値を含むlocal configとCI設定、実機Archive／署名、Desktop配布用環境設定は未確認。設定済み配布成果物で入力なし起動を確認 |
 
 ここでいう「同じアカウント」は、同じメール文字列だけでなく、同じSupabase projectで発行された同一Auth user／JWT subjectを指す。別Supabase projectや異なるbackend環境では同じメールを使っても別ユーザー・別データになる。接続値のBuild Settings注入は公開可能なProject URL、publishable key、HTTPS API URLだけとし、service-role key等の秘密は含めない。
 
@@ -74,7 +74,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    - 初回起動で未ログインなら歓迎／ログイン画面が表示されることを確認する。iPhone 17 / iOS 27.0のSimulator UI testでメール欄・ログイン後回し・接続値未設定時のOTP送信無効を確認済み。ログインを後回しにした場合の状態resolverもhost／Simulatorで確認した。
    - 新規メールと既存メールのOTPでSupabase Authへ入り、同じ環境のDesktopと同一の業務Userへ対応づくことを実機・Desktopで確認する。未登録メールが作成され、既存メールが既存アカウントへ入ることも別々に記録する。UIが両方を区別せず同じ導線で扱い、誤解を招く「新規登録専用」表示をしないことも見る。
    - 保存済みAuth sessionの再起動後復元、refresh、失効・ログアウト、EnsureUser／GetMe失敗後の再試行を確認する。
-   - 一般利用者がSupabase公開keyやAPI URLを手入力しないRelease経路と、開発者だけが設定するDebug経路を確認する。値自体は記録しない。MobileのRelease値をBuild Settings／CIから注入する設定とDesktop配布版の環境設定注入が未整備なので、配布構成を整えるまでは受け入れ未完了とする。
+   - 一般利用者がSupabase公開keyやAPI URLを手入力しないRelease経路と、開発者だけが設定するDebug経路を確認する。値自体は記録しない。Mobileにはlocal xcconfigとRelease Simulator build／Info.plist検証scriptを追加した。実値によるCI／Archive設定とDesktop配布版の環境設定注入は未整備なので、配布受け入れは未完了。
    - DesktopとiPhoneは同一メールOTPで直接認証する設計で、アプリ間ペアリングは不要。Desktopは現在起動時環境変数、Mobile Debugは開発者設定を使う。両方が同じSupabase projectとbackend環境を参照すること、および配布版で利用者にキーやURLの入力／環境変数設定を求めないことを確認する。
 
    | シナリオ | 期待結果 | 現在の確認状況 |
@@ -85,7 +85,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    | 新規メールで両アプリを利用 | Mobile／DesktopそれぞれでOTP送信・検証し、各Auth userから同一業務Userへ対応 | 両クライアントともAuth user新規作成を許可するコードを確認。実Auth作成・同一業務User確認は未実施 |
    | 既存メールで両アプリを利用 | 同じ既存Auth userへOTPログインし、各端末でsessionを復元 | OTP・Keychain／Credential Storeのコード経路を確認。実ログイン・session更新E2Eは未実施 |
    | Desktop + Mobile | 同じSupabase project・backend・アカウントなら同じ業務User。ペアリング操作なし | Mobile／Desktop双方のEnsureUser経路を確認。両アプリ同時の実接続未確認 |
-   | 接続値入力 | 開発者はDebug設定を使い、一般利用者はRelease配布アプリをそのまま使う | Release画面に入力欄はない。Build Settings／CIへの値注入なし。Desktop配布時の環境注入なし。利用者向け配布受け入れ未完了 |
+   | 接続値入力 | 開発者はDebug設定を使い、一般利用者はRelease配布アプリをそのまま使う | Release画面に入力欄なし。local xcconfig／検証scriptは実装し架空値でSimulator build・plist照合済み。実値CI／ArchiveとDesktop配布時の環境注入なし。利用者向け配布受け入れ未完了 |
 
 1. **API経路の棚卸し**
    - Auth／EnsureUser／GetMe

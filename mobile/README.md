@@ -54,9 +54,9 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 
 08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可・アプリ選択・Shield、iPhone登録、制限ポリシー同期、利用枠API、DeviceActivity monitor extensionを本番アプリ側に追加した。OSの監視イベントによる計測は1分単位。backendへは利用中画面を表示中に1分おき、アプリがforegroundへ戻った際にも同期する。設定タブへ戻った際は権限状態を更新し、端末設定をbackendへ再同期する。設定同期中に選択が変わった場合は最新設定も後続同期し、policy revision競合時は再取得して最大3回試行する。背景中の計測と期限後Shieldはextensionが行う。iOS Simulator向けDebugビルドは確認済み。App Groups共有、監視イベント、期限後の自動Shieldは未検証であり、実機受け入れが必要。履歴タブは作業と報酬のAPI履歴へ接続した。
 
-backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。初回未認証時はログイン画面を表示し、ログインを後回しにした場合も端末内設定を利用できる。起動時に保存済みAuth sessionがあれば`EnsureUser`／`GetMe`でbackend上の業務Userを確認し、成功するまでログイン済みAPI画面へ進まない。同期失敗時はエラー・再試行・端末内利用・別アカウントでのログインを表示する。ホーム・グループ・履歴では必要に応じてログインへ案内する。Debugではログイン画面・設定画面からSupabase Project URL、publishable/anon key、Connect API URLを入力する。Releaseではログイン／ログアウトを使い、接続先は`Info-Release.plist`が参照する`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`のBuild Settings値から読む設計だが、現在のXcode projectにはこれらのRelease値を注入する`.xcconfig`／CI設定がないため、配布設定が必要。通常利用者にURLやキーを入力させる画面はReleaseに表示しない。値はアプリへ組み込まれるため、publishable/anon keyと公開可能なHTTPS API URLだけを設定する。secret keyやservice_role keyは設定しない。Desktop・iPhoneは同じSupabase project／メールアカウント／backend環境で同じ業務Userへ対応する設計で、ペアリングコードは不要。iPhoneにbackend端末IDが保存されている場合、ログアウト時は`ListDevices`／`RevokeDevice`で端末を失効し、`DeleteNotificationEndpoint`で通知先を解除してregistration IDを破棄した後にAuthセッションを消す。通信失敗時はoperation ID・端末ID・versionを保存し、同一操作を再試行できる状態を保つため、ログアウトは中断する。実環境の新規・既存アカウントE2E、端末失効付きログアウト、Release値注入・接続は未確認。`MockHomeRepository`はSwiftUI Preview専用。APNs token登録・解除、作業開始通知のOutbox・配信コードは実装済み。PC表示連携、Apple Push署名設定を伴う実機配信、本番の永続workerは未確認。
+backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。初回未認証時はログイン画面を表示し、ログインを後回しにした場合も端末内設定を利用できる。起動時に保存済みAuth sessionがあれば`EnsureUser`／`GetMe`でbackend上の業務Userを確認し、成功するまでログイン済みAPI画面へ進まない。同期失敗時はエラー・再試行・端末内利用・別アカウントでのログインを表示する。ホーム・グループ・履歴では必要に応じてログインへ案内する。Debugではログイン画面・設定画面からSupabase Project URL、publishable/anon key、Connect API URLを入力する。Releaseではログイン／ログアウトを使い、接続値は`Info-Release.plist`へビルド時に組み込む。`Release.xcconfig`、git ignore対象の`Release.local.xcconfig`、接続値検証とSimulator Release build／Info.plist照合を行う`build-release-simulator.sh`を追加した。通常利用者にURLやキーを入力させる画面はReleaseに表示しない。値はアプリへ組み込まれるため、publishable/anon keyと公開可能なHTTPS API URLだけを設定する。secret keyやservice_role keyは設定しない。実際のProject値を含むlocal config、CI注入、実機Archive／署名・接続確認は未実施。Desktop・iPhoneは同じSupabase project／メールアカウント／backend環境で同じ業務Userへ対応する設計で、ペアリングコードは不要。iPhoneにbackend端末IDが保存されている場合、ログアウト時は`ListDevices`／`RevokeDevice`で端末を失効し、`DeleteNotificationEndpoint`で通知先を解除してregistration IDを破棄した後にAuthセッションを消す。通信失敗時はoperation ID・端末ID・versionを保存し、同一操作を再試行できる状態を保つため、ログアウトは中断する。実環境の新規・既存アカウントE2E、端末失効付きログアウト、Release値を使った認証・接続は未確認。`MockHomeRepository`はSwiftUI Preview専用。APNs token登録・解除、作業開始通知のOutbox・配信コードは実装済み。PC表示連携、Apple Push署名設定を伴う実機配信、本番の永続workerは未確認。
 
-認証の確認は初回起動時のログイン画面、または設定タブの「アカウント接続」から行う。Debugでは開発者がProject URL、公開用キー、Connect API URLを入力する。ReleaseではXcodeのRewardTime targetのRelease Build Settingsへ`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`をUser-Defined設定として追加し、アプリをビルドする。現状はRelease値を注入する`.xcconfig`／CI設定がないため、一般利用者へ入力を求めずに使える配布設定は未完成。Supabase URLとAPI URLにはHTTPSを指定する（ReleaseはHTTP接続を拒否）。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可し、登録済みメールも同じOTP導線を使う。Simulator testでは共通OTP routeと`create_user: true`、期限切れsessionのSupabase SDK自動refresh・新token保存をstub通信で確認した。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。起動時にAuth sessionがある場合も`EnsureUser`／`GetMe`が成功するまでAPI利用画面へ進まず、失敗時は再試行・端末内利用・別アカウントでのログインを選べる。ログインを後回しにした後は、グループ・履歴・ホームのログイン案内から再開できる。実機でMac上のAPIに接続する場合は、Debug API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
+認証の確認は初回起動時のログイン画面、または設定タブの「アカウント接続」から行う。Debugでは開発者がProject URL、公開用キー、Connect API URLを入力する。Release値は`mobile/Release.local.xcconfig`へ設定し、`mobile/build-release-simulator.sh`でRelease Simulator buildと生成Info.plistの値を確認する。このlocal configはgit ignore対象である。実機Archiveでは同じRelease.xcconfigを使い、チーム署名を別途設定する。一般利用者向けの入力画面はReleaseに表示しない。Supabase URLとAPI URLにはHTTPSを指定する（Release build scriptはHTTPを拒否）。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可し、登録済みメールも同じOTP導線を使う。Simulator testでは共通OTP routeと`create_user: true`、期限切れsessionのSupabase SDK自動refresh・新token保存をstub通信で確認した。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。起動時にAuth sessionがある場合も`EnsureUser`／`GetMe`が成功するまでAPI利用画面へ進まず、失敗時は再試行・端末内利用・別アカウントでのログインを選べる。ログインを後回しにした後は、グループ・履歴・ホームのログイン案内から再開できる。実機でMac上のAPIに接続する場合は、Debug API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
 
 未ログイン時はメールコードを送る前に、同梱の10種類からプロフィールアイコンを選べる。コード認証後に選択IDを本人のUserへ保存し、設定タブから変更できる。画像本体は`RewardTime/Avatars.xcassets`へ同梱し、DBにはカタログIDだけを保存する。
 
@@ -122,6 +122,18 @@ xcodebuild \
 ```
 
 プロジェクトのiOS Deployment Targetは現時点で16.0に仮設定している。対応OSの正式決定時に見直す。Bundle Identifierも開発用の仮値であり、署名・実機配布前にチームの設定へ置き換える。
+
+### Release接続先
+
+ReleaseアプリはURLやキーの入力画面を表示せず、ビルド時に`Info.plist`へ接続値を組み込む。環境値をソース管理へ入れないため、Releaseビルド前にローカル設定ファイルを作る。
+
+```sh
+cp mobile/Release.local.xcconfig.example mobile/Release.local.xcconfig
+# Release.local.xcconfigを編集し、Supabase URL・publishable key・HTTPS Connect API URLを設定
+mobile/build-release-simulator.sh
+```
+
+`Release.local.xcconfig`はgit ignore対象。xcconfigではURL中の`//`をコメントと誤認しないよう、雛形の`https:/$()/host`形式を保つ。publishable keyはアプリから取得可能な公開クライアント値で、service-role／secret keyは設定しない。`build-release-simulator.sh`は接続値の欠落・placeholder・HTTPS以外をビルド前に拒否し、Release Simulator appのInfo.plistに3値が正しく入ったことを値を表示せず確認する。この手順は接続設定のビルド検証で、実Supabase認証・backend接続やiPhone実機署名の確認ではない。実機Archiveでは同じ`mobile/Release.xcconfig`を使い、別途チームの署名設定を行う。
 
 ## 確認方法
 
