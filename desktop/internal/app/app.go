@@ -190,6 +190,26 @@ func (a *App) GetStartupState() session.Snapshot {
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "abort" {
+		a.mu.Lock()
+		current := a.engine.Snapshot()
+		shouldConfirm := current.Mode == "local-monitor" && current.Actions["abort"].Allowed
+		a.mu.Unlock()
+		if shouldConfirm {
+			confirmed, err := a.confirmAbort()
+			if err != nil {
+				a.mu.Lock()
+				now := time.Now()
+				a.engine.SetFailure("abort_confirmation", "中止の確認を表示できませんでした。もう一度お試しください。", true, now)
+				state := a.engine.Snapshot()
+				a.mu.Unlock()
+				return state
+			}
+			if !confirmed {
+				return current
+			}
+		}
+	}
 	if command.Action == "saveSettings" {
 		return a.saveTaskSettings(command)
 	}
@@ -229,6 +249,18 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
 	}
 	return state
+}
+
+func (a *App) confirmAbort() (bool, error) {
+	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
+		Type:          wailsruntime.QuestionDialog,
+		Title:         "作業を中止しますか？",
+		Message:       "計測を停止します。報酬は付与されません。",
+		Buttons:       []string{"中止する", "作業に戻る"},
+		DefaultButton: "作業に戻る",
+		CancelButton:  "作業に戻る",
+	})
+	return result == "中止する", err
 }
 
 func (a *App) startMonitoring(state, before session.Snapshot, now time.Time) {
