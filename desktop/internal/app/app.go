@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/tkb_2622/desktop/internal/cloud"
+	offlineevaluation "github.com/jphacks/tkb_2622/desktop/internal/evaluation"
 	"github.com/jphacks/tkb_2622/desktop/internal/monitor"
 	"github.com/jphacks/tkb_2622/desktop/internal/session"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -74,6 +75,7 @@ func New() *Host {
 					currentMonitor := toSessionMonitor(app.recorder.Status())
 					if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
 						currentMonitor.State = "paused"
+						currentMonitor.AppID = snapshot.Monitor.AppID
 						currentMonitor.AppName = snapshot.Monitor.AppName
 						currentMonitor.BrowserName = snapshot.Monitor.BrowserName
 						currentMonitor.Domain = snapshot.Monitor.Domain
@@ -287,9 +289,26 @@ func (a *App) finishMonitoring(outcome string, now time.Time) {
 	}
 	status, err := a.recorder.Finish(outcome)
 	a.engine.SetMonitor(toSessionMonitor(status), now)
-	if err != nil {
-		a.engine.SetFailure("monitor_finish", status.Message, true, now)
+	state := a.engine.Snapshot()
+	if state.Session == nil {
+		return
 	}
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		a.engine.SetFailure("monitor_finish", status.Message, true, now)
+		return
+	}
+	records, err := a.recorder.ReadRecords()
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		return
+	}
+	result, err := offlineevaluation.Evaluate(records, *state.Session)
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		return
+	}
+	a.engine.ApplyLocalEvaluation(result, now)
 }
 
 func (a *App) persistLocked(now time.Time) {
@@ -315,7 +334,7 @@ func (a *App) context() context.Context {
 
 func toMonitorStatus(status session.MonitorStatus) monitor.Status {
 	return monitor.Status{
-		State: status.State, AppName: status.AppName, BrowserName: status.BrowserName,
+		State: status.State, AppID: status.AppID, AppName: status.AppName, BrowserName: status.BrowserName,
 		Domain: status.Domain, LastSample: status.LastSample, SampleCount: status.SampleCount,
 		Message: status.Message,
 	}
@@ -323,7 +342,7 @@ func toMonitorStatus(status session.MonitorStatus) monitor.Status {
 
 func toSessionMonitor(status monitor.Status) session.MonitorStatus {
 	return session.MonitorStatus{
-		State: status.State, AppName: status.AppName, BrowserName: status.BrowserName,
+		State: status.State, AppID: status.AppID, AppName: status.AppName, BrowserName: status.BrowserName,
 		Domain: status.Domain, LastSample: status.LastSample, SampleCount: status.SampleCount,
 		Message: status.Message,
 	}

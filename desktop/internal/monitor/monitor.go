@@ -2,6 +2,7 @@
 package monitor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -48,6 +49,7 @@ type Observation struct {
 
 type Status struct {
 	State       string `json:"state"`
+	AppID       string `json:"appId"`
 	AppName     string `json:"appName"`
 	BrowserName string `json:"browserName"`
 	Domain      string `json:"domain"`
@@ -56,7 +58,7 @@ type Status struct {
 	Message     string `json:"message"`
 }
 
-type record struct {
+type Record struct {
 	Kind        string       `json:"kind"`
 	SessionID   string       `json:"sessionId"`
 	RecordedAt  time.Time    `json:"recordedAt"`
@@ -135,7 +137,7 @@ func (r *Recorder) Start(ctx context.Context, sessionID string) (Status, error) 
 	r.sessionID = sessionID
 	r.filePath = filepath.Join(r.dataDir, sessionID+".jsonl")
 	r.status = Status{State: "running"}
-	if err := r.append(record{Kind: "started"}); err != nil {
+	if err := r.append(Record{Kind: "started"}); err != nil {
 		return r.fail(err)
 	}
 	return r.Sample(ctx)
@@ -147,16 +149,17 @@ func (r *Recorder) Sample(ctx context.Context) (Status, error) {
 	}
 	observation, err := r.capture(ctx)
 	if err != nil {
-		_ = r.append(record{Kind: "sample_error", Reason: "native_sample_failed"})
+		_ = r.append(Record{Kind: "sample_error", Reason: "native_sample_failed"})
 		r.status.Message = "計測サンプルを取得できませんでした。必要なmacOS権限を確認してください。"
 		return r.status, err
 	}
-	if err := r.append(record{Kind: "sample", Observation: &observation}); err != nil {
+	if err := r.append(Record{Kind: "sample", Observation: &observation}); err != nil {
 		return r.fail(err)
 	}
 	r.status.SampleCount++
 	r.status.LastSample = observation.ReceivedAt.UTC().Format(time.RFC3339Nano)
 	r.status.Message = ""
+	r.status.AppID = stringValue(observation.AppID)
 	r.status.AppName = stringValue(observation.AppName)
 	r.status.BrowserName = stringValue(observation.BrowserName)
 	r.status.Domain = stringValue(observation.BrowserDomain)
@@ -167,7 +170,7 @@ func (r *Recorder) Pause() (Status, error) {
 	if r.status.State != "running" {
 		return r.status, nil
 	}
-	if err := r.append(record{Kind: "paused"}); err != nil {
+	if err := r.append(Record{Kind: "paused"}); err != nil {
 		return r.fail(err)
 	}
 	r.status.State = "paused"
@@ -199,7 +202,7 @@ func (r *Recorder) Resume(ctx context.Context, sessionID string, previous Status
 	previous.State = "paused"
 	r.status = previous
 	r.status.State = "running"
-	if err := r.append(record{Kind: "resumed"}); err != nil {
+	if err := r.append(Record{Kind: "resumed"}); err != nil {
 		return r.fail(err)
 	}
 	return r.Sample(ctx)
@@ -213,12 +216,41 @@ func (r *Recorder) Finish(outcome string) (Status, error) {
 		r.status.State = "ready"
 		return r.status, nil
 	}
-	if err := r.append(record{Kind: outcome}); err != nil {
+	if err := r.append(Record{Kind: outcome}); err != nil {
 		return r.fail(err)
 	}
 	r.status.State = outcome
 	r.status.Message = ""
 	return r.status, nil
+}
+
+func (r *Recorder) ReadRecords() ([]Record, error) {
+	if r.filePath == "" || r.sessionID == "" {
+		return nil, errors.New("session capture path unavailable")
+	}
+	file, err := os.Open(r.filePath)
+	if err != nil {
+		return nil, fmt.Errorf("session capture could not be opened: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 4096), maxOutputLength*2)
+	records := make([]Record, 0)
+	for scanner.Scan() {
+		var value Record
+		if err := json.Unmarshal(scanner.Bytes(), &value); err != nil {
+			return nil, fmt.Errorf("session capture record is invalid: %w", err)
+		}
+		if value.SessionID != r.sessionID {
+			return nil, errors.New("session capture contains a different session id")
+		}
+		records = append(records, value)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("session capture could not be read: %w", err)
+	}
+	return records, nil
 }
 
 func (r *Recorder) capture(ctx context.Context) (Observation, error) {
@@ -255,7 +287,7 @@ func (r *Recorder) capture(ctx context.Context) (Observation, error) {
 	return observation, nil
 }
 
-func (r *Recorder) append(value record) error {
+func (r *Recorder) append(value Record) error {
 	if r.filePath == "" {
 		return errors.New("session capture path unavailable")
 	}

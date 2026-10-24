@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	focuspocket/macos-native v0.0.0
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -44,3 +45,5 @@ require (
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 )
+
+replace focuspocket/macos-native => ../poc/macos-native

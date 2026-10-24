@@ -134,6 +134,33 @@ func (e *Engine) SetFailure(code, message string, retryable bool, now time.Time)
 	e.touch(now)
 }
 
+func (e *Engine) ApplyLocalEvaluation(result Result, now time.Time) bool {
+	if e.state.Mode != "local-monitor" || e.state.Session == nil || e.state.Session.ID != result.SessionID || result.EvaluatorVersion == "" {
+		return false
+	}
+	e.state.Session.Evaluation = "complete"
+	e.state.Result = &result
+	for index := range e.state.History {
+		if e.state.History[index].SessionID == result.SessionID {
+			e.state.History[index] = result
+			e.touch(now)
+			return true
+		}
+	}
+	e.state.History = append([]Result{result}, e.state.History...)
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) FailLocalEvaluation(sessionID string, now time.Time) {
+	if e.state.Mode != "local-monitor" || e.state.Session == nil || e.state.Session.ID != sessionID {
+		return
+	}
+	e.state.Session.Evaluation = "failed"
+	e.fail("local_evaluation", "ローカルの5分類評価に失敗しました。設定と保存済み観測データを確認してください。", false)
+	e.touch(now)
+}
+
 func (e *Engine) PauseForShutdown(now time.Time) {
 	if e.state.Session == nil || e.state.Session.Status != "RUNNING" {
 		return
@@ -191,15 +218,28 @@ func normalizeSettings(input Settings) (Settings, bool) {
 		return Settings{}, false
 	}
 	classificationNames := make(map[string]struct{}, len(input.Classifications))
+	classificationTargets := make(map[string]struct{}, len(input.Classifications))
 	for index, classification := range input.Classifications {
 		classification.Name = strings.TrimSpace(classification.Name)
-		if classification.Name == "" || len([]rune(classification.Name)) > 200 || (classification.Category != "work" && classification.Category != "distraction" && classification.Category != "uncertain") {
+		classification.AppID = strings.TrimSpace(classification.AppID)
+		classification.Domain = strings.TrimSpace(classification.Domain)
+		if classification.Name == "" || len([]rune(classification.Name)) > 200 || len(classification.AppID) > 256 || len(classification.Domain) > 253 ||
+			(classification.Category != "work" && classification.Category != "related" && classification.Category != "distraction" && classification.Category != "uncertain") ||
+			(classification.Domain != "" && !browserAppID(classification.AppID)) ||
+			(classification.AppID != "" && browserAppID(classification.AppID) && classification.Domain == "") {
 			return Settings{}, false
 		}
 		if _, exists := classificationNames[classification.Name]; exists {
 			return Settings{}, false
 		}
 		classificationNames[classification.Name] = struct{}{}
+		if classification.AppID != "" {
+			target := strings.ToLower(classification.AppID) + "|" + strings.ToLower(classification.Domain)
+			if _, exists := classificationTargets[target]; exists {
+				return Settings{}, false
+			}
+			classificationTargets[target] = struct{}{}
+		}
 		settings.Classifications[index] = classification
 	}
 	return settings, true
@@ -239,7 +279,11 @@ func (e *Engine) ExecuteWithSessionID(command Command, requestedSessionID string
 		if sessionID == "" {
 			sessionID = fmt.Sprintf("demo-%d-%d", now.UnixNano(), e.sequence)
 		}
-		e.state.Session = &WorkSession{ID: sessionID, Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task, Evaluation: "pending"}
+		e.state.Session = &WorkSession{
+			ID: sessionID, Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task,
+			Classifications: append([]Classification(nil), e.state.Settings.Classifications...),
+			RulesVersion:    "desktop-classifications-v1", Evaluation: "pending",
+		}
 		if e.state.Session.Name == "" {
 			e.state.Session.Name = task.Name
 		}
@@ -462,4 +506,13 @@ func (e *Engine) touch(now time.Time) {
 }
 func (e *Engine) fail(code, message string, retryable bool) {
 	e.state.Failure = &Failure{Code: code, Message: message, Retryable: retryable}
+}
+
+func browserAppID(appID string) bool {
+	switch strings.ToLower(appID) {
+	case "com.google.chrome", "com.apple.safari":
+		return true
+	default:
+		return false
+	}
 }

@@ -1,5 +1,5 @@
 export namespace session {
-	
+
 	export class AccountState {
 	    status: string;
 	    email: string;
@@ -21,11 +21,11 @@ export namespace session {
 	export class Capability {
 	    allowed: boolean;
 	    reason: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Capability(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.allowed = source["allowed"];
@@ -34,15 +34,19 @@ export namespace session {
 	}
 	export class Classification {
 	    name: string;
+	    appId?: string;
+	    domain?: string;
 	    category: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Classification(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.appId = source["appId"];
+	        this.domain = source["domain"];
 	        this.category = source["category"];
 	    }
 	}
@@ -50,18 +54,18 @@ export namespace session {
 	    tasks: Task[];
 	    selectedTaskId: string;
 	    classifications: Classification[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tasks = this.convertValues(source["tasks"], Task);
 	        this.selectedTaskId = source["selectedTaskId"];
 	        this.classifications = this.convertValues(source["classifications"], Classification);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -90,11 +94,11 @@ export namespace session {
 	    version: number;
 	    pendingOperationId?: string;
 	    pendingSettingsHash?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Task(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -115,11 +119,11 @@ export namespace session {
 	    task: Task;
 	    classification: Classification;
 	    settings: Settings;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Command(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.action = source["action"];
@@ -129,7 +133,7 @@ export namespace session {
 	        this.classification = this.convertValues(source["classification"], Classification);
 	        this.settings = this.convertValues(source["settings"], Settings);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -152,11 +156,11 @@ export namespace session {
 	    code: string;
 	    message: string;
 	    retryable: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Failure(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -166,6 +170,7 @@ export namespace session {
 	}
 	export class MonitorStatus {
 	    state: string;
+	    appId: string;
 	    appName: string;
 	    browserName: string;
 	    domain: string;
@@ -180,6 +185,7 @@ export namespace session {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.state = source["state"];
+	        this.appId = source["appId"];
 	        this.appName = source["appName"];
 	        this.browserName = source["browserName"];
 	        this.domain = source["domain"];
@@ -193,54 +199,66 @@ export namespace session {
 	    name: string;
 	    status: string;
 	    elapsedSeconds: number;
+	    taskSeconds: number;
+	    relatedSeconds: number;
 	    workSeconds: number;
 	    distractedSeconds: number;
 	    uncertainSeconds: number;
+	    inactiveSeconds: number;
+	    evaluatorVersion?: string;
 	    earnedSeconds: number;
 	    usedSeconds: number;
 	    discardedSeconds: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.elapsedSeconds = source["elapsedSeconds"];
+	        this.taskSeconds = source["taskSeconds"];
+	        this.relatedSeconds = source["relatedSeconds"];
 	        this.workSeconds = source["workSeconds"];
 	        this.distractedSeconds = source["distractedSeconds"];
 	        this.uncertainSeconds = source["uncertainSeconds"];
+	        this.inactiveSeconds = source["inactiveSeconds"];
+	        this.evaluatorVersion = source["evaluatorVersion"];
 	        this.earnedSeconds = source["earnedSeconds"];
 	        this.usedSeconds = source["usedSeconds"];
 	        this.discardedSeconds = source["discardedSeconds"];
 	    }
 	}
-	
+
 	export class WorkSession {
 	    id: string;
 	    name: string;
 	    status: string;
 	    task: Task;
+	    classifications?: Classification[];
+	    rulesVersion?: string;
 	    elapsedSeconds: number;
 	    evaluation: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new WorkSession(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.task = this.convertValues(source["task"], Task);
+	        this.classifications = this.convertValues(source["classifications"], Classification);
+	        this.rulesVersion = source["rulesVersion"];
 	        this.elapsedSeconds = source["elapsedSeconds"];
 	        this.evaluation = source["evaluation"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -278,11 +296,11 @@ export namespace session {
 	    actions: Record<string, Capability>;
 	    failure?: Failure;
 	    account: AccountState;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Snapshot(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.revision = source["revision"];
@@ -304,7 +322,7 @@ export namespace session {
 	        this.failure = this.convertValues(source["failure"], Failure);
 	        this.account = this.convertValues(source["account"], AccountState);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -323,7 +341,7 @@ export namespace session {
 		    return a;
 		}
 	}
-	
+
 
 }
 
