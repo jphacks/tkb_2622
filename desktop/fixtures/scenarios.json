@@ -6,15 +6,20 @@
     { "id": "reading", "name": "論文を読む", "purpose": "読解", "plannedSeconds": 3600, "minimumSeconds": 1800 }
   ],
   "classifications": [
-    { "name": "VS Code", "category": "work" },
-    { "name": "ターミナル", "category": "work" },
-    { "name": "github.com", "category": "work" },
-    { "name": "developer.apple.com", "category": "work" },
-    { "name": "Notion", "category": "work" },
-    { "name": "youtube.com", "category": "distraction" },
-    { "name": "x.com", "category": "distraction" },
-    { "name": "instagram.com", "category": "distraction" },
-    { "name": "Discord", "category": "distraction" }
+    { "name": "VS Code", "appId": "com.microsoft.VSCode", "category": "work" },
+    { "name": "ターミナル", "appId": "com.apple.Terminal", "category": "work" },
+    { "name": "github.com", "appId": "com.google.Chrome", "domain": "github.com", "category": "work" },
+    { "name": "developer.apple.com", "appId": "com.google.Chrome", "domain": "developer.apple.com", "category": "work" },
+    { "name": "Notion", "appId": "notion.id", "category": "work" },
+    { "name": "Slack", "appId": "com.tinyspeck.slackmacgap", "category": "work" },
+    { "name": "Word", "appId": "com.microsoft.Word", "category": "work" },
+    { "name": "Excel", "appId": "com.microsoft.Excel", "category": "work" },
+    { "name": "PowerPoint", "appId": "com.microsoft.Powerpoint", "category": "work" },
+    { "name": "ChatGPT", "appId": "com.openai.codex", "category": "work" },
+    { "name": "youtube.com", "appId": "com.google.Chrome", "domain": "youtube.com", "category": "distraction" },
+    { "name": "x.com", "appId": "com.google.Chrome", "domain": "x.com", "category": "distraction" },
+    { "name": "instagram.com", "appId": "com.google.Chrome", "domain": "instagram.com", "category": "distraction" },
+    { "name": "Discord", "appId": "com.hnc.Discord", "category": "distraction" }
   ],
   "scenarios": [
     { "id": "ready", "label": "開始前", "status": "", "elapsedSeconds": 0, "evaluation": "pending", "sync": "synced", "permission": "unknown", "online": true, "balanceSeconds": null },

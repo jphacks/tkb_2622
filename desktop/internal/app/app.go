@@ -18,6 +18,7 @@ import (
 
 const (
 	StateEvent                 = "desktop:state"
+	StartupStateReadyEvent     = "desktop:startup-state-ready"
 	classificationCaptureDelay = 5 * time.Second
 )
 
@@ -129,6 +130,9 @@ func clearStaleTerminalEvaluationFailure(snapshot *session.Snapshot) {
 }
 
 func (h *Host) Startup(ctx context.Context) { h.API.ctx = ctx }
+
+// CurrentSnapshot はメニューバーUIへ現在の端末状態を渡す。
+func (h *Host) CurrentSnapshot() session.Snapshot { return h.API.snapshot() }
 
 func (h *Host) DomReady(ctx context.Context) {
 	a := h.API
@@ -251,12 +255,14 @@ func (a *App) GetStartupState() session.Snapshot {
 	defer cancel()
 	a.syncCloud(ctx)
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	now := time.Now()
 	if a.engine.Tick(now) {
 		a.persistLocked(now)
 	}
-	return a.engine.Snapshot()
+	state := a.engine.Snapshot()
+	a.mu.Unlock()
+	a.emitStartupStateReady()
+	return state
 }
 
 func (a *App) GetClassificationCandidates() ([]monitor.ClassificationCandidate, error) {
@@ -568,6 +574,12 @@ func (a *App) failOrphanedCloudStart(started cloud.Session, cause error) session
 func (a *App) emitState(state session.Snapshot) {
 	if a.ctx != nil {
 		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
+	}
+}
+
+func (a *App) emitStartupStateReady() {
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, StartupStateReadyEvent)
 	}
 }
 

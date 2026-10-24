@@ -1,11 +1,12 @@
 package main
 
 import (
+	"github.com/jphacks/tkb_2622/desktop/internal/app"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
-func configurePlatform(configuration *options.App) {
+func configurePlatform(configuration *options.App, _ *app.Host) {
 	configuration.Windows = &windows.Options{
 		// 画面はライト配色だけなので，OSがダークモードでもタイトルバーを画面に合わせる．
 		Theme:    windows.Light,

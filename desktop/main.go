@@ -22,7 +22,7 @@ func main() {
 		OnStartup:        application.Startup, OnDomReady: application.DomReady, OnShutdown: application.Shutdown,
 		Bind: []interface{}{application.API},
 	}
-	configurePlatform(configuration)
+	configurePlatform(configuration, application)
 	if err := wails.Run(configuration); err != nil {
 		log.Fatal(err)
 	}
