@@ -6,7 +6,7 @@
 
 | ディレクトリ | 用途・現状 |
 | --- | --- |
-| [backend/](backend/) | バックエンド用。README は未記入 |
+| [backend/](backend/) | Go APIの最小実装。Userテーブル，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
 | [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
 | [infra/](infra/) | インフラ構成の管理用 |
@@ -28,7 +28,7 @@
 | --- | --- |
 | [プロダクト全体像](docs/spec/5.プロダクト全体像.md) | 採用構成・Mermaid全体図・各要素の役割・利用の流れを記載 |
 | [バックエンド構成](docs/spec/1.バックエンド構成.md) | 技術スタック案を記載 |
-| [API仕様書](docs/spec/3.API仕様書.md) | 必要な操作と責務・整合性を記載．RPC名・通信型は未定 |
+| [API仕様書](docs/spec/3.API仕様書.md) | ヘルスチェックを実装済み．業務操作の責務を記載し，業務RPC名・通信型は未定 |
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | セッション終了・中止，報酬・実利用時間，利用枠失効，グループ・通知のモデルを記載 |
 | [インフラ構成](docs/spec/2.インフラ構成.md) | 未記入（空ファイル） |
 
