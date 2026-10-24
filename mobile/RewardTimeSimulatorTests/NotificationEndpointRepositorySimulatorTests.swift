@@ -62,6 +62,10 @@ final class NotificationEndpointRepositorySimulatorTests: XCTestCase {
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("(internal)"))
             XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RegisterDevice"))
+            XCTAssertEqual(
+                error.localizedDescription.components(separatedBy: "identity.v1.IdentityService/RegisterDevice").count - 1,
+                1
+            )
         }
 
         XCTAssertEqual(methods.values, ["RegisterDevice"])

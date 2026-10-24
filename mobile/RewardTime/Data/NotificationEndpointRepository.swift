@@ -37,14 +37,7 @@ struct ConfiguredNotificationEndpointRepository {
         let registrationID = deviceSettings.stableRegistrationID()
         try await NotificationEndpointRegistrationFlow.register(
             ensureDevice: {
-                do {
-                    _ = try await deviceSettings.ensureDeviceRegistered(client: client)
-                } catch {
-                    throw NotificationEndpointError.requestFailed(
-                        operation: "identity.v1.IdentityService/RegisterDevice",
-                        underlying: error
-                    )
-                }
+                _ = try await deviceSettings.ensureDeviceRegistered(client: client)
             },
             registerEndpoint: {
                 do {

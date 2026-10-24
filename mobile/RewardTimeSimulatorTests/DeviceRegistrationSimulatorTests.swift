@@ -60,8 +60,9 @@ final class DeviceRegistrationSimulatorTests: XCTestCase {
             do {
                 _ = try await repository.ensureDeviceRegistered(client: client())
                 XCTFail("Expected the device registration request to fail")
-            } catch ConnectJSONClient.ClientError.connect(let code) {
-                XCTAssertEqual(code, "internal")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+                XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/RegisterDevice"))
             }
             let currentOperationID = try XCTUnwrap(defaults.string(forKey: operationKey))
             if let previousOperationID = failedOperationID {

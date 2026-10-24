@@ -6,19 +6,24 @@ enum DeviceSettingsRepositoryError: Error, LocalizedError {
     case deviceNotActive
     case deviceNotRevoked
     case policyConflict
+    case requestFailed(operation: String, underlying: Error)
 
     var errorDescription: String? {
         switch self {
         case .missingConfiguration:
-            "設定タブでSupabaseとAPIの接続情報を設定してください。"
+            return "設定タブでSupabaseとAPIの接続情報を設定してください。"
         case .invalidConfiguration:
-            "Supabase URL・公開用キー・API URLを確認してください。"
+            return "Supabase URL・公開用キー・API URLを確認してください。"
         case .deviceNotActive:
-            "この端末の登録が無効です。端末管理で状態を確認してください。"
+            return "この端末の登録が無効です。端末管理で状態を確認してください。"
         case .deviceNotRevoked:
-            "この端末の登録を解除できませんでした。通信状態を確認して再試行してください。"
+            return "この端末の登録を解除できませんでした。通信状態を確認して再試行してください。"
         case .policyConflict:
-            "制限設定が続けて更新されました。少し待ってからもう一度同期してください。"
+            return "制限設定が続けて更新されました。少し待ってからもう一度同期してください。"
+        case .requestFailed(let operation, let underlying):
+            let detail = (underlying as? LocalizedError)?.errorDescription
+                ?? underlying.localizedDescription
+            return "\(detail) (API: \(operation))"
         }
     }
 }

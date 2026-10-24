@@ -131,20 +131,30 @@ struct ConfiguredDeviceSettingsRepository {
             }
 
             do {
-                let response: UpdatePolicyResponse = try await client.call(
-                    service: "restriction.v1.RestrictionService",
-                    method: "UpdateRestrictionPolicy",
-                    requestBody: UpdatePolicyRequest(
-                        operationId: UUID().uuidString.lowercased(),
-                        deviceId: deviceID,
-                        expectedVersion: String(currentPolicy?.version.value ?? 0),
-                        enabled: settings.enabled,
-                        targetMode: settings.targetMode,
-                        deviceConfigVersion: String(settings.deviceConfigVersion),
-                        configured: settings.configured
-                    ),
-                    responseType: UpdatePolicyResponse.self
-                )
+                let response: UpdatePolicyResponse
+                do {
+                    response = try await client.call(
+                        service: "restriction.v1.RestrictionService",
+                        method: "UpdateRestrictionPolicy",
+                        requestBody: UpdatePolicyRequest(
+                            operationId: UUID().uuidString.lowercased(),
+                            deviceId: deviceID,
+                            expectedVersion: String(currentPolicy?.version.value ?? 0),
+                            enabled: settings.enabled,
+                            targetMode: settings.targetMode,
+                            deviceConfigVersion: String(settings.deviceConfigVersion),
+                            configured: settings.configured
+                        ),
+                        responseType: UpdatePolicyResponse.self
+                    )
+                } catch ConnectJSONClient.ClientError.connect(code: "aborted") {
+                    throw ConnectJSONClient.ClientError.connect(code: "aborted")
+                } catch {
+                    throw DeviceSettingsRepositoryError.requestFailed(
+                        operation: "restriction.v1.RestrictionService/UpdateRestrictionPolicy",
+                        underlying: error
+                    )
+                }
                 return SyncedDevicePolicy(
                     deviceID: response.policy.deviceId,
                     deviceName: deviceName,
@@ -188,17 +198,25 @@ struct ConfiguredDeviceSettingsRepository {
         let key = "mobile.device.register.operation.\(registrationID)"
         let operationID = (defaults.string(forKey: key) ?? UUID().uuidString).lowercased()
         defaults.set(operationID, forKey: key)
-        let response: RegisterDeviceResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "RegisterDevice",
-            requestBody: RegisterDeviceRequest(
-                operationId: operationID,
-                registrationId: registrationID,
-                platform: "PLATFORM_IOS",
-                name: deviceName
-            ),
-            responseType: RegisterDeviceResponse.self
-        )
+        let response: RegisterDeviceResponse
+        do {
+            response = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "RegisterDevice",
+                requestBody: RegisterDeviceRequest(
+                    operationId: operationID,
+                    registrationId: registrationID,
+                    platform: "PLATFORM_IOS",
+                    name: deviceName
+                ),
+                responseType: RegisterDeviceResponse.self
+            )
+        } catch {
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/RegisterDevice",
+                underlying: error
+            )
+        }
         defaults.removeObject(forKey: key)
         guard response.device.status == "ACTIVE" else {
             throw DeviceSettingsRepositoryError.deviceNotActive
@@ -208,15 +226,23 @@ struct ConfiguredDeviceSettingsRepository {
 
     private func currentPolicy(client: ConnectJSONClient, deviceID: String) async throws -> PolicyDTO? {
         do {
-            let response: GetPolicyResponse = try await client.call(
-                service: "restriction.v1.RestrictionService",
-                method: "GetRestrictionPolicy",
-                requestBody: GetPolicyRequest(deviceId: deviceID),
-                responseType: GetPolicyResponse.self
-            )
+            let response: GetPolicyResponse
+            do {
+                response = try await client.call(
+                    service: "restriction.v1.RestrictionService",
+                    method: "GetRestrictionPolicy",
+                    requestBody: GetPolicyRequest(deviceId: deviceID),
+                    responseType: GetPolicyResponse.self
+                )
+            } catch ConnectJSONClient.ClientError.connect(code: "not_found") {
+                return nil
+            } catch {
+                throw DeviceSettingsRepositoryError.requestFailed(
+                    operation: "restriction.v1.RestrictionService/GetRestrictionPolicy",
+                    underlying: error
+                )
+            }
             return response.policy
-        } catch ConnectJSONClient.ClientError.connect(code: "not_found") {
-            return nil
         }
     }
 

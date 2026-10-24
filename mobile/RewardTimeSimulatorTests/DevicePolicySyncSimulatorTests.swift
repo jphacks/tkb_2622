@@ -89,6 +89,74 @@ final class DevicePolicySyncSimulatorTests: XCTestCase {
         XCTAssertEqual(policy.policyVersion, 3)
     }
 
+    func testIncludesFailingGetPolicyOperationWhenPolicySyncFails() async {
+        let methods = LockedRequestMethods()
+        DevicePolicySyncURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            methods.append(method)
+            if method == "RegisterDevice" {
+                return (200, #"{"device":{"id":"device-1","status":"ACTIVE"}}"#)
+            }
+            return (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            _ = try await repository().sync(
+                settings: DeviceRestrictionSettings(
+                    enabled: true,
+                    targetMode: "TARGET_MODE_SELECTED_APPS",
+                    configured: true,
+                    deviceConfigVersion: 4
+                ),
+                client: client(),
+                deviceName: "Simulator"
+            )
+            XCTFail("Expected the policy read request to fail")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/GetRestrictionPolicy"))
+        }
+
+        XCTAssertEqual(methods.values, ["RegisterDevice", "GetRestrictionPolicy"])
+    }
+
+    func testIncludesFailingUpdatePolicyOperationWithoutRetryingAsVersionConflict() async {
+        let methods = LockedRequestMethods()
+        DevicePolicySyncURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            methods.append(method)
+            switch method {
+            case "RegisterDevice":
+                return (200, #"{"device":{"id":"device-1","status":"ACTIVE"}}"#)
+            case "GetRestrictionPolicy":
+                return (404, #"{"code":"not_found","message":"policy missing"}"#)
+            case "UpdateRestrictionPolicy":
+                return (500, #"{"code":"internal","message":"request failed"}"#)
+            default:
+                return (404, #"{"code":"not_found","message":"unknown route"}"#)
+            }
+        }
+
+        do {
+            _ = try await repository().sync(
+                settings: DeviceRestrictionSettings(
+                    enabled: true,
+                    targetMode: "TARGET_MODE_SELECTED_APPS",
+                    configured: true,
+                    deviceConfigVersion: 4
+                ),
+                client: client(),
+                deviceName: "Simulator"
+            )
+            XCTFail("Expected the policy update request to fail")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/UpdateRestrictionPolicy"))
+        }
+
+        XCTAssertEqual(methods.values, ["RegisterDevice", "GetRestrictionPolicy", "UpdateRestrictionPolicy"])
+    }
+
     private func repository() -> ConfiguredDeviceSettingsRepository {
         ConfiguredDeviceSettingsRepository(defaults: defaults)
     }
