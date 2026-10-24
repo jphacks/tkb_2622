@@ -21,6 +21,8 @@
         <string>10.13.0</string>
         <key>NSHighResolutionCapable</key>
         <string>true</string>
+        <key>NSAppleEventsUsageDescription</key>
+        <string>Focus Linkは作業セッションを記録するため、対応ブラウザーのアクティブタブのドメインを読み取ります。完全なURLやページタイトルは保存しません。</string>
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
         {{if .Info.FileAssociations}}
