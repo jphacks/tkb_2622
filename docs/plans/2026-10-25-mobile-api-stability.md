@@ -21,7 +21,7 @@
 | 起動・アカウント | Supabase OTP／refresh、Identity `EnsureUser`・`GetMe`・`UpdateDisplayName`・`UpdateAvatar` | 起動時業務User同期とAuth状態の分離を要確認 |
 | Home | Focus `GetCurrentSession`、Reward `GetBalance`、Restriction `GetRestrictionState` | refresh失敗時に古いsnapshotを残しつつ警告を表示し、古いrestriction状態をOSへ再適用しないよう修正。回帰XCTestを追加。3 API間のsession ID／version整合・部分失敗時の実API表示は未確認 |
 | Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | RPC名とproto JSON DTO、REST response項目をGo handlerと静的照合し一致。過去の`internal`／`not_found`は現在再現せず、画面・認証付き実API成功は未確認 |
-| History | Focus `ListSessions`、Reward `ListTransactions` | ページング・片方だけの失敗・reloadを要確認 |
+| History | Focus `ListSessions`、Reward `ListTransactions` | response DTO（entries/session/reward, transactions）・ProtoJSON int64・timestamp・page tokenをproto／Go handlerと照合し一致。ViewModelは両方の初回取得が成功してから更新し、失敗時は前回値とstale表示を保つ。片方だけの失敗・実API pagingは未確認 |
 | 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
 | 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | APNs token／認証／DB失敗を分離して再現。過去ログにはregister時の`internal`とSQLSTATE 2201Bがあるが、現ブランチでの再発は未確認 |
