@@ -77,6 +77,11 @@ final class UsageReservationFailurePolicyTests: XCTestCase {
                 after: ConnectJSONClient.ClientError.httpStatus(409)
             )
         )
+        XCTAssertTrue(
+            UsageReservationFailurePolicy.shouldDiscardPendingOperation(
+                after: WrappedAPIError(underlyingError: ConnectJSONClient.ClientError.connect(code: "failed_precondition"))
+            )
+        )
     }
 
     func testAmbiguousServerAndTransportResponsesKeepPendingOperation() {
@@ -103,6 +108,11 @@ final class UsageReservationFailurePolicyTests: XCTestCase {
         XCTAssertFalse(
             UsageReservationFailurePolicy.shouldDiscardPendingOperation(after: URLError(.timedOut))
         )
+        XCTAssertFalse(
+            UsageReservationFailurePolicy.shouldDiscardPendingOperation(
+                after: WrappedAPIError(underlyingError: ConnectJSONClient.ClientError.connect(code: "internal"))
+            )
+        )
     }
 
     func testRateLimitsAndTimeoutLikeResponsesKeepTheOriginalRequest() {
@@ -122,4 +132,8 @@ final class UsageReservationFailurePolicyTests: XCTestCase {
             )
         )
     }
+}
+
+private struct WrappedAPIError: Error, UnderlyingErrorProviding {
+    let underlyingError: Error
 }

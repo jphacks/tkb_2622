@@ -68,8 +68,9 @@ final class UsageGrantRepositorySimulatorTests: XCTestCase {
                 requestedSeconds: 300
             )
             XCTFail("Expected the backend Connect error to be surfaced")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "not_found")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(not_found)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/ReserveUsageGrant"))
         }
     }
 
@@ -143,6 +144,74 @@ final class UsageGrantRepositorySimulatorTests: XCTestCase {
             let payload = try requestPayload(from: request)
             XCTAssertEqual(payload["kind"] as? String, "OPERATION_KIND_RESERVE")
             XCTAssertEqual(payload["operationId"] as? String, expectedOperationID)
+        }
+    }
+
+    func testReportRestrictionStateFailureIncludesFailingOperation() async {
+        UsageGrantRepositoryURLProtocol.handler = { _ in
+            (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            try await repository().reportRestrictionState(
+                deviceID: "device-1",
+                controlRevision: 9,
+                shieldStatus: "SHIELD_STATUS_UNSHIELDED",
+                permissionStatus: "PERMISSION_STATUS_GRANTED"
+            )
+            XCTFail("Expected ReportRestrictionState error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/ReportRestrictionState"))
+        }
+    }
+
+    func testGetGrantFailureIncludesFailingOperation() async {
+        UsageGrantRepositoryURLProtocol.handler = { _ in
+            (404, #"{"code":"not_found","message":"grant missing"}"#)
+        }
+
+        do {
+            _ = try await repository().getGrant(grantID: "grant-1")
+            XCTFail("Expected GetUsageGrant error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(not_found)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/GetUsageGrant"))
+        }
+    }
+
+    func testReportUsageFailureIncludesFailingOperation() async {
+        UsageGrantRepositoryURLProtocol.handler = { _ in
+            (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            _ = try await repository().reportUsage(
+                operationID: "report-operation-1",
+                grantID: "grant-1",
+                reportSequence: 2,
+                cumulativeSeconds: 120,
+                observedAt: Date(timeIntervalSince1970: 1_791_000_000),
+                final: false
+            )
+            XCTFail("Expected ReportUsage error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/ReportUsage"))
+        }
+    }
+
+    func testReservationOperationFailureIncludesFailingOperation() async {
+        UsageGrantRepositoryURLProtocol.handler = { _ in
+            (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            _ = try await repository().reservationOperation(operationID: "reserve-operation-1")
+            XCTFail("Expected GetRestrictionOperation error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("restriction.v1.RestrictionService/GetRestrictionOperation"))
         }
     }
 

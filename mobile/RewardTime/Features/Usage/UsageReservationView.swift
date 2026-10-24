@@ -153,7 +153,9 @@ final class UsageReservationViewModel: ObservableObject {
                 )
             } catch {
                 screenTime.applyRestriction()
-                reservationError = "利用枠は確保しましたが、解除状態をbackendへ報告できませんでした。通信を確認して利用中画面から再同期してください。"
+                let detail = (error as? LocalizedError)?.errorDescription
+                    ?? "接続状態を確認してください。"
+                reservationError = "利用枠は確保しましたが、解除状態をbackendへ報告できませんでした。通信を確認して利用中画面から再同期してください。\n\(detail)"
             }
         } catch {
             let canDiscardPendingOperation = error is UsageGrantRepositoryError

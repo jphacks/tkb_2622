@@ -138,8 +138,7 @@ struct ConfiguredUsageGrantRepository {
         guard let deviceID = defaults.string(forKey: "mobile.device.id"), !deviceID.isEmpty else {
             throw UsageGrantRepositoryError.deviceNotRegistered
         }
-        let response: ReserveResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
+        let response: ReserveResponse = try await call(
             method: "ReserveUsageGrant",
             requestBody: ReserveRequest(
                 operationId: operationID,
@@ -187,8 +186,7 @@ struct ConfiguredUsageGrantRepository {
         failureReason: String = "",
         appliedAt: Date = Date()
     ) async throws {
-        let _: ReportStateResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
+        let _: ReportStateResponse = try await call(
             method: "ReportRestrictionState",
             requestBody: ReportStateRequest(
                 operationId: operationID,
@@ -205,8 +203,7 @@ struct ConfiguredUsageGrantRepository {
     }
 
     func getGrant(grantID: String) async throws -> UsageGrantSnapshot {
-        let response: GrantResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
+        let response: GrantResponse = try await call(
             method: "GetUsageGrant",
             requestBody: GetGrantRequest(grantId: grantID),
             responseType: GrantResponse.self
@@ -325,8 +322,7 @@ struct ConfiguredUsageGrantRepository {
         observedAt: Date,
         final: Bool
     ) async throws -> UsageGrantSnapshot {
-        let response: ReportUsageResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
+        let response: ReportUsageResponse = try await call(
             method: "ReportUsage",
             requestBody: ReportUsageRequest(
                 operationId: operationID,
@@ -342,13 +338,32 @@ struct ConfiguredUsageGrantRepository {
     }
 
     func reservationOperation(operationID: String) async throws -> String? {
-        let response: GetOperationResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
+        let response: GetOperationResponse = try await call(
             method: "GetRestrictionOperation",
             requestBody: GetOperationRequest(kind: "OPERATION_KIND_RESERVE", operationId: operationID),
             responseType: GetOperationResponse.self
         )
         return response.status == "OPERATION_STATUS_SUCCEEDED" ? response.resourceId : nil
+    }
+
+    private func call<Request: Encodable, Response: Decodable>(
+        method: String,
+        requestBody: Request,
+        responseType: Response.Type
+    ) async throws -> Response {
+        do {
+            return try await client.call(
+                service: "restriction.v1.RestrictionService",
+                method: method,
+                requestBody: requestBody,
+                responseType: responseType
+            )
+        } catch {
+            throw UsageGrantAPIError(
+                operation: "restriction.v1.RestrictionService/\(method)",
+                underlyingError: error
+            )
+        }
     }
 
     private static func snapshot(_ grant: GrantDTO) -> UsageGrantSnapshot {
@@ -437,5 +452,16 @@ enum UsageGrantRepositoryError: Error, LocalizedError {
         case .deviceNotRegistered:
             "設定画面からiPhoneをbackendへ登録してください。"
         }
+    }
+}
+
+private struct UsageGrantAPIError: LocalizedError, UnderlyingErrorProviding {
+    let operation: String
+    let underlyingError: Error
+
+    var errorDescription: String? {
+        let detail = (underlyingError as? LocalizedError)?.errorDescription
+            ?? underlyingError.localizedDescription
+        return "\(detail) (API: \(operation))"
     }
 }

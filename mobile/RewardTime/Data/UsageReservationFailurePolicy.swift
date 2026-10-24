@@ -1,10 +1,17 @@
 import Foundation
 
+protocol UnderlyingErrorProviding {
+    var underlyingError: Error { get }
+}
+
 enum UsageReservationFailurePolicy {
     /// Keep the operation ID unless the server response proves the request was rejected.
     /// A lost response or server error may follow a committed reservation, which must be replayed
     /// with its original idempotency key.
     static func shouldDiscardPendingOperation(after error: Error) -> Bool {
+        if let wrapped = error as? UnderlyingErrorProviding {
+            return shouldDiscardPendingOperation(after: wrapped.underlyingError)
+        }
         guard let clientError = error as? ConnectJSONClient.ClientError else { return false }
 
         switch clientError {
