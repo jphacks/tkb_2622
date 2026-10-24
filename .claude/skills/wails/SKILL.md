@@ -47,6 +47,8 @@ wails build -platform windows/amd64 -nsis   # Windows インストーラー（�
 
 ### Go バックエンド
 
+> **このリポジトリでの扱い:** 以下のメモアプリは Wails の使い方を示す汎用サンプルで，SQLite を端末内の保存先として使っています．本プロジェクトの業務データ（作業記録・報酬残高・端末・グループ等）は Cloud Run 上の Go API が Supabase PostgreSQL に保存します．デスクトップアプリの端末内 Go は Connect RPC / HTTPS で API を呼び出し，DB へ直接接続しません．端末内の保存（オフライン中の記録の保持等）の方式は未定のため，サンプルの SQLite をそのまま採用しないでください．[desktop/README.md](../../../desktop/README.md)，[バックエンド構成](../../../docs/spec/1.バックエンド構成.md)を参照してください．
+
 ```go
 // app.go — バインドされた構造体のエクスポート済みメソッドは JavaScript から呼び出せます
 package main
@@ -299,12 +301,12 @@ wails build -platform windows/amd64       # build/bin/fieldnotes.exe、Windows �
 
 ## ガイドライン
 
-1. **バックエンドは Go、UI は Web** — ビジネスロジック、ファイル入出力、データベースアクセスは Go に置き、描画はフロントエンドで行います
+1. **バックエンドは Go、UI は Web** — 端末内の処理（計測、ファイル入出力、クラウド API の呼び出し）は Go に置き、描画はフロントエンドで行います。本プロジェクトでは報酬の確定・残高管理はクラウドの Go API が担い、端末内 Go は Connect RPC で API を呼び出します
 2. **自動生成バインディング** — `frontend/wailsjs/` は編集しないでください。`wails dev` と `wails build` のたびに書き換えられます
 3. **アセットの埋め込み** — `//go:embed all:frontend/dist` はフロントエンドをバイナリに組み込み、単一ファイルで配布できるようにします
 4. **非同期処理にはイベントを使用** — `runtime.EventsEmit` は進捗やバックグラウンド処理の結果をフロントエンドへ送信します。`EventsOn` が返す関数を保持し、アンマウント時に呼び出してください
 5. **ネイティブダイアログ** — HTML モーダルではなく、ランタイムのダイアログ（`OpenFileDialog`、`SaveFileDialog`、`MessageDialog`）を使用します
-6. **ローカルデータには SQLite** — データベースは実行ファイルの隣ではなく、`os.UserConfigDir()` の配下に保存します。純粋な Go ドライバーを使用すると、クロスコンパイルを維持できます
+6. **業務データはクラウド、端末内の保存は最小限** — 業務データは Go API 経由で Supabase PostgreSQL に保存し、デスクトップから DB へ直接接続しません。オフライン中の記録など端末内に保存するものは、実行ファイルの隣ではなく `os.UserConfigDir()` の配下に置きます。保存方式は未定で、SQLite を使う場合は純粋な Go ドライバー（`modernc.org/sqlite`）にするとクロスコンパイルを維持できます
 7. **コンテキストは `OnStartup` から取得** — そこで保存しますが、ウィンドウ、ダイアログ、イベントの関数は `OnDomReady` 以降でのみ呼び出してください。ドキュメントでは `OnStartup` 内のランタイム動作は保証されていません
 8. **クロスコンパイルの対応は限定的** — Windows 向けは Linux と macOS からビルドでき、macOS 向けは macOS 上でのみビルドできます。Linux 向けには GTK と WebKit のヘッダーを備えた Linux が必要です。OS ごとに CI ランナーを用意してください
 9. **バインドされたメソッドは API として公開される** — WebView 内のあらゆるものから呼び出せるため、引数を検証し、信頼できないリモートページをアプリウィンドウに読み込まないでください

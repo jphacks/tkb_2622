@@ -79,8 +79,11 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 	}
 	earned := w.policy.Increment(workMillis, summary.EarnedSeconds)
 	from := wallet.EvaluatedSeq + 1
+	wallet, err = wallet.Credit(earned)
+	if err != nil {
+		return 0, domain.Wallet{}, err
+	}
 	wallet.EvaluatedSeq = throughSeq
-	wallet.BalanceSeconds += earned
 	wallet.Version++
 	if err = w.repo.SaveWallet(ctx, wallet); err != nil {
 		return 0, domain.Wallet{}, err
@@ -107,10 +110,10 @@ func (w *Wallets) Spend(ctx context.Context, userID, sessionID, grantID string, 
 	if wallet.SessionID != sessionID {
 		return domain.Wallet{}, domain.ErrState
 	}
-	if seconds <= 0 || seconds > wallet.BalanceSeconds {
-		return domain.Wallet{}, errors.Join(apperr.ErrPrecondition, domain.ErrInsufficient)
+	wallet, err = wallet.Reserve(seconds)
+	if err != nil {
+		return domain.Wallet{}, errors.Join(apperr.ErrPrecondition, err)
 	}
-	wallet.BalanceSeconds -= seconds
 	wallet.Version++
 	if err = w.repo.SaveWallet(ctx, wallet); err != nil {
 		return domain.Wallet{}, err
@@ -128,8 +131,7 @@ func (w *Wallets) Discard(ctx context.Context, userID, sessionID string) (int64,
 	if wallet.SessionID != sessionID {
 		return 0, domain.Wallet{}, domain.ErrState
 	}
-	discarded := wallet.BalanceSeconds
-	wallet.SessionID, wallet.BalanceSeconds, wallet.EvaluatedSeq = "", 0, 0
+	wallet, discarded := wallet.DiscardOnSessionEnd()
 	wallet.Version++
 	if err = w.repo.SaveWallet(ctx, wallet); err != nil {
 		return 0, domain.Wallet{}, err

@@ -6,11 +6,11 @@
 
 | ディレクトリ | 用途・現状 |
 | --- | --- |
-| [backend/](backend/) | Go APIの最小実装。Userテーブル，HTTP／Connectヘルスチェック，Docker起動手順 |
+| [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restrictionのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-| [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
-| [infra/](infra/) | インフラ構成の管理用 |
-| [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
+| [mobile/](mobile/) | SwiftUIアプリの画面モック実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
+| [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
+| [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
 ## 戦略資料
@@ -30,10 +30,21 @@
 | [バックエンド構成](docs/spec/1.バックエンド構成.md) | モジュラーモノリス，クリーンアーキテクチャの依存方向，横断処理・トランザクション方針を記載 |
 | [API仕様書](docs/spec/3.API仕様書.md) | ヘルスチェックを実装済み．小休憩モデルの業務動作，基本APIの契約案，全機能の対応表，未決事項を記載 |
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | 途中報酬・小休憩，終了時の全未使用報酬破棄・制限解除，グループ・通知のモデルを記載 |
-| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLへの移行方針，接続・権限・環境設定を記載．移行未実施 |
+| [iOSクライアント開発フロー](docs/spec/6.iOSクライアント開発フロー.md) | バックエンドAPI完成後のmobile接続順，開始条件，画面別API対応，iOS側の未決事項と担当を記載 |
+| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLの接続・権限・環境設定，Supabase接続の残作業を記載．コードのPostgreSQL移行は済み，Supabase接続は未実施 |
 | [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
 | [フロントエンド構成](docs/spec/6.フロントエンド構成.md) | Wails v2・React・TypeScript・ViteとSwiftUIの構成，責務・状態・検証方針を記載．デスクトップ共通基盤はデモ実装済み，API・計測・iPhone連携は未接続 |
 | [デスクトップ共同開発](docs/spec/7.デスクトップ共同開発.md) | Mac担当者が先行する共通基盤，OS別UIの境界・配置・接続契約，引き渡し条件・分担・検証を記載 |
+
+## UIモック
+
+画面遷移と表示項目の参照用HTMLです。モックの状態と仕様との対応・実装時の扱いは[UIモック案内](docs/UI/README.md)，業務ルールは仕様資料を正とします。
+
+| 画面群 | モック |
+| --- | --- |
+| Macの作業結果・履歴・設定・セッション操作 | [作業後フィードバック](docs/UI/01_Mac_作業後フィードバック.html)，[これまでの記録](docs/UI/02_Mac_これまでの記録.html)，[設定](docs/UI/03_Mac_設定.html)，[メニューバー開始前](<docs/UI/04_Mac_メニューバー(開始前).html>)，[作業中](<docs/UI/05_Mac_メニューバー(作業中).html>)，[一時停止中](<docs/UI/06_Mac_メニューバー(一時停止中).html>)，[起動時ポップアップ](docs/UI/07_Mac_アプリ起動時ポップアップ.html) |
+| iPhoneの作業状態・制限・残高利用 | [作業中ホーム](docs/UI/08_iPhone_作業中ホーム.html)，[制限画面](<docs/UI/09_iPhone_制限画面(Shield).html>)，[残高を使う](docs/UI/10_iPhone_残高を使う.html)，[利用中](docs/UI/11_iPhone_利用中.html) |
+| iPhoneの設定・グループ・通知 | [設定](docs/UI/12_iPhone_設定.html)，[グループ](docs/UI/13_iPhone_グループ.html)，[通知の例](docs/UI/14_iPhone_Mac_通知の例.html) |
 
 資料が空の場合は仕様未定として扱います。実装に必要な仕様を決めたら該当資料に記載し、資料の追加・移動や記入状況の変更に合わせてこの索引を更新します。
 
