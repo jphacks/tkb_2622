@@ -55,6 +55,155 @@ final class ConnectJSONClientTests: XCTestCase {
         }
     }
 
+    func testCallPreservesPlainHTTPStatusWhenResponseIsNotConnectJSON() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 404, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"message":"route missing"}"#.utf8))
+        }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected HTTP status to be preserved")
+        } catch ConnectJSONClient.ClientError.httpStatus(let status) {
+            XCTAssertEqual(status, 404)
+        }
+    }
+
+    func testCallPreservesUnauthenticatedCodeAndProjectGuidanceFor401() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 401, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"code":"unauthenticated","message":"authentication required"}"#.utf8))
+        }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected unauthenticated Connect error")
+        } catch let error as ConnectJSONClient.ClientError {
+            guard case .connect(let code) = error else { return XCTFail("Expected Connect error, got \(error)") }
+            XCTAssertEqual(code, "unauthenticated")
+            XCTAssertTrue(error.localizedDescription.contains("Project URL"))
+        }
+    }
+
+    func testCallPreservesPermissionDeniedConnectCodeFor403() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 403, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"code":"permission_denied","message":"forbidden"}"#.utf8))
+        }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected permission denied Connect error")
+        } catch ConnectJSONClient.ClientError.connect(let code) {
+            XCTAssertEqual(code, "permission_denied")
+        }
+    }
+
+    func testGetPreservesConnectErrorCodeForRESTEndpoint() async throws {
+        var receivedRequest: URLRequest?
+        StubURLProtocol.handler = { request in
+            receivedRequest = request
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 404, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"code":"not_found","message":"feed missing"}"#.utf8))
+        }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.get(
+                path: "v1/group/work-starts",
+                queryItems: [],
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected REST Connect error to be surfaced")
+        } catch ConnectJSONClient.ClientError.connect(let code) {
+            XCTAssertEqual(code, "not_found")
+        }
+
+        XCTAssertEqual(receivedRequest?.url?.path, "/v1/group/work-starts")
+        XCTAssertEqual(receivedRequest?.httpMethod, "GET")
+        XCTAssertEqual(receivedRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer test-access-token")
+    }
+
+    func testCallPropagatesNetworkFailureWithoutConvertingItToHTTPError() async throws {
+        StubURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected transport failure")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .notConnectedToInternet)
+        }
+    }
+
+    func testCallPropagatesTimeoutWithoutConvertingItToHTTPError() async throws {
+        StubURLProtocol.handler = { _ in throw URLError(.timedOut) }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected timeout")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        }
+    }
+
+    func testCallSurfacesDecodeFailureForSuccessfulButMalformedJSON() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(#"{"groups":"not-an-array"}"#.utf8))
+        }
+        let client = makeClient(token: "test-access-token")
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "group.v1.GroupService",
+                method: "ListGroups",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected successful HTTP response with invalid DTO to fail decoding")
+        } catch is DecodingError {}
+    }
+
     func testCallDoesNotSendRequestWithoutAccessToken() async throws {
         StubURLProtocol.handler = { _ in
             XCTFail("A request must not be sent without an access token")

@@ -117,7 +117,7 @@ xcodebuild \
 - XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。各画面のSwiftUI Previewでも状態を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
-- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止のユニットテストはSwift Packageで実行する。現在はmacOS host上で動作し、iOS Simulator XCTestではない。アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。
+- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止のユニットテストはSwift Packageで実行する。transport testsはBearer認証、Connect code、401／403、plain HTTP 404、REST Connect error、token欠落、通信断、timeout、JSON decode failureをmacOS host上で確認する。これらはiOS Simulator XCTestではなく、アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。Supabase SDKの失効session refreshとの結合は未確認。
 
   ```sh
   swift test --package-path mobile/RewardTimeTests
