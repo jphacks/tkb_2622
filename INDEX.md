@@ -8,9 +8,9 @@
 | --- | --- |
 | [backend/](backend/) | バックエンド用。README は未記入 |
 | [desktop/](desktop/) | 作業・集中度合を検知するデスクトップアプリ用 |
-| [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
+| [mobile/](mobile/) | 本番向けスマホアプリ用。現時点では未着手 |
 | [infra/](infra/) | インフラ構成の管理用 |
-| [poc/](poc/) | 必要な機能の PoC 用 |
+| [poc/](poc/) | 必要な機能の PoC 用。[iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
 ## 戦略資料
