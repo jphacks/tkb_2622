@@ -38,11 +38,4 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    func showPreview(_ snapshot: MobileHomeSnapshot) {
-        state = .loaded(snapshot)
-    }
-
-    func showFailurePreview() {
-        state = .failed("開発用の通信エラー表示です。")
-    }
 }

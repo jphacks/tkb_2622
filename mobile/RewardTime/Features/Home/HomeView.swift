@@ -33,13 +33,6 @@ struct HomeView: View {
                 errorCard(message: message)
             }
 
-#if DEBUG
-            DisclosureGroup("開発用ツール") {
-                previewControls
-            }
-            .font(.footnote.weight(.semibold))
-            .tint(AppTheme.primary)
-#endif
         }
         .navigationTitle("Focus Link")
         .navigationBarTitleDisplayMode(.inline)
@@ -70,35 +63,6 @@ struct HomeView: View {
         guard case .loaded(let snapshot) = viewModel.state else { return }
         await screenTime.reconcileServerRestriction(snapshot)
     }
-
-#if DEBUG
-    private var previewControls: some View {
-        SurfaceCard {
-            Label("表示するサンプル状態", systemImage: "slider.horizontal.3")
-                .font(.subheadline.weight(.bold))
-            Menu("画面状態を選ぶ") {
-                Button("08 作業中・制限中") { viewModel.showPreview(.workingSample) }
-                Button("10 一時停止中") { viewModel.showPreview(.pausedSample) }
-                Button("11 小休憩中") { viewModel.showPreview(.releasedSample) }
-                Button("08 セッションなし") { viewModel.showPreview(.noSessionSample) }
-                Button("通信エラー") { viewModel.showFailurePreview() }
-            }
-            .font(.subheadline.weight(.semibold))
-            NavigationLink {
-                RestrictionShieldPreview()
-            } label: {
-                Label("09 制限画面のプレビュー", systemImage: "lock.iphone")
-                    .font(.footnote.weight(.medium))
-            }
-            NavigationLink {
-                BackendHealthCheckView()
-            } label: {
-                Label("backendヘルスチェック", systemImage: "network")
-                    .font(.footnote.weight(.medium))
-            }
-        }
-    }
-#endif
 
     private func sessionCard(_ snapshot: MobileHomeSnapshot) -> some View {
         SurfaceCard(padding: 20) {
