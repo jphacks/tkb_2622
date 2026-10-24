@@ -51,14 +51,21 @@ npm run dev -- --host 127.0.0.1
 
 #### Windowsでの起動
 
-Windowsのアプリとして起動するには，**Windows側（例：`C:\dev\tkb_2622`）にcloneしたリポジトリ**をPowerShellで操作する．WSLで`wails dev`を実行するとLinux版としてビルドされ，WSL上のパス（`\\wsl.localhost\...`）ではnpmが動かない．`make`がなければ`winget install ezwinports.make`で入れる．
+Windows版はWindowsのPowerShellとWSLのどちらからでも準備・起動できる．`make`がなければ，Windowsでは`winget install ezwinports.make`で入れる．
 
-```powershell
+```sh
 make -C desktop setup-win   # 初回・依存更新時
 make -C desktop up-win      # wails devで起動（終了はCtrl+C）
 ```
 
-`setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加するため，初回後は新しいターミナルを開く．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．処理は`scripts/windows/*.ps1`にあり，`make`がない場合は`powershell -ExecutionPolicy Bypass -File desktop\scripts\windows\setup.ps1`（起動は`up.ps1`）でも実行できる．
+| 実行場所 | 動作 |
+| --- | --- |
+| Windows（PowerShell） | Windows側にcloneしたリポジトリでそのまま実行する |
+| WSL | `desktop/`をWindows側（既定は`%LOCALAPPDATA%\tkb_2622\desktop`．`WIN_DESKTOP_DIR`で変更可）へ同期し，`powershell.exe`でそこから実行する．`up-win`の実行中はWSLでの編集を1秒ごとに同期し，ホットリロードに反映する |
+
+WSLのリポジトリをWindowsから直接動かさないのは，Windowsのnpmが`\\wsl.localhost\...`上でスクリプトを実行できず，`node_modules`のネイティブ部品もOSごとに異なるためである．同期先の`node_modules`・`wailsjs`等はWindows側で生成し，同期で上書き・削除しない．同期先で編集した内容はWSLへ戻らないため，編集はWSL側で行う．
+
+`setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加する．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．`package-lock.json`を変更したら`setup-win`を再実行する．処理は`scripts/windows/`（PowerShellの`setup.ps1`・`up.ps1`，WSL用の`wsl.sh`）にある．
 
 ```sh
 cd desktop/frontend
