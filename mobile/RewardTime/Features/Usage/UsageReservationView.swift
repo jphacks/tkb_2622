@@ -227,7 +227,7 @@ struct UsageReservationView: View {
             SurfaceCard {
                 Label("選んだアプリの画面利用時間をDeviceActivityで計測します。", systemImage: "hourglass")
                 Label("計測と自動再制限にはiPhoneのFamily Controls許可が必要です。", systemImage: "checkmark.shield.fill")
-                Label("利用時間は1分ごとのチェックポイントでbackendへ反映します。", systemImage: "clock")
+                Label("DeviceActivityが1分単位で計測し、backendへは利用中画面の表示中に1分おき、アプリ復帰時に同期します。", systemImage: "clock")
             }
             .font(.footnote)
             .foregroundStyle(AppTheme.secondaryInk)
@@ -365,14 +365,25 @@ struct ActiveUsageView: View {
             }
 
             SurfaceCard {
-                Text("残り枠は選択アプリの利用がある場合に減ります。利用時間はDeviceActivityが1分単位で通知し、アプリを開いたときにbackendへ同期します。")
+                Text("残り枠は選択アプリの利用がある場合に減ります。DeviceActivityはバックグラウンドでも計測と自動再制限を行い、backendへはこの画面を表示中に1分おき、アプリ復帰時にも同期します。")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
             }
         }
         .navigationTitle("利用中")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.refresh(grantID: grantID) }
+        .task {
+            await viewModel.refresh(grantID: grantID)
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 60_000_000_000)
+                } catch {
+                    return
+                }
+                guard scenePhase == .active else { continue }
+                await viewModel.refresh(grantID: grantID)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await viewModel.refresh(grantID: grantID) } }
         }
