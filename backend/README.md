@@ -39,6 +39,8 @@ HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を
 
 ローカルDBは2つのロールを使い分けます．マイグレーションは`postgres`ロール，APIは`dev/postgres/001_roles.sql`で作る`tkb_app`ロール（`app`スキーマのテーブルへのSELECT／INSERT／UPDATE／DELETEのみ）で接続します．初期化SQLはボリューム作成時にだけ実行されるため，変更した場合はボリュームを作り直します．これらのパスワードはローカル専用です．
 
+DBクライアント（DBeaver等）からは`localhost:5432`，データベース`tkb`で接続できます．PostgreSQLはホストの`127.0.0.1`だけに公開しています．全テーブルを見る場合は`postgres`／`local-migration-only`，APIと同じ権限で確認する場合は`tkb_app`／`local-app-only`を使います．業務テーブルは`app`スキーマにあります．ホストで別のPostgreSQLが5432番を使っている場合は起動に失敗するため，停止するか`compose.local.yaml`の公開ポートを変更してください．
+
 旧SQLite用のボリューム`tkb-backend-local_sqlite-data`は自動では削除しません．不要なら`docker volume rm tkb-backend-local_sqlite-data`で削除してください．
 
 ## APIドキュメント（Swagger UI）
