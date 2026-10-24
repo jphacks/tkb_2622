@@ -117,14 +117,14 @@ xcrun devicectl device process launch \
 
 初回はXcodeがiPhoneの開発サポート情報を準備するため、Devices and Simulatorsに準備中と表示されることがある。iPhoneを接続・ロック解除したまま完了を待ってからビルドする。Family Controls (Development) の表示に配布向けentitlement申請の警告が併記される場合、それは配布時の要件であり、開発用の実機検証とは区別する。
 
-## 実機起動の現在状況（2026-10-24）
+## 実機起動時の経過（2026-10-24）
 
 - iPhoneへのビルド、インストール、`devicectl device process launch` は成功した。
-- 起動後にiPhoneで白画面になり、Xcodeは `Launching suspended and the debugger is responsible for resuming` の後、アプリへのデバッガ接続待ちになった。
-- 使用環境はmacOS 26.5.2 / Xcode 26.5 / iPhone SE (第3世代)・iOS 27.0.1。Xcode 26.5がこのiOSバージョンの実機デバッグに対応していないことが原因候補だが、白画面の直接原因としては未確定。
+- 初回起動時はiPhoneが白画面になり、Xcodeは `Launching suspended and the debugger is responsible for resuming` の後、アプリへのデバッガ接続待ちになった。
+- 使用環境はmacOS 26.5.2 / Xcode 26.5 / iPhone SE (第3世代)・iOS 27.0.1。Xcode 26.5とiOS 27.0.1の組み合わせが原因候補だったが、白画面の直接原因は確定していない。
 - Family Controlsの認可ダイアログは表示されたが、許可状態とShieldの動作は未確認。配布向け `Family Controls (Distribution)` の警告は、今回の起動待ちとは別の項目。
 
-macOS 26.6以降とiOS 27対応のXcodeに更新した後、Xcodeからプロジェクトを開き、iPhoneのロックを解除して実行先に選び、⌘Rで起動する。アプリ画面が表示されたら、認可状態、アプリ選択、Shield設定・解除の順に実機確認を再開する。白画面が続く場合は、XcodeのデバッグコンソールとDevices and Simulatorsの端末状態を記録し、原因を切り分ける。
+その後、iPhoneアプリの画面表示と、アプリからAPIの仮残高42分を取得する動作を確認した。初回の白画面は解消しているが、発生原因とXcodeデバッガ接続の関係は未確定。
 
 ## MacからiPhoneへ報酬状態を送るPoC
 
@@ -142,10 +142,11 @@ MacのIPアドレスをシステム設定のネットワーク詳細で確認す
 
 ### 2. Macから仮の報酬状態を送信
 
-別のターミナルで、`MAC_IP` をMacのIPアドレスに置き換えて実行する。
+別のターミナルでMacのWi-Fi側IPアドレスを設定してから実行する。
 
 ```sh
-MAC_IP="157.82.201.173"
+MAC_IP="$(ipconfig getifaddr en0)"
+echo "$MAC_IP"
 UNLOCK_ENDS_AT="$(date -u -v+10M '+%Y-%m-%dT%H:%M:%SZ')"
 
 curl --fail-with-body -X POST "http://${MAC_IP}:8787/v1/reward-snapshot" \
@@ -157,6 +158,25 @@ curl --fail-with-body -X POST "http://${MAC_IP}:8787/v1/reward-snapshot" \
 
 ### 3. iPhoneでAPIから取得
 
-PoCアプリの「Mac/API通信（PoC）」に `http://192.168.1.20:8787` のようにMacのIPアドレスを入力し、「APIから報酬状態を取得」を押す。初回のローカルネットワーク確認では許可する。APIの仮残高と解除終了予定が表示されれば、APIからiPhoneへの取得は成功。アプリ内のローカル仮残高は変更しない。
+PoCアプリの「Mac/API通信（PoC）」に `http://<MacのIPアドレス>:8787` を入力し、「APIから報酬状態を取得」を押す。`/v1/reward-snapshot` は入力しない。初回のローカルネットワーク確認では許可する。APIの仮残高と解除終了予定が表示されれば、APIからiPhoneへの取得は成功。アプリ内のローカル仮残高は変更しない。
 
 APIは再起動すると保持データが消える。接続できない場合は、MacとiPhoneが同じネットワーク上にあること、MacのIPアドレス、APIプロセスの起動状態、Macのファイアウォール設定を確認する。
+
+### 実機で確認できた結果
+
+- MacからのPOSTは `201 Created` を返した。
+- MacのネットワークIP経由のGETは `200 OK` を返した。
+- iPhoneアプリからAPIの仮データを取得し、42分の表示を確認した。
+- これでMac → API → iPhoneアプリの通信経路を確認できた。Family Controls認可・Shield動作・期限後の再制限は別の未確認項目。
+
+## 次のPoC：本人認可と1アプリのShield
+
+通信確認後は、iPhone実機でScreen Timeの認可と手動制限を検証する。
+
+1. アプリの「Family Controls」状態を確認し、「本人利用の認可を要求」を押す。認可を許可し、表示が「許可済み」になるか確認する。
+2. 「制限するアプリを選択」でアプリを1つ選ぶ。
+3. 「選択したアプリを制限」を押し、対象アプリを開いてShieldが表示されるか確認する。
+4. PoCに戻り「このPoCの制限を解除」を押し、Shieldが消えるか確認する。
+5. 認可状態、対象アプリ、制限・解除結果、表示されたエラーを記録する。
+
+以前の試行では認可ダイアログで拒否を選んでおり、許可状態は未確認。アプリに「拒否」と表示された場合はその状態を記録し、許可済みと扱わない。
