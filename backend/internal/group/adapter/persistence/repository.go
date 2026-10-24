@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jphacks/tkb_2622/backend/internal/apperr"
@@ -57,6 +58,49 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Gr
 		return nil, err
 	}
 	return groups, nil
+}
+
+func (r *Repository) ListWorkStarts(ctx context.Context, userID string, after time.Time, afterID string, limit int) ([]domain.WorkStart, error) {
+	var cursorID uuid.UUID
+	if afterID != "" {
+		cursorID = uuid.MustParse(afterID)
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT e.session_id, e.started_at
+		FROM app.group_work_start_events AS e
+		WHERE (e.started_at, e.session_id) > ($2, $3)
+		  AND EXISTS (
+		    SELECT 1
+		    FROM app.group_memberships AS recipient
+		    JOIN app.group_memberships AS sender
+		      ON sender.group_id = recipient.group_id
+		    WHERE recipient.user_id = $1
+		      AND recipient.user_id <> e.user_id
+		      AND recipient.status = 'ACTIVE'
+		      AND recipient.joined_at <= e.started_at
+		      AND sender.user_id = e.user_id
+		      AND sender.joined_at <= e.started_at
+		      AND (sender.left_at IS NULL OR sender.left_at > e.started_at)
+		  )
+		ORDER BY e.started_at, e.session_id
+		LIMIT $4`, uuid.MustParse(userID), after, cursorID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.WorkStart, 0, limit)
+	for rows.Next() {
+		var event domain.WorkStart
+		var id uuid.UUID
+		if err := rows.Scan(&id, &event.StartedAt); err != nil {
+			return nil, err
+		}
+		event.ID = id.String()
+		event.StartedAt = event.StartedAt.UTC()
+		out = append(out, event)
+	}
+	return out, rows.Err()
 }
 
 func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name string) (out domain.Group, err error) {

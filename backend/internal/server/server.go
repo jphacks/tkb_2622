@@ -17,6 +17,7 @@ import (
 	focusconnect "github.com/jphacks/tkb_2622/backend/internal/focus/adapter/connect"
 	focus "github.com/jphacks/tkb_2622/backend/internal/focus/application"
 	groupconnect "github.com/jphacks/tkb_2622/backend/internal/group/adapter/connect"
+	grouphttp "github.com/jphacks/tkb_2622/backend/internal/group/adapter/http"
 	group "github.com/jphacks/tkb_2622/backend/internal/group/application"
 	identityconnect "github.com/jphacks/tkb_2622/backend/internal/identity/adapter/connect"
 	identity "github.com/jphacks/tkb_2622/backend/internal/identity/application"
@@ -96,6 +97,7 @@ func Handler(d Deps) http.Handler {
 		}
 	}
 	mux.Handle(groupv1connect.NewGroupServiceHandler(groupconnect.New(resolveGroupUser, d.Groups), auth, connect.WithReadMaxBytes(64*1024)))
+	mux.Handle("GET /v1/group/work-starts", grouphttp.NewWorkStartsHandler(d.Verifier, d.Identity, d.Groups))
 	mux.Handle(rewardv1connect.NewRewardServiceHandler(rewardconnect.New(func(ctx context.Context) (string, error) {
 		a, err := resolve(ctx)
 		if err != nil {

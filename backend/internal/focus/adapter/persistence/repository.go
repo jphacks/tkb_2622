@@ -102,11 +102,23 @@ func (r *Repository) ListTasks(ctx context.Context, userID, after string, limit 
 }
 
 func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error {
-	return r.q.CreateSession(ctx, q.CreateSessionParams{
+	err := r.q.CreateSession(ctx, q.CreateSessionParams{
 		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TaskID: uid(s.TaskID),
 		TaskName: s.Snapshot.Name, Category: s.Snapshot.Category, Mode: s.Snapshot.Mode, PlannedSeconds: s.Snapshot.PlannedSeconds, MinimumSeconds: s.Snapshot.MinimumSeconds,
 		Status: s.Status, Version: s.Version, StartedAt: s.StartedAt, RunningSince: nullTime(s.RunningSince),
 	})
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO app.group_work_start_events (session_id, user_id, started_at)
+		SELECT $1, $2, $3
+		WHERE EXISTS (
+		  SELECT 1 FROM app.group_memberships
+		  WHERE user_id = $2 AND status = 'ACTIVE' AND joined_at <= $3
+		)
+		ON CONFLICT (session_id) DO NOTHING`, uid(s.ID), uid(s.UserID), s.StartedAt)
+	return err
 }
 func (r *Repository) GetSession(ctx context.Context, userID, sessionID string) (domain.Session, error) {
 	row, err := r.q.GetSession(ctx, q.GetSessionParams{UserID: uid(userID), ID: uid(sessionID)})

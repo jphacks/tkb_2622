@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ var (
 
 type Repository interface {
 	ListGroups(context.Context, string) ([]domain.Group, error)
+	ListWorkStarts(context.Context, string, time.Time, string, int) ([]domain.WorkStart, error)
 	CreateGroup(context.Context, string, string, string) (domain.Group, error)
 	CreateInvitation(context.Context, string, string, string) (domain.Invitation, error)
 	AcceptInvitation(context.Context, string, string, string) (domain.Group, error)
@@ -37,6 +39,16 @@ func (s *Service) ListGroups(ctx context.Context, userID string) ([]domain.Group
 		return nil, ErrUnauthenticated
 	}
 	return s.repo.ListGroups(ctx, userID)
+}
+
+func (s *Service) ListWorkStarts(ctx context.Context, userID string, after time.Time, afterID string, limit int) ([]domain.WorkStart, error) {
+	if !validUserID(userID) {
+		return nil, ErrUnauthenticated
+	}
+	if after.IsZero() || limit < 1 || limit > 100 || (afterID != "" && !validUUID(afterID)) {
+		return nil, ErrInvalid
+	}
+	return s.repo.ListWorkStarts(ctx, userID, after, afterID, limit)
 }
 
 func (s *Service) CreateGroup(ctx context.Context, userID, operationID, name string) (domain.Group, error) {
