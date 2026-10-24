@@ -4,52 +4,44 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"net/url"
 	"os"
+	"strconv"
 	"time"
 
-	_ "github.com/tursodatabase/libsql-client-go/libsql"
-	_ "modernc.org/sqlite"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
-// Open is shared by database tooling. Connection errors are deliberately sanitized.
-func Open(ctx context.Context) (*sql.DB, error) {
-	driver := os.Getenv("DB_DRIVER")
-	if driver == "" {
-		driver = "sqlite"
+func Open(ctx context.Context) (*sql.DB, error) { return OpenURL(ctx, os.Getenv("DATABASE_URL")) }
+func OpenURL(ctx context.Context, dsn string) (*sql.DB, error) {
+	if dsn == "" {
+		return nil, errors.New("database URL is required")
 	}
-	var dsn string
-	switch driver {
-	case "sqlite":
-		dsn = os.Getenv("SQLITE_PATH")
-		if dsn == "" {
-			dsn = "app.db"
-		}
-	case "libsql":
-		u, err := url.Parse(os.Getenv("TURSO_DATABASE_URL"))
-		if err != nil || u == nil || u.Host == "" || (u.Scheme != "libsql" && u.Scheme != "https") {
-			return nil, errors.New("TURSO_DATABASE_URL must be a libsql or https URL")
-		}
-		token := os.Getenv("TURSO_AUTH_TOKEN")
-		if token == "" {
-			return nil, errors.New("TURSO_AUTH_TOKEN is required")
-		}
-		q := u.Query()
-		q.Set("authToken", token)
-		u.RawQuery = q.Encode()
-		dsn = u.String()
-	default:
-		return nil, errors.New("DB_DRIVER must be sqlite or libsql")
-	}
-	db, err := sql.Open(driver, dsn)
+	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
-		return nil, errors.New("database open failed")
+		return nil, errors.New("invalid database configuration")
 	}
-	db.SetMaxOpenConns(1)
-	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// No server-side prepared statements: compatible with Supavisor transaction mode.
+	config.DefaultQueryExecMode = pgx.QueryExecModeExec
+	config.ConnectTimeout = 10 * time.Second
+	db := stdlib.OpenDB(*config)
+	maxConnections := 5
+	if raw := os.Getenv("DB_MAX_CONNECTIONS"); raw != "" {
+		n, e := strconv.Atoi(raw)
+		if e != nil || n < 1 || n > 100 {
+			db.Close()
+			return nil, errors.New("DB_MAX_CONNECTIONS must be between 1 and 100")
+		}
+		maxConnections = n
+	}
+	db.SetMaxOpenConns(maxConnections)
+	db.SetMaxIdleConns(maxConnections)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+	ping, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	if err := db.PingContext(pingCtx); err != nil {
-		_ = db.Close()
+	if err = db.PingContext(ping); err != nil {
+		db.Close()
 		return nil, errors.New("database connection failed (check configuration and connectivity)")
 	}
 	return db, nil
