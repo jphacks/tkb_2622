@@ -179,7 +179,7 @@ func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name 
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO app.group_operations (user_id, kind, operation_id, request_hash, response)
-		VALUES ($1, 'create', $2, $3, $4)`, userIDValue, operationIDValue, requestHash, response)
+		VALUES ($1, 'create', $2, $3, $4)`, userIDValue, operationIDValue, requestHash, string(response))
 	if err != nil {
 		return domain.Group{}, err
 	}
@@ -484,7 +484,7 @@ func saveOperation(ctx context.Context, tx *sql.Tx, userID uuid.UUID, kind strin
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO app.group_operations (user_id, kind, operation_id, request_hash, response)
-		VALUES ($1, $2, $3, $4, $5)`, userID, kind, operationID, requestHash, response)
+		VALUES ($1, $2, $3, $4, $5)`, userID, kind, operationID, requestHash, string(response))
 	return err
 }
 
