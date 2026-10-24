@@ -27,7 +27,7 @@ Mac担当者が共通基盤を先に作り，その後にMac担当者とWindows�
 
 ブラウザプレビューは従来どおり`DemoBridge`を使い，表示確認用データだけを扱う．macOSのWailsアプリはローカル計測モードで起動し，作業状態をユーザー設定フォルダーの`Focus Link/desktop-state.json`へ保存する．観測記録は同じフォルダーの`sessions/<session-id>.jsonl`へ保存する．保存ディレクトリは`0700`，ファイルは`0600`で作成する．
 
-macOSでは既存のネイティブPoCから前面アプリ名・アプリID・入力アイドル時間・対応ブラウザーのドメインを取得する．raw URL，ページタイトル，キー入力内容，画面画像，ブラウザーのタブIDは保存しない．分類評価，報酬計算，作業セッションAPI，残高取得，iPhone制限は未接続である．Windowsは計測をデモモードとする．
+macOSでは既存のネイティブPoCから前面アプリ名・アプリID・入力アイドル時間・対応ブラウザーのドメインを取得する．raw URL，ページタイトル，キー入力内容，画面画像，ブラウザーのタブIDは保存・送信しない．分類済み区間をConnect APIへ送り，報酬はセッション内で記録する．有効なiPhoneがないセッションは記録専用として開始し，iPhone制限処理は行わない．Windowsは計測をデモモードとする．
 
 ### API接続の範囲
 
@@ -43,7 +43,7 @@ macOSでは既存のネイティブPoCから前面アプリ名・アプリID・�
 
 Supabase側ではメールOTPのテンプレートに`{{ .Token }}`を含め，メール送信設定を行う．未設定の環境変数，API到達不能，資格情報ストア未使用は設定画面に表示する．
 
-この段階ではStartSession，GetBalance，ListSessions，タスク選択のサーバー保存，アプリ分類設定の同期を呼ばない．StartSessionには有効なiPhone登録が必要であり，未対応APIは追加しない．
+ログイン中の作業ではStartSession／GetCurrentSessionでサーバーセッションを開始・復元し，UploadActivityBatchで分類済み区間を送る．一時停止・再開・終了・中止もConnect APIへ同期する．有効なiPhoneが未登録ならSessionの`tracking_only`がtrueとなり，制限を適用せず作業記録とセッション内報酬を保存する．iPhone登録済みで制限ポリシーが無効の場合は開始を拒否する．報酬は次のセッションへ持ち越さず，終了・中止時に未使用分を破棄する．ブラウザプレビューは引き続きDemoBridgeを使い，実APIへ接続しない．
 
 ### 着手順序
 
@@ -52,7 +52,7 @@ Supabase側ではメールOTPのテンプレートに`{{ .Token }}`を含め，�
 3. Windows担当者が共通基盤を取得し，Windowsで起動・Go呼び出し・イベントを確認する．両担当がOS別UIを実装し，共通ファイルは作業ごとに編集担当を一人に決める．
 4. 共通Go bridgeから認証・PC登録・タスクAPIを接続する．続いて計測・セッション／報酬同期を接続する．トレイ・配布の実機確認は画面デモと分ける．
 
-7画面すべての完成や，実API・トレイの完成を待ってからWindowsのUIに着手する必要はない．共通基盤の段階では通常ウィンドウで操作を確認し，実接続されていない機能はデモ／未対応と表示する．
+macOSではメニューバーのStatus Itemからウィンドウを表示できる．ウィンドウを閉じてもアプリと計測は継続し，メニューの「終了」でアプリを終了する．Windowsのトレイ対応は未実装である．
 
 ### 起動手順の整備
 
@@ -66,7 +66,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．ブラウザーは従来どおりデモ表示である．macOSでWailsを起動するときは，ヘルパーを先にビルドするスクリプトを使う．
+ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．ブラウザーは従来どおりデモ表示である．実APIを使う場合はConnect API URLとSupabase Auth URL・公開キーを起動プロセスの`FOCUS_LINK_*`環境変数に設定する．ローカルAPIには`http://127.0.0.1:8080`を指定する．`make -C backend up`はPostgreSQL・マイグレーション・APIを起動するが，Authは`backend/.env`で指定したSupabaseプロジェクトを使う．
 
 ```sh
 cd desktop
@@ -104,7 +104,7 @@ Wailsの採用だけで，他アプリの最前面情報・入力・アイドル
 
 GoとNode.js / npmに加えて，macOSの開発にはXcode Command Line Tools，Windowsでの動作にはWebView2 Runtimeが必要．詳細は[Wails v2のインストール手順](https://wails.io/docs/gettingstarted/installation/)を参照する．Wailsはv2系を使用し，具体的なバージョンはプロジェクト初期化時に固定する．
 
-macOSのローカル観測・作業状態保存と，メールOTP・PC登録・タスク設定のConnect APIを実装している．実際の活動分類・報酬確定・残高・セッション同期，メニューバー常駐，iPhone連携は未接続として扱う．本番SupabaseのSMTP／OTPテンプレートとURL・公開キーは環境ごとに設定する．
+macOSのローカル観測・分類・作業状態保存，メールOTP・PC登録・タスク設定，作業セッションと分類済み活動区間のConnect同期，セッション内報酬の取得，メニューバー常駐を実装している．有効なiPhoneがない場合は記録専用セッションとなる．iPhone制限の実機連携，Windowsネイティブ計測・トレイは未接続である．Supabase AuthのSMTP／OTPテンプレートと接続URL・公開キーは環境ごとに設定する．
 
 ## 公式資料
 
