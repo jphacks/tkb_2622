@@ -1,0 +1,23 @@
+name: tkb-backend-local
+services:
+  migrate:
+    build: .
+    image: tkb-backend:local
+    command: ["/app/migrate", "up"]
+    environment:
+      DB_DRIVER: sqlite
+      SQLITE_PATH: /data/app.db
+    volumes:
+      - sqlite-data:/data
+  api:
+    image: tkb-backend:local
+    build: .
+    environment:
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  sqlite-data:
