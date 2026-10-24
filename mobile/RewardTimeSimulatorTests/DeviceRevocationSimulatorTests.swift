@@ -204,6 +204,27 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertTrue(UsageReservationFailurePolicy.shouldDiscardPendingOperation(after: rejected))
     }
 
+    func testPendingReservationCanRetryWhenCommittedBalanceWasDebited() {
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 0,
+                pendingOperationID: "operation-1",
+                pendingSeconds: 600
+            ),
+            .allowed
+        )
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 0,
+                pendingOperationID: nil,
+                pendingSeconds: 600
+            ),
+            .insufficientBalance
+        )
+    }
+
     private func repository() -> ConfiguredDeviceRevocationRepository {
         ConfiguredDeviceRevocationRepository(defaults: defaults)
     }

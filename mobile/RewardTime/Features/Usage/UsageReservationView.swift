@@ -37,22 +37,36 @@ final class UsageReservationViewModel: ObservableObject {
         if balanceMinutes < selectedMinutes {
             selectedMinutes = options.last(where: { $0 <= balanceMinutes }) ?? 0
         }
-        if let pendingSeconds = defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int {
+        if defaults.string(forKey: "mobile.usage.reserve.pendingOperationID") != nil,
+           let pendingSeconds = defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int {
             selectedMinutes = pendingSeconds / 60
         }
     }
 
     var hasPendingRequest: Bool {
-        defaults.string(forKey: "mobile.usage.reserve.pendingOperationID") != nil
+        guard let operationID = defaults.string(forKey: "mobile.usage.reserve.pendingOperationID") else { return false }
+        return !operationID.isEmpty
     }
 
     var canReserve: Bool {
-        !isReserving && selectedMinutes > 0 && selectedMinutes <= balanceMinutes
-            && !sessionID.isEmpty && screenTime.isAuthorized
+        !isReserving && selectedMinutes > 0 && eligibility == .allowed && sessionCanReserve
+    }
+
+    private var sessionCanReserve: Bool {
+        !sessionID.isEmpty && screenTime.isAuthorized
             && screenTime.restrictionMode == .selectedApplications
             && screenTime.restrictedApplicationCount > 0
             && !screenTime.hasUnsupportedTargets
             && ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID") == nil
+    }
+
+    private var eligibility: UsageReservationEligibility {
+        UsageReservationEligibility.evaluate(
+            selectedMinutes: selectedMinutes,
+            balanceMinutes: balanceMinutes,
+            pendingOperationID: defaults.string(forKey: "mobile.usage.reserve.pendingOperationID"),
+            pendingSeconds: defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int
+        )
     }
 
     var unavailableReason: String? {
@@ -67,7 +81,10 @@ final class UsageReservationViewModel: ObservableObject {
         if screenTime.hasUnsupportedTargets {
             return "現在は選択したアプリだけを利用時間の計測対象にできます。"
         }
-        if selectedMinutes > balanceMinutes { return "残高を超える時間は選べません。" }
+        if eligibility == .invalidPendingRequest {
+            return "前回の予約結果を確認できません。アプリを再起動して、同じ予約を再試行してください。"
+        }
+        if eligibility == .insufficientBalance { return "残高を超える時間は選べません。" }
         if ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID") != nil {
             return "利用中の枠があります。先に利用状況を同期してください。"
         }
@@ -83,10 +100,11 @@ final class UsageReservationViewModel: ObservableObject {
         reservationError = nil
         defer { isReserving = false }
 
-        let requestedSeconds = (defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int)
-            ?? (selectedMinutes * 60)
-        let operationID = defaults.string(forKey: "mobile.usage.reserve.pendingOperationID")
-            ?? UUID().uuidString.lowercased()
+        let savedOperationID = defaults.string(forKey: "mobile.usage.reserve.pendingOperationID")
+        let operationID = savedOperationID ?? UUID().uuidString.lowercased()
+        let requestedSeconds = savedOperationID == nil
+            ? selectedMinutes * 60
+            : (defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int ?? selectedMinutes * 60)
         defaults.set(operationID, forKey: "mobile.usage.reserve.pendingOperationID")
         defaults.set(requestedSeconds, forKey: "mobile.usage.reserve.pendingSeconds")
 
@@ -256,7 +274,11 @@ struct UsageReservationView: View {
                 Task { await viewModel.requestReservation() }
             } label: {
                 Label(
-                    viewModel.isReserving ? "利用枠を確保中…" : "\(viewModel.selectedMinutes)分の利用枠を確保",
+                    viewModel.isReserving
+                        ? "利用枠を確保中…"
+                        : viewModel.hasPendingRequest
+                            ? "\(viewModel.selectedMinutes)分の予約を再試行"
+                            : "\(viewModel.selectedMinutes)分の利用枠を確保",
                     systemImage: viewModel.isReserving ? "hourglass" : "lock.open"
                 )
                 .font(.headline)

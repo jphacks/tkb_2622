@@ -3,6 +3,69 @@ import XCTest
 @testable import ConnectJSONClient
 
 final class UsageReservationFailurePolicyTests: XCTestCase {
+    func testPendingReservationCanBeRetriedAfterItsBalanceWasDebited() {
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 0,
+                pendingOperationID: "operation-1",
+                pendingSeconds: 600
+            ),
+            .allowed
+        )
+    }
+
+    func testPendingReservationRetryRequiresTheOriginalDurationAndValidMetadata() {
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 15,
+                balanceMinutes: 0,
+                pendingOperationID: "operation-1",
+                pendingSeconds: 600
+            ),
+            .invalidPendingRequest
+        )
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 30,
+                pendingOperationID: "operation-1",
+                pendingSeconds: nil
+            ),
+            .invalidPendingRequest
+        )
+    }
+
+    func testNewReservationStillRequiresEnoughBalance() {
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 5,
+                pendingOperationID: nil,
+                pendingSeconds: nil
+            ),
+            .insufficientBalance
+        )
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 10,
+                balanceMinutes: 10,
+                pendingOperationID: nil,
+                pendingSeconds: nil
+            ),
+            .allowed
+        )
+        XCTAssertEqual(
+            UsageReservationEligibility.evaluate(
+                selectedMinutes: 0,
+                balanceMinutes: 0,
+                pendingOperationID: nil,
+                pendingSeconds: nil
+            ),
+            .insufficientBalance
+        )
+    }
+
     func testDefinitiveClientRejectionsCanDiscardPendingOperation() {
         XCTAssertTrue(
             UsageReservationFailurePolicy.shouldDiscardPendingOperation(
