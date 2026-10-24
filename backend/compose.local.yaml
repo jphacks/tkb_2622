@@ -38,7 +38,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${API_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
