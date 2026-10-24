@@ -166,6 +166,20 @@ func (h *Host) DomReady(ctx context.Context) {
 			}
 		}
 	}()
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(loop, 10*time.Second)
+				a.syncIPhoneRestrictionState(ctx)
+				cancel()
+			case <-loop.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (h *Host) Shutdown(context.Context) {
@@ -227,9 +241,11 @@ func (a *App) shutdown() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := a.queueAndPrepareCloudOperation("pause", time.Now()); err == nil {
-			_ = a.flushActivitySync(ctx)
+			if err := a.flushActivitySync(ctx); err != nil {
+				a.markActivitySyncPending(err)
+			}
 		} else {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		}
 	}
 }
@@ -291,6 +307,12 @@ func (a *App) CaptureCurrentClassificationCandidate() (monitor.ClassificationCan
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "retryCloudSync" {
+		ctx, cancel := context.WithTimeout(a.context(), 20*time.Second)
+		defer cancel()
+		a.syncActivity(ctx)
+		return a.snapshot()
+	}
 	if command.Action == "abortCloudSession" {
 		return a.abortCloudSessionFromUI()
 	}
@@ -356,9 +378,9 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 		ctx, cancel := context.WithTimeout(a.context(), 20*time.Second)
 		defer cancel()
 		if err := a.queueAndPrepareCloudOperation(command.Action, time.Now()); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		} else if err := a.flushActivitySync(ctx); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		}
 		state = a.snapshot()
 	}

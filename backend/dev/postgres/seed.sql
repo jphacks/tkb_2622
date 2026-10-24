@@ -306,9 +306,9 @@ INSERT INTO app.groups (id, name, created_by, created_at)
 VALUES ('f6262200-0000-4000-8000-000000000501', '朝の集中ルーム', :'seed_user_id'::uuid, now() - interval '5 days')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, created_by = EXCLUDED.created_by, created_at = EXCLUDED.created_at;
 
-INSERT INTO app.users (id, auth_provider, auth_subject, status, created_at)
-VALUES ('f6262200-0000-4000-8000-000000000599', 'supabase', 'f6262200-0000-4000-8000-000000000599', 'ACTIVE', now() - interval '5 days')
-ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE';
+INSERT INTO app.users (id, auth_provider, auth_subject, status, created_at, display_name, avatar_id)
+VALUES ('f6262200-0000-4000-8000-000000000599', 'supabase', 'f6262200-0000-4000-8000-000000000599', 'ACTIVE', now() - interval '5 days', 'こむぎ', 'puppy')
+ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', display_name = EXCLUDED.display_name, avatar_id = EXCLUDED.avatar_id;
 
 INSERT INTO app.group_memberships (id, group_id, user_id, status, joined_at)
 VALUES

@@ -22,13 +22,22 @@ import (
 type ResolveActor func(context.Context) (application.Actor, error)
 
 type Handler struct {
-	resolve  ResolveActor
-	service  *application.Service
-	sessions *workflow.Sessions
+	resolve       ResolveActor
+	service       *application.Service
+	sessions      *workflow.Sessions
+	notifications interface {
+		DispatchSession(context.Context, string) error
+	}
 }
 
-func New(resolve ResolveActor, service *application.Service, sessions *workflow.Sessions) *Handler {
-	return &Handler{resolve: resolve, service: service, sessions: sessions}
+func New(resolve ResolveActor, service *application.Service, sessions *workflow.Sessions, notifications ...interface {
+	DispatchSession(context.Context, string) error
+}) *Handler {
+	handler := &Handler{resolve: resolve, service: service, sessions: sessions}
+	if len(notifications) > 0 {
+		handler.notifications = notifications[0]
+	}
+	return handler
 }
 
 func rpcError(err error) error { return apperr.Connect(err) }
@@ -159,6 +168,9 @@ func (h *Handler) StartSession(ctx context.Context, req *connect.Request[v1.Star
 	r, err := h.sessions.Start(ctx, a, workflow.StartInput{OperationID: req.Msg.OperationId, TaskID: req.Msg.TaskId, TaskVersion: req.Msg.TaskVersion})
 	if err != nil {
 		return nil, rpcError(err)
+	}
+	if h.notifications != nil {
+		_ = h.notifications.DispatchSession(ctx, r.Session.ID)
 	}
 	return connect.NewResponse(&v1.StartSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: sessionRestriction(r)}), nil
 }

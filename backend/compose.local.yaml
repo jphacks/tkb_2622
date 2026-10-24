@@ -2,8 +2,6 @@ name: tkb-backend-local
 services:
   postgres:
     image: postgres:17.7-bookworm
-    ports:
-      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: tkb
       POSTGRES_USER: postgres
@@ -41,7 +39,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${API_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${API_BIND_ADDRESS:-0.0.0.0}:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -7,10 +7,28 @@ import UserNotifications
 private final class NotificationSettingsViewModel: ObservableObject {
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var isRequesting = false
+    @Published private(set) var apiStatusMessage = "サーバー登録を確認中です。"
 
     func refresh() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
+        if isAllowed {
+            if let token = UserDefaults.standard.string(forKey: "mobile.apns.token"), !token.isEmpty {
+                await register(token: token)
+            } else {
+                UIApplication.shared.registerForRemoteNotifications()
+                apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
+            }
+        } else if authorizationStatus == .denied {
+            do {
+                try await ConfiguredNotificationEndpointRepository().delete()
+                apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
+            } catch {
+                apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
+            }
+        } else {
+            apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
+        }
     }
 
     func requestAuthorization() async {
@@ -21,6 +39,24 @@ private final class NotificationSettingsViewModel: ObservableObject {
         await refresh()
     }
 
+    func register(token: String) async {
+        #if DEBUG
+        let environment = "development"
+        #else
+        let environment = "production"
+        #endif
+        do {
+            try await ConfiguredNotificationEndpointRepository().register(token: token, environment: environment)
+            apiStatusMessage = "通知先をサーバーに登録しました。配信にはサーバー側のAPNs設定が必要です。"
+        } catch {
+            apiStatusMessage = "通知先の登録に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    func apnsRegistrationFailed() {
+        apiStatusMessage = "Appleの通知サービスへ登録できません。アプリの署名設定を確認してください。"
+    }
+
     var title: String {
         switch authorizationStatus {
         case .notDetermined: "未設定"
@@ -29,17 +65,6 @@ private final class NotificationSettingsViewModel: ObservableObject {
         case .provisional: "仮許可"
         case .ephemeral: "一時許可"
         @unknown default: "状態を確認できません"
-        }
-    }
-
-    var detail: String {
-        switch authorizationStatus {
-        case .notDetermined: "通知を使うにはiPhoneの許可が必要です。"
-        case .denied: "通知はiPhoneの設定で許可できます。"
-        case .authorized: "このアプリから通知を表示する許可があります。"
-        case .provisional: "通知は通知センターへ静かに表示されます。"
-        case .ephemeral: "通知の許可は一時的です。"
-        @unknown default: "iPhoneの通知設定を確認してください。"
         }
     }
 
@@ -72,14 +97,20 @@ struct NotificationSettingsView: View {
     var body: some View {
         ScreenContainer {
             SurfaceCard {
-                Label("iPhoneの通知許可", systemImage: model.symbol)
-                    .font(.headline)
-                    .foregroundStyle(model.isAllowed ? AppTheme.teal : AppTheme.primary)
+                HStack {
+                    Label("通知", systemImage: model.symbol)
+                        .font(.headline)
+                        .foregroundStyle(model.isAllowed ? AppTheme.teal : AppTheme.primary)
+                    Spacer()
+                    Text(model.title)
+                        .font(.subheadline.weight(.semibold))
+                }
 
-                Text(model.title)
-                    .font(.title3.weight(.bold))
+                Text("通知許可とiPhoneの通知先を同期し、グループの作業開始をお知らせします。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
 
-                Text(model.detail)
+                Text(model.apiStatusMessage)
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
 
@@ -101,30 +132,48 @@ struct NotificationSettingsView: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
+                } else if model.isAllowed {
+                    Button {
+                        Task { await model.refresh() }
+                    } label: {
+                        Label("通知先を再同期", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
 
-            SurfaceCard {
-                Label("通知配信は未接続です", systemImage: "info.circle")
-                    .font(.subheadline.weight(.bold))
-                Text("ここではiPhoneの通知許可だけを確認します。APNsの端末登録、グループ開始や報酬確定の配信、作業中の通知抑制はbackend未接続のため、通知は届きません。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            SurfaceCard {
-                Text("作業・報酬の履歴は、通知に頼らずアプリ内で確認できます。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
-            }
         }
         .task { await model.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsTokenReceived)) { notification in
+            guard let token = notification.object as? String else { return }
+            Task { await model.register(token: token) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsRegistrationFailed)) { _ in
+            model.apnsRegistrationFailed()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await model.refresh() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
         }
-        .navigationTitle("通知設定")
+        .navigationTitle("通知")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct NotificationToolbarButton: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
+                Image(systemName: "bell")
+            }
+            .accessibilityLabel("通知")
+            .accessibilityIdentifier("notificationToolbarButton")
+        }
     }
 }
 

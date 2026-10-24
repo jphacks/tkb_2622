@@ -9,12 +9,11 @@ struct SettingsView: View {
     @State private var isSyncingDeviceSettings = false
     @State private var needsDeviceSettingsSync = false
     @State private var hasOpenUsageGrant = false
-    @State private var deviceSyncStatus = "未同期"
     @State private var deviceSyncError: String?
 
     var body: some View {
         ScreenContainer {
-            AuthenticationSettingsSection {
+            AuthenticationSettingsSection(showsDeveloperConfiguration: true) {
                 NotificationCenter.default.post(name: .mobileAuthenticationChanged, object: nil)
                 Task { await syncDeviceSettings() }
             }
@@ -30,12 +29,8 @@ struct SettingsView: View {
                 }
 
                 if screenTime.isAuthorized {
-                    Label("スクリーンタイムを利用できます", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.teal)
-
                     if screenTime.restrictionMode == .selectedApplications && screenTime.hasUnsupportedTargets {
-                        Text("現在はアプリだけを制限できます。選択画面でカテゴリとWebサイトを外してください。")
+                        Text("カテゴリとWebサイトは制限できません。")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
@@ -65,49 +60,48 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("選択したアプリはこのiPhoneに保存します。セッションに応じた自動制限は、バックエンド連携後に有効になります。")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
-
-                HStack {
-                    Label("backend設定同期", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.caption.weight(.medium))
-                    Spacer()
-                    Text(deviceSyncStatus)
-                        .font(.caption)
-                        .foregroundStyle(deviceSyncError == nil ? AppTheme.secondaryInk : .red)
-                }
                 if let deviceSyncError {
-                    Text(deviceSyncError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Text(deviceSyncError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                        Spacer()
+                        Button("再試行") { Task { await syncDeviceSettings() } }
+                            .font(.caption.weight(.semibold))
+                            .disabled(isSyncingDeviceSettings)
+                    }
                 }
-                Button {
-                    Task { await syncDeviceSettings() }
-                } label: {
-                    Label(
-                        isSyncingDeviceSettings ? "端末・設定を同期中…" : "端末と制限設定をbackendへ同期",
-                        systemImage: "arrow.up.circle"
-                    )
-                    .frame(maxWidth: .infinity, minHeight: 42)
-                }
-                .buttonStyle(.bordered)
-                .disabled(isSyncingDeviceSettings)
             }
 
             SurfaceCard {
-                HStack {
-                    sectionTitle("制限のしかた", icon: "slider.horizontal.3")
-                    Spacer(minLength: 0)
+                sectionTitle("制限モード", icon: "slider.horizontal.3")
+                VStack(spacing: 8) {
+                    ForEach([LocalRestrictionMode.entireDevice, .selectedApplications]) { mode in
+                        Button {
+                            screenTime.restrictionMode = mode
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: screenTime.restrictionMode == mode ? "largecircle.fill.circle" : "circle")
+                                    .foregroundStyle(screenTime.restrictionMode == mode ? AppTheme.primary : AppTheme.secondaryInk)
+                                Text(mode.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(AppTheme.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                            .background(
+                                screenTime.restrictionMode == mode ? AppTheme.lavender : AppTheme.background,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(hasOpenUsageGrant)
+                    }
                 }
-                modeButton(.selectedApplications)
 
                 if screenTime.restrictionMode == .selectedApplications {
-                    Divider()
-                    sectionTitle("制限するアプリ", icon: "square.grid.2x2")
                     HStack {
-                        Text("制限対象のアプリ")
+                        Label("制限するアプリ", systemImage: "square.grid.2x2")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
                         Text("\(screenTime.restrictedApplicationCount)個")
@@ -118,7 +112,7 @@ struct SettingsView: View {
                         isPickingAlwaysAllowedApps = false
                         isFamilyActivityPickerPresented = true
                     } label: {
-                        Label("アプリを選ぶ", systemImage: "plus.app")
+                        Label("アプリを選択", systemImage: "plus.app")
                     }
                     .buttonStyle(.bordered)
                     .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
@@ -142,28 +136,25 @@ struct SettingsView: View {
                     }
                 }
 
-                Divider()
-                sectionTitle("常時許可するアプリ", icon: "checkmark.shield")
-                Text("選んだアプリはどちらの制限モードでも対象外です。iPhone標準アプリを選び、Safariは選ばないでください。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                HStack {
-                    Text("選択中のアプリ")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(screenTime.alwaysAllowedSelection.applicationTokens.count)個")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.primary)
-                }
-                Button {
-                    isPickingAlwaysAllowedApps = true
-                    isFamilyActivityPickerPresented = true
+                DisclosureGroup {
+                    Text("標準アプリを選びます。Safariは含めないでください。")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                    Button {
+                        isPickingAlwaysAllowedApps = true
+                        isFamilyActivityPickerPresented = true
+                    } label: {
+                        Label("アプリを選択", systemImage: "checkmark.app")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
                 } label: {
-                    Label("常時許可するアプリを選ぶ", systemImage: "checkmark.app")
+                    Label(
+                        "常に許可するアプリ · \(screenTime.alwaysAllowedSelection.applicationTokens.count)",
+                        systemImage: "checkmark.shield"
+                    )
+                    .font(.subheadline.weight(.medium))
                 }
-                .buttonStyle(.bordered)
-                .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
-                modeButton(.entireDevice)
 
                 Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "lock.fill")
                     .font(.footnote.weight(.semibold))
@@ -173,16 +164,16 @@ struct SettingsView: View {
                     screenTime.applyRestriction()
                 } label: {
                     Label(
-                        screenTime.appliedRestrictionMode == nil ? "この設定を適用" : "選択した設定を再適用",
+                        screenTime.appliedRestrictionMode == nil ? "制限を適用" : "制限を再適用",
                         systemImage: "lock.iphone")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.primary)
-                .disabled(hasOpenUsageGrant)
+                .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
 
                 if hasOpenUsageGrant {
-                    Text("利用枠を使用中です。作業を再開して利用枠を閉じるまで制限設定は変更できません。")
+                    Text("利用枠を閉じると変更できます。")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                 }
@@ -199,39 +190,6 @@ struct SettingsView: View {
                 }
                 .disabled(screenTime.appliedRestrictionMode == nil || hasOpenUsageGrant)
 
-                Text("適用後、対象アプリを開いてiOSのShield画面が出ることを確認してください。解除ボタンからいつでも戻せます。")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
-            }
-
-            SurfaceCard {
-                sectionTitle("通知", icon: "bell")
-                NavigationLink {
-                    NotificationSettingsView()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("通知設定")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppTheme.ink)
-                            Text("iPhoneの許可状態を確認")
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.secondaryInk)
-                        }
-                        Spacer()
-                    }
-                }
-                .accessibilityIdentifier("notificationSettingsLink")
-                Text("APNs配信は未接続です。")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
-            }
-
-            SurfaceCard {
-                sectionTitle("端末", icon: "iphone.and.arrow.forward")
-                deviceRow(name: "この iPhone", state: deviceSyncStatus)
-                Divider()
-                deviceRow(name: "MacBook Air", state: "このiPhoneからは未取得")
             }
         }
         .navigationTitle("設定")
@@ -301,74 +259,16 @@ struct SettingsView: View {
     @MainActor
     private func performDeviceSettingsSync() async {
         do {
-            let synced = try await ConfiguredDeviceSettingsRepository().sync(
+            _ = try await ConfiguredDeviceSettingsRepository().sync(
                 settings: screenTime.backendRestrictionSettings
             )
-            deviceSyncStatus = "登録済み・設定 v\(synced.policyVersion)・\(policyStatusLabel(synced.policyStatus))"
             deviceSyncError = nil
         } catch DeviceSettingsRepositoryError.missingConfiguration {
-            deviceSyncStatus = "未ログイン"
-            deviceSyncError = "アカウント接続後に同期できます。"
+            deviceSyncError = nil
         } catch DeviceSettingsRepositoryError.invalidConfiguration {
-            deviceSyncStatus = "設定エラー"
-            deviceSyncError = "Supabase URL・公開用キー・API URLを確認してください。"
-        } catch let error as LocalizedError {
-            deviceSyncStatus = "同期できません"
-            deviceSyncError = error.errorDescription ?? "API接続とログイン状態を確認してください。"
+            deviceSyncError = "接続設定を確認してください。"
         } catch {
-            deviceSyncStatus = "同期できません"
-            deviceSyncError = "API接続とログイン状態を確認してください。"
-        }
-    }
-
-    private func policyStatusLabel(_ status: String) -> String {
-        switch status {
-        case "POLICY_STATUS_ENABLED": "有効"
-        case "POLICY_STATUS_DISABLED": "無効"
-        case "POLICY_STATUS_PERMISSION_REQUIRED": "端末の権限報告待ち"
-        default: "状態未確定"
-        }
-    }
-
-    private func modeButton(_ mode: LocalRestrictionMode) -> some View {
-        Button {
-            screenTime.restrictionMode = mode
-        } label: {
-            modeOption(title: mode.title, detail: mode.detail, isSelected: screenTime.restrictionMode == mode)
-        }
-        .buttonStyle(.plain)
-        .disabled(hasOpenUsageGrant)
-        .accessibilityIdentifier("restrictionMode_\(mode.rawValue)")
-    }
-
-    private func modeOption(title: String, detail: String, isSelected: Bool) -> some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                .foregroundStyle(isSelected ? AppTheme.primary : AppTheme.secondaryInk)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? AppTheme.lavender : AppTheme.background, in: RoundedRectangle(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
-    }
-
-    private func deviceRow(name: String, state: String) -> some View {
-        HStack {
-            Label(name, systemImage: name.contains("iPhone") ? "iphone" : "laptopcomputer")
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Text(state)
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryInk)
+            deviceSyncError = "端末設定を同期できません。"
         }
     }
 }

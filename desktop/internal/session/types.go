@@ -36,6 +36,19 @@ type CloudSession struct {
 	Message           string `json:"message"`
 }
 
+type IPhoneRestrictionState struct {
+	SessionID        string `json:"sessionId"`
+	DeviceID         string `json:"deviceId"`
+	ControlRevision  int64  `json:"controlRevision"`
+	DesiredMode      string `json:"desiredMode"`
+	AppliedRevision  int64  `json:"appliedRevision"`
+	ShieldStatus     string `json:"shieldStatus"`
+	PermissionStatus string `json:"permissionStatus"`
+	LastAppliedAt    string `json:"lastAppliedAt,omitempty"`
+	LastReportedAt   string `json:"lastReportedAt,omitempty"`
+	FailureReason    string `json:"failureReason,omitempty"`
+}
+
 type Capability struct {
 	Allowed bool   `json:"allowed"`
 	Reason  string `json:"reason"`
@@ -75,6 +88,8 @@ type Result struct {
 	SessionID         string   `json:"sessionId"`
 	Name              string   `json:"name"`
 	Status            string   `json:"status"`
+	StartedAt         string   `json:"startedAt,omitempty"`
+	EndedAt           string   `json:"endedAt,omitempty"`
 	ElapsedSeconds    int      `json:"elapsedSeconds"`
 	TaskSeconds       int      `json:"taskSeconds"`
 	RelatedSeconds    int      `json:"relatedSeconds"`
@@ -92,26 +107,29 @@ type Result struct {
 }
 
 type Snapshot struct {
-	Revision              int                   `json:"revision"`
-	Platform              string                `json:"platform"`
-	Mode                  string                `json:"mode"`
-	UpdatedAt             string                `json:"updatedAt"`
-	Session               *WorkSession          `json:"session"`
-	CloudSession          *CloudSession         `json:"cloudSession,omitempty"`
-	CloudOperationPending bool                  `json:"cloudOperationPending,omitempty"`
-	BalanceSeconds        *int                  `json:"balanceSeconds"`
-	Sync                  string                `json:"sync"`
-	Permission            string                `json:"permission"`
-	Online                bool                  `json:"online"`
-	Monitor               MonitorStatus         `json:"monitor"`
-	RestrictionDesired    string                `json:"restrictionDesired"`
-	RestrictionConfirmed  bool                  `json:"restrictionConfirmed"`
-	Settings              Settings              `json:"settings"`
-	History               []Result              `json:"history"`
-	Result                *Result               `json:"result"`
-	Actions               map[string]Capability `json:"actions"`
-	Failure               *Failure              `json:"failure"`
-	Account               AccountState          `json:"account"`
+	Revision               int                     `json:"revision"`
+	Platform               string                  `json:"platform"`
+	Mode                   string                  `json:"mode"`
+	UpdatedAt              string                  `json:"updatedAt"`
+	Session                *WorkSession            `json:"session"`
+	CloudSession           *CloudSession           `json:"cloudSession,omitempty"`
+	IPhoneRestriction      *IPhoneRestrictionState `json:"iPhoneRestriction,omitempty"`
+	IPhoneRestrictionError string                  `json:"iPhoneRestrictionError,omitempty"`
+	CloudOperationPending  bool                    `json:"cloudOperationPending,omitempty"`
+	BalanceSeconds         *int                    `json:"balanceSeconds"`
+	Sync                   string                  `json:"sync"`
+	Permission             string                  `json:"permission"`
+	Online                 bool                    `json:"online"`
+	Monitor                MonitorStatus           `json:"monitor"`
+	RestrictionDesired     string                  `json:"restrictionDesired"`
+	RestrictionConfirmed   bool                    `json:"restrictionConfirmed"`
+	Settings               Settings                `json:"settings"`
+	History                []Result                `json:"history"`
+	HistoryError           string                  `json:"historyError,omitempty"`
+	Result                 *Result                 `json:"result"`
+	Actions                map[string]Capability   `json:"actions"`
+	Failure                *Failure                `json:"failure"`
+	Account                AccountState            `json:"account"`
 }
 
 type AccountState struct {

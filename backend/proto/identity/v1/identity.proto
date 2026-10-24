@@ -6,15 +6,19 @@ service IdentityService {
   rpc EnsureUser(EnsureUserRequest) returns (EnsureUserResponse);
   rpc GetMe(GetMeRequest) returns (GetMeResponse);
   rpc UpdateDisplayName(UpdateDisplayNameRequest) returns (UpdateDisplayNameResponse);
+  rpc UpdateAvatar(UpdateAvatarRequest) returns (UpdateAvatarResponse);
   rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  rpc RegisterNotificationEndpoint(RegisterNotificationEndpointRequest) returns (RegisterNotificationEndpointResponse);
+  rpc DeleteNotificationEndpoint(DeleteNotificationEndpointRequest) returns (DeleteNotificationEndpointResponse);
 }
 message User {
   string id = 1;
   string status = 2;
   string created_at = 3;
   string display_name = 4;
+  string avatar_id = 5;
 }
 enum Platform {
   PLATFORM_UNSPECIFIED = 0;
@@ -36,6 +40,8 @@ message GetMeRequest {}
 message GetMeResponse { User user = 1; }
 message UpdateDisplayNameRequest { string display_name = 1; }
 message UpdateDisplayNameResponse { User user = 1; }
+message UpdateAvatarRequest { string avatar_id = 1; }
+message UpdateAvatarResponse { User user = 1; }
 message RegisterDeviceRequest {
   string operation_id = 1;
   string registration_id = 2;
@@ -57,3 +63,16 @@ message RevokeDeviceRequest {
   int64 expected_version = 3;
 }
 message RevokeDeviceResponse { Device device = 1; }
+enum APNsEnvironment {
+  AP_NS_ENVIRONMENT_UNSPECIFIED = 0;
+  AP_NS_ENVIRONMENT_DEVELOPMENT = 1;
+  AP_NS_ENVIRONMENT_PRODUCTION = 2;
+}
+message RegisterNotificationEndpointRequest {
+  string apns_token = 1;
+  APNsEnvironment environment = 2;
+  string registration_id = 3;
+}
+message RegisterNotificationEndpointResponse { bool registered = 1; }
+message DeleteNotificationEndpointRequest { string registration_id = 1; }
+message DeleteNotificationEndpointResponse { bool deleted = 1; }

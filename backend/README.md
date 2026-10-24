@@ -23,13 +23,12 @@ curl --fail http://localhost:8080/grpc.health.v1.Health/Check \
 
 HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を返します．両方ともAPIプロセスの生存確認であり，DB接続・スキーマの確認は行いません．APIは起動時にDBへ接続し，接続できない場合は起動しません．
 
-`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．既定ではAPIを `127.0.0.1:8080` にだけ公開します．実機iPhoneから確認する場合はMacのLAN IPv4を指定して起動します．
+`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．ローカル開発用APIは既定で `0.0.0.0:8080` に公開し，同じLANの実機iPhoneから接続できます．アプリのConnect API URLには `http://<MacのLAN IPv4>:8080` を設定します．MacのIPv4は `ipconfig getifaddr en0` で確認します．loopbackだけに限定する場合は `API_BIND_ADDRESS=127.0.0.1 make -C backend up` とします．
 
 ```sh
-API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
+make -C backend up
 ```
 
-アプリのConnect API URLには `http://<MacのLAN IPv4>:8080` を設定します．この設定はローカル開発用APIをLANから到達可能にするためのものです．確認後は `make -C backend down` で停止し，通常時は既定のloopback公開を使います．
 
 | コマンド | 動作 |
 | --- | --- |
@@ -40,6 +39,7 @@ API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
 | `SEED_AUTH_SUBJECT=<UUID> make -C backend seed` | 登録済みiOS開発ユーザー用のモックデータをローカルDBへ投入 |
+| `SEED_AUTH_SUBJECT=<UUID> make -C backend seed-group-profile` | アカウント設定を変えず，2人のプロフィールとグループだけを投入 |
 | `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
 
 ### 開発用モックデータ
@@ -50,7 +50,13 @@ API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
 SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed
 ```
 
-作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，グループを投入します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
+作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，2人分のグループを投入します。グループ用のfixtureメンバーには表示名「こむぎ」とアイコン`puppy`を設定し，ログイン中の利用者は自分のプロフィールアイコンで表示します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
+
+すでに利用中の開発アカウントでプロフィールとグループだけを確認する場合は，次のコマンドを使います。このfixtureはローカルCompose DB専用で，フォーカス・報酬・制限データを書き換えません。
+
+```sh
+SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed-group-profile
+```
 
 ローカルのPostgreSQL（`postgres:17.7-bookworm`）は名前付きボリューム`tkb-backend-local_postgres-data`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
 
@@ -85,6 +91,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 | `SUPABASE_JWT_AUDIENCE` | 許可するaudience．既定`authenticated` |
 | `AUTH_ALLOW_LOCAL_HTTP` | `true`でHTTPのissuer（Supabase CLIのローカル環境等）を許可．既定は無効 |
 | `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
+| `APNS_TEAM_ID`，`APNS_KEY_ID`，`APNS_BUNDLE_ID`，`APNS_AUTH_KEY_PATH` | すべて設定するとAPNs配信を有効化．秘密鍵ファイルは実行環境のSecret管理からマウントする．未設定時はAPNs送信を停止し，Outboxを保持 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 
 接続先や認証情報をログへ出力しないよう，DBエラーは秘匿したメッセージに変換します．`.env`はコードから自動読み込みしません．必要な変数を実行環境から渡してください．
@@ -95,9 +102,13 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 
 | テーブル | 内容 |
 | --- | --- |
-| `app.users` | 業務User．`id`（UUID），`auth_provider`（`supabase`のみ），`auth_subject`（Supabase AuthのユーザーID）．プロバイダーとsubjectの組み合わせは一意．状態は`ACTIVE`／`DISABLED` |
+| `app.users` | 業務User．`id`（UUID），`auth_provider`（`supabase`のみ），`auth_subject`（Supabase AuthのユーザーID），公開表示名，プロフィール画像カタログID．プロバイダーとsubjectの組み合わせは一意．状態は`ACTIVE`／`DISABLED` |
 | `app.devices` | 登録端末．プラットフォームは`MACOS`／`WINDOWS`／`IOS`．有効なiPhoneはUserごとに1台 |
+| `app.notification_endpoints` | 有効なiPhone端末ごとのAPNs tokenとSandbox／Production環境 |
+| `app.notification_outbox` | グループ作業開始通知の宛先・送信状態・再試行記録 |
 | `app.identity_operations` | 再送を同じ結果で返すための操作記録 |
+
+作業開始イベントとOutboxは同じPostgreSQLトランザクションで保存します。ローカルAPIは30秒間隔で保留通知を再試行します。本番のCloud Runではプロセス内workerの継続を保証しないため、永続的な再試行にはCloud Scheduler／Cloud Tasks等を接続してください。APNsは`APNS_TEAM_ID`、`APNS_KEY_ID`、アプリのbundle ID、Apple Push Auth Keyが必要です。秘密鍵をソースや通常の環境変数値へ保存せず、Secret Manager等からファイルとしてマウントしてください。
 
 通常起動でDownは実行しません．`migrate down`は業務テーブルとそのデータを削除するため，明示的なロールバック用です．
 

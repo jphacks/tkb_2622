@@ -68,7 +68,18 @@ type Session struct {
 	AcceptedThroughSeq int64
 	Durations          Durations
 	StartedAt          time.Time
+	EndedAt            time.Time
+	FocusScore         *float64
+	Quality            *float64
+	WorkRate           *float64
 	Balance            Balance
+}
+
+type SessionHistoryEntry struct {
+	Session          Session
+	EarnedSeconds    int64
+	SpentSeconds     int64
+	DiscardedSeconds int64
 }
 
 type Durations struct {
@@ -111,6 +122,19 @@ type Balance struct {
 	BalanceSeconds      int64
 	Version             int64
 	EvaluatedThroughSeq int64
+}
+
+type RestrictionState struct {
+	SessionID        string
+	DeviceID         string
+	ControlRevision  int64
+	DesiredMode      string
+	AppliedRevision  int64
+	ShieldStatus     string
+	PermissionStatus string
+	LastAppliedAt    *time.Time
+	LastReportedAt   *time.Time
+	FailureReason    string
 }
 
 type SessionResult struct {
@@ -251,7 +275,10 @@ func (c *Client) authRequest(ctx context.Context, method, path string, input, ou
 func (c *Client) Connect(ctx context.Context, method, accessToken string, input, output any) error {
 	endpoint := *c.base
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/" + method
-	return c.request(ctx, http.MethodPost, &endpoint, input, output, false, accessToken)
+	if err := c.request(ctx, http.MethodPost, &endpoint, input, output, false, accessToken); err != nil {
+		return fmt.Errorf("%s: %w", method, err)
+	}
+	return nil
 }
 
 func (c *Client) request(ctx context.Context, method string, endpoint *url.URL, input, output any, auth bool, accessToken string) error {
@@ -468,6 +495,10 @@ type sessionMessage struct {
 	AcceptedThroughSeq protoInt64          `json:"acceptedThroughSeq"`
 	Durations          durationMessage     `json:"durations"`
 	StartedAt          string              `json:"startedAt"`
+	EndedAt            string              `json:"endedAt"`
+	FocusScore         *float64            `json:"focusScore"`
+	Quality            *float64            `json:"quality"`
+	WorkRate           *float64            `json:"workRate"`
 }
 
 type durationMessage struct {
@@ -482,6 +513,7 @@ type durationMessage struct {
 
 func sessionFromMessage(message sessionMessage) Session {
 	startedAt, _ := time.Parse(time.RFC3339Nano, message.StartedAt)
+	endedAt, _ := time.Parse(time.RFC3339Nano, message.EndedAt)
 	return Session{
 		ID: message.ID, DeviceID: message.DeviceID, TaskID: message.TaskID,
 		TaskSettings: TaskSettings{
@@ -493,14 +525,51 @@ func sessionFromMessage(message sessionMessage) Session {
 		},
 		Status: strings.TrimPrefix(message.Status, "SESSION_STATUS_"), Version: int64(message.Version),
 		TrackingOnly: message.TrackingOnly, AcceptedThroughSeq: int64(message.AcceptedThroughSeq),
+		FocusScore: message.FocusScore, Quality: message.Quality, WorkRate: message.WorkRate,
 		Durations: Durations{
 			TaskMillis: int64(message.Durations.TaskMillis), RelatedTransitionMillis: int64(message.Durations.RelatedTransitionMillis),
 			DistractionMillis: int64(message.Durations.DistractionMillis), UnknownMillis: int64(message.Durations.UnknownMillis),
 			IdleMillis: int64(message.Durations.IdleMillis), ActiveMillis: int64(message.Durations.ActiveMillis),
 			WorkMillis: int64(message.Durations.WorkMillis),
 		},
-		StartedAt: startedAt,
+		StartedAt: startedAt, EndedAt: endedAt,
 	}
+}
+
+func (c *Client) ListSessionHistory(ctx context.Context, auth AuthSession) ([]SessionHistoryEntry, error) {
+	entries := make([]SessionHistoryEntry, 0)
+	pageToken := ""
+	for page := 0; page < 100; page++ {
+		input := map[string]any{"pageSize": 100}
+		if pageToken != "" {
+			input["pageToken"] = pageToken
+		}
+		var response struct {
+			Entries []struct {
+				Session sessionMessage `json:"session"`
+				Reward  struct {
+					EarnedSeconds    protoInt64 `json:"earnedSeconds"`
+					SpentSeconds     protoInt64 `json:"spentSeconds"`
+					DiscardedSeconds protoInt64 `json:"discardedSeconds"`
+				} `json:"reward"`
+			} `json:"entries"`
+			NextPageToken string `json:"nextPageToken"`
+		}
+		if err := c.Connect(ctx, "focus.v1.FocusService/ListSessions", auth.AccessToken, input, &response); err != nil {
+			return nil, err
+		}
+		for _, item := range response.Entries {
+			entries = append(entries, SessionHistoryEntry{
+				Session: sessionFromMessage(item.Session), EarnedSeconds: int64(item.Reward.EarnedSeconds),
+				SpentSeconds: int64(item.Reward.SpentSeconds), DiscardedSeconds: int64(item.Reward.DiscardedSeconds),
+			})
+		}
+		if response.NextPageToken == "" {
+			return entries, nil
+		}
+		pageToken = response.NextPageToken
+	}
+	return nil, errors.New("session history exceeded the maximum page count")
 }
 
 func (c *Client) GetCurrentSession(ctx context.Context, session AuthSession) (*Session, error) {
@@ -563,6 +632,49 @@ func (c *Client) GetBalance(ctx context.Context, auth AuthSession) (Balance, err
 		return Balance{}, errors.New("API omitted the reward balance")
 	}
 	return balanceFromMessage(*response.Balance), nil
+}
+
+func (c *Client) GetRestrictionState(ctx context.Context, auth AuthSession) (RestrictionState, error) {
+	var response struct {
+		State *struct {
+			SessionID        string     `json:"sessionId"`
+			DeviceID         string     `json:"deviceId"`
+			ControlRevision  protoInt64 `json:"controlRevision"`
+			DesiredMode      string     `json:"desiredMode"`
+			AppliedRevision  protoInt64 `json:"appliedRevision"`
+			ShieldStatus     string     `json:"shieldStatus"`
+			PermissionStatus string     `json:"permissionStatus"`
+			LastAppliedAt    string     `json:"lastAppliedAt"`
+			LastReportedAt   string     `json:"lastReportedAt"`
+			FailureReason    string     `json:"failureReason"`
+		} `json:"state"`
+	}
+	if err := c.Connect(ctx, "restriction.v1.RestrictionService/GetRestrictionState", auth.AccessToken, struct{}{}, &response); err != nil {
+		return RestrictionState{}, err
+	}
+	if response.State == nil {
+		return RestrictionState{}, errors.New("APIからiPhone制限状態が返りませんでした")
+	}
+	state := response.State
+	return RestrictionState{
+		SessionID: state.SessionID, DeviceID: state.DeviceID,
+		ControlRevision: int64(state.ControlRevision), DesiredMode: strings.TrimPrefix(state.DesiredMode, "DESIRED_MODE_"),
+		AppliedRevision: int64(state.AppliedRevision), ShieldStatus: strings.TrimPrefix(state.ShieldStatus, "SHIELD_STATUS_"),
+		PermissionStatus: strings.TrimPrefix(state.PermissionStatus, "PERMISSION_STATUS_"),
+		LastAppliedAt:    parseOptionalTime(state.LastAppliedAt), LastReportedAt: parseOptionalTime(state.LastReportedAt),
+		FailureReason: state.FailureReason,
+	}, nil
+}
+
+func parseOptionalTime(value string) *time.Time {
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }
 
 type activitySegmentMessage struct {

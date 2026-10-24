@@ -102,7 +102,19 @@ func (r *Repository) ListTasks(ctx context.Context, userID, after string, limit 
 }
 
 func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error {
-	err := r.q.CreateSession(ctx, q.CreateSessionParams{
+	var tx *sql.Tx
+	var db q.DBTX = r.db
+	var err error
+	if pool, ok := r.db.(*sql.DB); ok {
+		tx, err = pool.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		db = tx
+	}
+	queries := q.New(db)
+	err = queries.CreateSession(ctx, q.CreateSessionParams{
 		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TrackingOnly: s.TrackingOnly, TaskID: uid(s.TaskID),
 		TaskName: s.Snapshot.Name, Category: s.Snapshot.Category, Mode: s.Snapshot.Mode, PlannedSeconds: s.Snapshot.PlannedSeconds, MinimumSeconds: s.Snapshot.MinimumSeconds,
 		Status: s.Status, Version: s.Version, StartedAt: s.StartedAt, RunningSince: nullTime(s.RunningSince),
@@ -110,7 +122,7 @@ func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error 
 	if err != nil {
 		return err
 	}
-	_, err = r.db.ExecContext(ctx, `
+	result, err := db.ExecContext(ctx, `
 		INSERT INTO app.group_work_start_events (session_id, user_id, started_at)
 		SELECT $1, $2, $3
 		WHERE EXISTS (
@@ -118,7 +130,58 @@ func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error 
 		  WHERE user_id = $2 AND status = 'ACTIVE' AND joined_at <= $3
 		)
 		ON CONFLICT (session_id) DO NOTHING`, uid(s.ID), uid(s.UserID), s.StartedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil || inserted == 0 {
+		return err
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT DISTINCT recipient_device.id, recipient.user_id
+		FROM app.group_work_start_events AS event
+		JOIN app.group_memberships AS sender
+		  ON sender.user_id = event.user_id AND sender.status = 'ACTIVE' AND sender.joined_at <= event.started_at
+		JOIN app.group_memberships AS recipient
+		  ON recipient.group_id = sender.group_id AND recipient.user_id <> sender.user_id
+		 AND recipient.status = 'ACTIVE' AND recipient.joined_at <= event.started_at
+		JOIN app.devices AS recipient_device
+		  ON recipient_device.user_id = recipient.user_id AND recipient_device.platform = 'IOS' AND recipient_device.status = 'ACTIVE'
+		JOIN app.notification_endpoints AS endpoint
+		  ON endpoint.device_id = recipient_device.id AND endpoint.user_id = recipient.user_id
+		WHERE event.session_id = $1`, uid(s.ID))
+	if err != nil {
+		return err
+	}
+	type endpoint struct{ deviceID, userID uuid.UUID }
+	var recipients []endpoint
+	for rows.Next() {
+		var recipient endpoint
+		if err := rows.Scan(&recipient.deviceID, &recipient.userID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		recipients = append(recipients, recipient)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, recipient := range recipients {
+		if _, err := db.ExecContext(ctx, `
+			INSERT INTO app.notification_outbox (id, session_id, recipient_user_id, recipient_device_id, type)
+			VALUES ($1, $2, $3, $4, 'GROUP_WORK_STARTED')
+			ON CONFLICT (session_id, recipient_device_id, type) DO NOTHING`, uuid.New(), uid(s.ID), recipient.userID, recipient.deviceID); err != nil {
+			return err
+		}
+	}
+	if tx != nil {
+		return tx.Commit()
+	}
+	return nil
 }
 func (r *Repository) GetSession(ctx context.Context, userID, sessionID string) (domain.Session, error) {
 	row, err := r.q.GetSession(ctx, q.GetSessionParams{UserID: uid(userID), ID: uid(sessionID)})

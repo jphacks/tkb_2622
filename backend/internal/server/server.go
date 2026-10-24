@@ -29,13 +29,16 @@ import (
 )
 
 type Deps struct {
-	Identity    *identity.Service
-	Verifier    identityconnect.Verifier
-	Focus       *focus.Service
-	Groups      *group.Service
-	Sessions    *workflow.Sessions
-	Wallets     *reward.Wallets
-	Restriction *restriction.Service
+	Identity      *identity.Service
+	Verifier      identityconnect.Verifier
+	Focus         *focus.Service
+	Groups        *group.Service
+	Sessions      *workflow.Sessions
+	Wallets       *reward.Wallets
+	Restriction   *restriction.Service
+	Notifications interface {
+		DispatchSession(context.Context, string) error
+	}
 	// EnableDocs adds the Swagger UI at /docs and should stay off outside local development.
 	EnableDocs bool
 }
@@ -80,7 +83,7 @@ func Handler(d Deps) http.Handler {
 	auth := connect.WithInterceptors(identityconnect.AuthInterceptor(d.Verifier))
 	mux.Handle(identityv1connect.NewIdentityServiceHandler(identityconnect.New(d.Identity), auth, connect.WithReadMaxBytes(64*1024)))
 	resolve := actor(d.Identity)
-	mux.Handle(focusv1connect.NewFocusServiceHandler(focusconnect.New(resolve, d.Focus, d.Sessions), auth, connect.WithReadMaxBytes(1024*1024)))
+	mux.Handle(focusv1connect.NewFocusServiceHandler(focusconnect.New(resolve, d.Focus, d.Sessions, d.Notifications), auth, connect.WithReadMaxBytes(1024*1024)))
 	resolveGroupUser := func(ctx context.Context) (string, error) {
 		a, err := d.Identity.ResolveActor(ctx, identityconnect.PrincipalFromContext(ctx))
 		switch {

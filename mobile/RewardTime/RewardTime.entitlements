@@ -8,5 +8,7 @@
 	<array>
 		<string>group.com.example.tkb2622.mobile</string>
 	</array>
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 </dict>
 </plist>
