@@ -99,7 +99,7 @@ func (r *trackingTestReward) Open(_ context.Context, userID, sessionID string) (
 	r.wallet = reward.Wallet{UserID: userID, SessionID: sessionID}
 	return r.wallet, nil
 }
-func (r *trackingTestReward) Accrue(_ context.Context, _, _ string, _, throughSeq int64) (int64, reward.Wallet, error) {
+func (r *trackingTestReward) Accrue(_ context.Context, _, _ string, _ int64, _ reward.Eligibility, throughSeq int64) (int64, reward.Wallet, error) {
 	r.accrueCalls++
 	r.wallet.EvaluatedSeq = throughSeq
 	return 0, r.wallet, nil
@@ -107,7 +107,7 @@ func (r *trackingTestReward) Accrue(_ context.Context, _, _ string, _, throughSe
 func (r *trackingTestReward) Spend(context.Context, string, string, string, int64) (reward.Wallet, error) {
 	return r.wallet, nil
 }
-func (r *trackingTestReward) Discard(_ context.Context, _, _ string) (int64, reward.Wallet, error) {
+func (r *trackingTestReward) Discard(_ context.Context, _, _ string, _ reward.Eligibility) (int64, reward.Wallet, error) {
 	r.discardCalls++
 	discarded := r.wallet.BalanceSeconds
 	r.wallet.SessionID, r.wallet.BalanceSeconds, r.wallet.EvaluatedSeq = "", 0, 0

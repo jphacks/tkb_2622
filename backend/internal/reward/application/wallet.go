@@ -34,6 +34,7 @@ type Repository interface {
 	AddTransaction(ctx context.Context, t Transaction) error
 	AddGrant(ctx context.Context, g Grant) error
 	Summary(ctx context.Context, sessionID string) (domain.Summary, error)
+	SaveOutcome(ctx context.Context, outcome domain.SessionOutcome) error
 	ListTransactions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]Transaction, error)
 }
 
@@ -47,11 +48,10 @@ type transactionCursor struct {
 }
 
 type Wallets struct {
-	repo   Repository
-	policy domain.Policy
+	repo Repository
 }
 
-func New(repo Repository) *Wallets { return &Wallets{repo: repo, policy: domain.CurrentPolicy} }
+func New(repo Repository) *Wallets { return &Wallets{repo: repo} }
 
 func (w *Wallets) Balance(ctx context.Context, userID string) (domain.Wallet, error) {
 	return w.repo.Wallet(ctx, userID)
@@ -108,13 +108,14 @@ func (w *Wallets) Open(ctx context.Context, userID, sessionID string) (domain.Wa
 		return domain.Wallet{}, domain.ErrState
 	}
 	wallet.UserID, wallet.SessionID, wallet.EvaluatedSeq = userID, sessionID, 0
+	wallet.PolicyVersion = domain.CurrentPolicy.Version
+	wallet.GrantStopped, wallet.StopReason, wallet.CollectorHealthy = false, "", false
 	wallet.Version++
 	return wallet, w.repo.SaveWallet(ctx, wallet)
 }
 
-// Accrue grants the interim reward for the session's cumulative work time evaluated through throughSeq.
-// Replays and re-splits of batches cannot increase the reward because the total is recomputed from the cumulative time.
-func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMillis, throughSeq int64) (int64, domain.Wallet, error) {
+// Accrue grants only the cumulative delta when the session meets its reward policy.
+func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMillis int64, eligibility domain.Eligibility, throughSeq int64) (int64, domain.Wallet, error) {
 	wallet, err := w.repo.Wallet(ctx, userID)
 	if err != nil {
 		return 0, domain.Wallet{}, err
@@ -125,11 +126,31 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 	if throughSeq <= wallet.EvaluatedSeq {
 		return 0, wallet, nil
 	}
+	if eligibility.CollectorHealthy != nil {
+		wallet.CollectorHealthy = *eligibility.CollectorHealthy
+	}
+	if wallet.PolicyVersion == 0 {
+		wallet.PolicyVersion = domain.CurrentPolicy.Version
+	}
+	policy, err := domain.PolicyForVersion(wallet.PolicyVersion)
+	if err != nil {
+		return 0, domain.Wallet{}, err
+	}
 	summary, err := w.repo.Summary(ctx, sessionID)
 	if err != nil {
 		return 0, domain.Wallet{}, err
 	}
-	earned := w.policy.Increment(workMillis, summary.EarnedSeconds)
+	eligible, reason := eligibility.Check(wallet.CollectorHealthy)
+	if policy.Version == domain.PolicyV1.Version {
+		eligible, reason = true, ""
+	}
+	if summary.EarnedSeconds > 0 && !eligible && !wallet.GrantStopped {
+		wallet.GrantStopped, wallet.StopReason = true, reason
+	}
+	earned := int64(0)
+	if eligible && !wallet.GrantStopped {
+		earned = policy.Increment(workMillis, summary.EarnedSeconds)
+	}
 	from := wallet.EvaluatedSeq + 1
 	wallet, err = wallet.Credit(earned)
 	if err != nil {
@@ -145,7 +166,7 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 		if err = w.repo.AddTransaction(ctx, t); err != nil {
 			return 0, domain.Wallet{}, err
 		}
-		g := Grant{ID: uuid.NewString(), SessionID: sessionID, UserID: userID, TransactionID: t.ID, PolicyVersion: w.policy.Version, FromSeq: from, ToSeq: throughSeq, EarnedSeconds: earned}
+		g := Grant{ID: uuid.NewString(), SessionID: sessionID, UserID: userID, TransactionID: t.ID, PolicyVersion: policy.Version, FromSeq: from, ToSeq: throughSeq, EarnedSeconds: earned}
 		if err = w.repo.AddGrant(ctx, g); err != nil {
 			return 0, domain.Wallet{}, err
 		}
@@ -175,7 +196,7 @@ func (w *Wallets) Spend(ctx context.Context, userID, sessionID, grantID string, 
 }
 
 // Discard zeroes the unused balance when the session finishes or aborts and detaches the wallet.
-func (w *Wallets) Discard(ctx context.Context, userID, sessionID string) (int64, domain.Wallet, error) {
+func (w *Wallets) Discard(ctx context.Context, userID, sessionID string, eligibility domain.Eligibility) (int64, domain.Wallet, error) {
 	wallet, err := w.repo.Wallet(ctx, userID)
 	if err != nil {
 		return 0, domain.Wallet{}, err
@@ -183,6 +204,47 @@ func (w *Wallets) Discard(ctx context.Context, userID, sessionID string) (int64,
 	if wallet.SessionID != sessionID {
 		return 0, domain.Wallet{}, domain.ErrState
 	}
+	if eligibility.CollectorHealthy != nil {
+		wallet.CollectorHealthy = *eligibility.CollectorHealthy
+	}
+	if wallet.PolicyVersion == 0 {
+		wallet.PolicyVersion = domain.CurrentPolicy.Version
+	}
+	policy, err := domain.PolicyForVersion(wallet.PolicyVersion)
+	if err != nil {
+		return 0, domain.Wallet{}, err
+	}
+	summary, err := w.repo.Summary(ctx, sessionID)
+	if err != nil {
+		return 0, domain.Wallet{}, err
+	}
+	eligible, reason := eligibility.Check(wallet.CollectorHealthy)
+	if policy.Version == domain.PolicyV1.Version {
+		eligible, reason = true, ""
+	}
+	grantStopped := wallet.GrantStopped
+	stopReason := wallet.StopReason
+	if summary.EarnedSeconds > 0 {
+		if !eligible && !wallet.GrantStopped {
+			wallet.GrantStopped, wallet.StopReason = true, reason
+		}
+	} else if !eligible {
+		wallet.StopReason = reason
+	} else {
+		wallet.StopReason = "no_reward_block"
+	}
+	status := domain.StatusIneligible
+	if summary.EarnedSeconds > 0 {
+		status = domain.StatusGranted
+	}
+	if summary.EarnedSeconds == 0 && wallet.StopReason == "" {
+		wallet.StopReason = "no_reward_granted"
+	}
+	grantStopped = grantStopped || (summary.EarnedSeconds > 0 && !eligible)
+	if stopReason == "" {
+		stopReason = wallet.StopReason
+	}
+	policyVersion := wallet.PolicyVersion
 	wallet, discarded := wallet.DiscardOnSessionEnd()
 	wallet.Version++
 	if err = w.repo.SaveWallet(ctx, wallet); err != nil {
@@ -194,8 +256,29 @@ func (w *Wallets) Discard(ctx context.Context, userID, sessionID string) (int64,
 			return 0, domain.Wallet{}, err
 		}
 	}
+	if err := w.repo.SaveOutcome(ctx, domain.SessionOutcome{
+		SessionID: sessionID, UserID: userID, PolicyVersion: policyVersion,
+		Status: status, Reason: stopReason, GrantStopped: grantStopped,
+	}); err != nil {
+		return 0, domain.Wallet{}, err
+	}
 	return discarded, wallet, nil
 }
 
 type Wallet = domain.Wallet
 type Summary = domain.Summary
+type Eligibility = domain.Eligibility
+type Policy = domain.Policy
+
+const (
+	StatusPending    = domain.StatusPending
+	StatusGranted    = domain.StatusGranted
+	StatusIneligible = domain.StatusIneligible
+)
+
+var (
+	PolicyV1         = domain.PolicyV1
+	PolicyV2         = domain.PolicyV2
+	CurrentPolicy    = domain.CurrentPolicy
+	PolicyForVersion = domain.PolicyForVersion
+)

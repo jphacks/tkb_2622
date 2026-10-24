@@ -88,6 +88,17 @@ func sessionRestriction(result workflow.SessionResult) *restrictionv1.Restrictio
 func balance(w reward.Wallet) *rewardv1.RewardBalance {
 	return &rewardv1.RewardBalance{SessionId: w.SessionID, BalanceSeconds: w.BalanceSeconds, Version: w.Version, EvaluatedThroughSeq: w.EvaluatedSeq}
 }
+func rewardSummary(s reward.Summary) *rewardv1.RewardSummary {
+	status := map[string]rewardv1.RewardStatus{
+		reward.StatusPending:    rewardv1.RewardStatus_REWARD_STATUS_PENDING,
+		reward.StatusGranted:    rewardv1.RewardStatus_REWARD_STATUS_GRANTED,
+		reward.StatusIneligible: rewardv1.RewardStatus_REWARD_STATUS_INELIGIBLE,
+	}[s.Status]
+	return &rewardv1.RewardSummary{
+		EarnedSeconds: s.EarnedSeconds, SpentSeconds: s.SpentSeconds, DiscardedSeconds: s.DiscardedSeconds,
+		Status: status, PolicyVersion: s.PolicyVersion, Reason: s.Reason, GrantStopped: s.GrantStopped,
+	}
+}
 func segments(in []*v1.ActivitySegment) ([]application.Segment, error) {
 	out := make([]application.Segment, 0, len(in))
 	for _, s := range in {
@@ -183,7 +194,11 @@ func (h *Handler) UploadActivityBatch(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	r, err := h.sessions.Upload(ctx, a, application.BatchInput{SessionID: req.Msg.SessionId, BatchID: req.Msg.BatchId, Seq: req.Msg.Seq, EvaluatorVersion: req.Msg.EvaluatorVersion, RulesVersion: req.Msg.RulesVersion, Segments: segs})
+	r, err := h.sessions.Upload(ctx, a, application.BatchInput{
+		SessionID: req.Msg.SessionId, BatchID: req.Msg.BatchId, Seq: req.Msg.Seq,
+		EvaluatorVersion: req.Msg.EvaluatorVersion, RulesVersion: req.Msg.RulesVersion,
+		CollectorHealthy: req.Msg.CollectorHealthy, Segments: segs,
+	})
 	if err != nil {
 		return nil, rpcError(err)
 	}
@@ -289,7 +304,7 @@ func (h *Handler) GetSession(ctx context.Context, req *connect.Request[v1.GetSes
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.GetSessionResponse{Session: session(d.Session), Reward: &rewardv1.RewardSummary{EarnedSeconds: d.Reward.EarnedSeconds, SpentSeconds: d.Reward.SpentSeconds, DiscardedSeconds: d.Reward.DiscardedSeconds}}), nil
+	return connect.NewResponse(&v1.GetSessionResponse{Session: session(d.Session), Reward: rewardSummary(d.Reward)}), nil
 }
 func (h *Handler) ListSessions(ctx context.Context, req *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
 	a, err := h.resolve(ctx)
@@ -308,7 +323,7 @@ func (h *Handler) ListSessions(ctx context.Context, req *connect.Request[v1.List
 		}
 		res.Entries = append(res.Entries, &v1.SessionHistoryEntry{
 			Session: session(d.Session),
-			Reward:  &rewardv1.RewardSummary{EarnedSeconds: d.Reward.EarnedSeconds, SpentSeconds: d.Reward.SpentSeconds, DiscardedSeconds: d.Reward.DiscardedSeconds},
+			Reward:  rewardSummary(d.Reward),
 		})
 	}
 	return connect.NewResponse(res), nil

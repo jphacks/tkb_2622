@@ -10,7 +10,7 @@ info:
 
     **基本ループ**
     1. PC：StartSession（有効なiPhoneがなければtracking-onlyで開始）
-    2. PC：UploadActivityBatch を seq=1,2,… で定期送信．作業時間（TASK＋RELATED_TRANSITION）の1/3が秒単位切り捨てで残高に付与される
+    2. PC：UploadActivityBatch を seq=1,2,… で定期送信．新規セッションはT+Rの5分ごとに60秒を仮付与し，Q>=70%，K>=5分，計測正常を条件とする．開始済みセッションは開始時のポリシー版を維持する
     3. PC：PauseSession（last_seq に最後に送った seq）
     4. iPhone：ReserveUsageGrant で残高から秒数を確保 → ReportRestrictionState（解除適用）→ ReportUsage（累積の実利用秒数）
     5. PC：ResumeSession（利用枠の残りは破棄，残高は保持）または FinishSession／AbortSession（残高は全て破棄）

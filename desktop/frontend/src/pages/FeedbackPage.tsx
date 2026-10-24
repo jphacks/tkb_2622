@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { Result } from '../bridge/types';
+import type { Result, RewardStatus } from '../bridge/types';
 import { duration } from '../components/format';
 import { statusLabels } from './SessionPage';
 
@@ -54,7 +54,39 @@ const categories = [
   { key: 'uncertain', label: '保留', color: colors.uncertain, background: '#F2EFF7', foreground: '#655B79' },
 ] as const;
 
+const rewardStatusLabels: Record<RewardStatus, string> = {
+  pending: 'ログ確認中',
+  queued: '残高への反映待ち',
+  granted: '付与済み',
+  ineligible: '付与対象外',
+  unavailable: '未取得',
+};
+
+const rewardStatusMessages: Record<RewardStatus, string> = {
+  pending: '記録の確認が終わるまで、金額は確定表示しません。',
+  queued: '付与条件を満たし、残高への反映を待っています。',
+  granted: '獲得額はサーバーで確定しています。',
+  ineligible: 'このセッションは報酬の付与対象外です。',
+  unavailable: 'サーバーから報酬結果を取得できていません。',
+};
+
+const rewardReasonLabels: Record<string, string> = {
+  collector_unhealthy: '計測機能が正常でないため、報酬付与を保留しています。',
+  coverage_below_70_percent: '判定カバレッジ（Q）が70%未満のため、報酬付与を保留しています。',
+  known_active_below_5_minutes: '既知の活動時間（T+R+D）が5分未満のため、報酬付与を保留しています。',
+  no_reward_block: '関連作業（T+R）が5分に達していないため、今回は付与がありません。',
+  no_reward_granted: 'このセッションでは報酬の付与がありませんでした。',
+};
+
 export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'demo' | 'local-monitor' }) {
+  const rewardStatus = result?.rewardStatus ?? 'unavailable';
+  const hasConfirmedReward = rewardStatus === 'granted' || rewardStatus === 'ineligible';
+  const rewardAmount = hasConfirmedReward && result && Number.isFinite(result.earnedSeconds) && result.earnedSeconds >= 0
+    ? result.earnedSeconds === 0 && rewardStatus === 'ineligible' ? '0秒' : `+${duration(result.earnedSeconds)}`
+    : '—';
+  const rewardReason = result?.rewardReason
+    ? rewardReasonLabels[result.rewardReason] ?? result.rewardReason
+    : rewardStatusMessages[rewardStatus];
   const hasLocalEvaluation = mode === 'local-monitor' && Boolean(result?.evaluatorVersion);
   const categories = hasLocalEvaluation ? [
     { key: 'task', label: '作業（T）', color: colors.work, background: '#ECE9FF', foreground: '#4336B8' },
@@ -100,11 +132,17 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
 
     <section className="result-metrics-grid" aria-label="報酬と分類指標">
       <div style={{ minWidth: 0, boxSizing: 'border-box', background: colors.purple, color: '#FFFFFF', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬（未確定）' : '獲得した報酬'}</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{rewardStatus === 'granted' ? '獲得した報酬' : '今回の報酬'}</div>
         <div style={{ fontWeight: 700, fontSize: 44, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
-          {mode === 'local-monitor' ? '—' : result ? `+${duration(result.earnedSeconds)}` : '—'}
+          {rewardAmount}
         </div>
-        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬換算式・報酬APIは未接続です' : '算定根拠・受取前後の残高：未取得'}</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }} role="status">{rewardStatusLabels[rewardStatus]}</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{rewardReason}</div>
+        {result?.rewardPolicyVersion !== undefined && result.rewardPolicyVersion > 0 && <div style={{ fontSize: 12, color: '#E4E0FF' }}>適用ルール v{result.rewardPolicyVersion}</div>}
+        {result?.rewardGrantStopped && <div style={{ fontSize: 12, color: '#E4E0FF' }}>このセッションへの追加付与は停止しています。</div>}
+        {hasConfirmedReward && result && <div style={{ fontSize: 12, color: '#E4E0FF' }}>
+          利用枠に充当 {duration(result.usedSeconds)}（実利用時間ではありません） ・ 終了時に破棄 {duration(result.discardedSeconds)}
+        </div>}
       </div>
       {hasLocalEvaluation ? [
         { label: '既知分類内の作業割合（B100）', value: percentage(b100, 1), detail: '100×(T+R)/(T+R+D)。不明・非活動は分母に含みません。' },
@@ -159,7 +197,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
         </span>
         <span>終了時刻 —</span>
       </div>
-      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{hasLocalEvaluation ? '5分類はこのMacで集計しました。非活動（I）は確定した画面ロック・スリープ情報がある場合だけ加算します。報酬時間は未確定です。' : mode === 'local-monitor' ? '観測データはこのMacに保存しました。ローカル評価を完了できませんでした。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
+      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{hasLocalEvaluation ? `5分類はこのMacで集計しました。非活動（I）は確定した画面ロック・スリープ情報がある場合だけ加算します。${hasConfirmedReward ? '報酬額はサーバー確定値です。' : '報酬額はサーバー確認後に表示します。'}` : mode === 'local-monitor' ? '観測データはこのMacに保存しました。ローカル評価を完了できませんでした。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
     </section>
 
     <section style={{ ...cardStyle, gap: 12 }}>

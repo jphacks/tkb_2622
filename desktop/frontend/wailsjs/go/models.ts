@@ -293,6 +293,10 @@ export namespace session {
 	    earnedSeconds: number;
 	    usedSeconds: number;
 	    discardedSeconds: number;
+	    rewardStatus?: string;
+	    rewardReason?: string;
+	    rewardPolicyVersion?: number;
+	    rewardGrantStopped?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -317,6 +321,10 @@ export namespace session {
 	        this.earnedSeconds = source["earnedSeconds"];
 	        this.usedSeconds = source["usedSeconds"];
 	        this.discardedSeconds = source["discardedSeconds"];
+	        this.rewardStatus = source["rewardStatus"];
+	        this.rewardReason = source["rewardReason"];
+	        this.rewardPolicyVersion = source["rewardPolicyVersion"];
+	        this.rewardGrantStopped = source["rewardGrantStopped"];
 	    }
 	}
 	

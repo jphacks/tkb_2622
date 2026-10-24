@@ -35,6 +35,7 @@ func TestUploadActivityBatchSendsOnlyClassifiedSegmentsAndStableIdentity(t *test
 	batch := ActivityBatch{
 		SessionID: "session-1", BatchID: "batch-1", Seq: 1,
 		EvaluatorVersion: "evaluator-v1", RulesVersion: "rules-v1",
+		CollectorHealthy: true,
 		Segments: []ActivitySegment{{
 			StartTime:      time.Date(2026, time.October, 24, 10, 0, 0, 0, time.UTC),
 			EndTime:        time.Date(2026, time.October, 24, 10, 0, 1, 0, time.UTC),
@@ -58,6 +59,9 @@ func TestUploadActivityBatchSendsOnlyClassifiedSegmentsAndStableIdentity(t *test
 		if payload["batchId"] != "batch-1" || payload["seq"] != "1" {
 			t.Fatalf("retry changed its batch identity: %#v", payload)
 		}
+		if payload["collectorHealthy"] != true {
+			t.Fatalf("collector state was not sent: %#v", payload)
+		}
 		segments, ok := payload["segments"].([]any)
 		if !ok || len(segments) != 1 {
 			t.Fatalf("classified segments missing: %#v", payload["segments"])
@@ -75,6 +79,31 @@ func TestUploadActivityBatchSendsOnlyClassifiedSegmentsAndStableIdentity(t *test
 				t.Fatalf("raw URL or title leaked in activity payload: %s", encoded)
 			}
 		}
+	}
+}
+
+func TestGetSessionReadsServerConfirmedRewardStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/focus.v1.FocusService/GetSession" {
+			t.Errorf("unexpected RPC path: %s", request.URL.Path)
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = response.Write([]byte(`{"session":{"id":"session-1","status":"SESSION_STATUS_FINALIZED","version":"2"},"reward":{"earnedSeconds":"120","spentSeconds":"45","discardedSeconds":"75","status":"REWARD_STATUS_GRANTED","policyVersion":2,"reason":"","grantStopped":true}}`))
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{
+		APIBaseURL: server.URL, SupabaseURL: server.URL, SupabasePublishableKey: "test-key",
+	})
+	if err != nil {
+		t.Fatalf("create client: %v", err)
+	}
+	_, reward, err := client.GetSession(context.Background(), AuthSession{AccessToken: "access"}, "session-1")
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	if reward.EarnedSeconds != 120 || reward.SpentSeconds != 45 || reward.DiscardedSeconds != 75 ||
+		reward.Status != "granted" || reward.PolicyVersion != 2 || !reward.GrantStopped {
+		t.Fatalf("unexpected server reward summary: %#v", reward)
 	}
 }
 
