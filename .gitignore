@@ -6,3 +6,8 @@ backend/*.db
 backend/*.db-*
 backend/*.sqlite*
 backend/bin/
+
+# Desktop dependencies and build outputs
+desktop/frontend/node_modules/
+desktop/frontend/dist/
+desktop/build/bin/
