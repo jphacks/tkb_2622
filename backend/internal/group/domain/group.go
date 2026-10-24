@@ -5,6 +5,7 @@ import "time"
 type Member struct {
 	IsCurrentUser bool
 	DisplayName   string
+	AvatarID      string
 	JoinedAt      time.Time
 }
 

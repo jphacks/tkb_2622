@@ -22,7 +22,7 @@ func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Group, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT g.id, g.name, g.created_at, m.user_id = $1 AS is_current_user, u.display_name, m.joined_at
+		SELECT g.id, g.name, g.created_at, m.user_id = $1 AS is_current_user, u.display_name, u.avatar_id, m.joined_at
 		FROM app.groups AS g
 		JOIN app.group_memberships AS mine
 		  ON mine.group_id = g.id AND mine.user_id = $1 AND mine.status = 'ACTIVE'
@@ -41,7 +41,7 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Gr
 		var id uuid.UUID
 		var group domain.Group
 		var member domain.Member
-		if err := rows.Scan(&id, &group.Name, &group.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.JoinedAt); err != nil {
+		if err := rows.Scan(&id, &group.Name, &group.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.AvatarID, &member.JoinedAt); err != nil {
 			return nil, err
 		}
 		if len(groups) == 0 || id != currentID {
@@ -412,7 +412,7 @@ func (r *Repository) LeaveGroup(ctx context.Context, userID, operationID, groupI
 
 func groupSnapshot(ctx context.Context, tx *sql.Tx, groupID, currentUserID uuid.UUID) (domain.Group, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT g.id, g.name, g.created_at, m.user_id = $2 AS is_current_user, u.display_name, m.joined_at
+		SELECT g.id, g.name, g.created_at, m.user_id = $2 AS is_current_user, u.display_name, u.avatar_id, m.joined_at
 		FROM app.groups AS g
 		JOIN app.group_memberships AS m
 		  ON m.group_id = g.id AND m.status = 'ACTIVE'
@@ -427,7 +427,7 @@ func groupSnapshot(ctx context.Context, tx *sql.Tx, groupID, currentUserID uuid.
 	for rows.Next() {
 		var id uuid.UUID
 		var member domain.Member
-		if err = rows.Scan(&id, &out.Name, &out.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.JoinedAt); err != nil {
+		if err = rows.Scan(&id, &out.Name, &out.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.AvatarID, &member.JoinedAt); err != nil {
 			return domain.Group{}, err
 		}
 		out.ID = id.String()

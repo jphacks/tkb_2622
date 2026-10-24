@@ -16,6 +16,7 @@ message GroupMember {
   bool is_current_user = 1;
   google.protobuf.Timestamp joined_at = 2;
   string display_name = 3;
+  string avatar_id = 4;
 }
 
 message Group {

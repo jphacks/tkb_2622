@@ -79,6 +79,7 @@ type User struct {
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarId      string                 `protobuf:"bytes,5,opt,name=avatar_id,json=avatarId,proto3" json:"avatar_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,6 +138,13 @@ func (x *User) GetCreatedAt() string {
 func (x *User) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *User) GetAvatarId() string {
+	if x != nil {
+		return x.AvatarId
 	}
 	return ""
 }
@@ -481,6 +489,94 @@ func (x *UpdateDisplayNameResponse) GetUser() *User {
 	return nil
 }
 
+type UpdateAvatarRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AvatarId      string                 `protobuf:"bytes,1,opt,name=avatar_id,json=avatarId,proto3" json:"avatar_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAvatarRequest) Reset() {
+	*x = UpdateAvatarRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAvatarRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAvatarRequest) ProtoMessage() {}
+
+func (x *UpdateAvatarRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAvatarRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAvatarRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateAvatarRequest) GetAvatarId() string {
+	if x != nil {
+		return x.AvatarId
+	}
+	return ""
+}
+
+type UpdateAvatarResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAvatarResponse) Reset() {
+	*x = UpdateAvatarResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAvatarResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAvatarResponse) ProtoMessage() {}
+
+func (x *UpdateAvatarResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAvatarResponse.ProtoReflect.Descriptor instead.
+func (*UpdateAvatarResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UpdateAvatarResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 type RegisterDeviceRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OperationId    string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
@@ -493,7 +589,7 @@ type RegisterDeviceRequest struct {
 
 func (x *RegisterDeviceRequest) Reset() {
 	*x = RegisterDeviceRequest{}
-	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	mi := &file_identity_v1_identity_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +601,7 @@ func (x *RegisterDeviceRequest) String() string {
 func (*RegisterDeviceRequest) ProtoMessage() {}
 
 func (x *RegisterDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	mi := &file_identity_v1_identity_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +614,7 @@ func (x *RegisterDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RegisterDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{8}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RegisterDeviceRequest) GetOperationId() string {
@@ -558,7 +654,7 @@ type RegisterDeviceResponse struct {
 
 func (x *RegisterDeviceResponse) Reset() {
 	*x = RegisterDeviceResponse{}
-	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	mi := &file_identity_v1_identity_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +666,7 @@ func (x *RegisterDeviceResponse) String() string {
 func (*RegisterDeviceResponse) ProtoMessage() {}
 
 func (x *RegisterDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	mi := &file_identity_v1_identity_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +679,7 @@ func (x *RegisterDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RegisterDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{9}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RegisterDeviceResponse) GetDevice() *Device {
@@ -603,7 +699,7 @@ type ListDevicesRequest struct {
 
 func (x *ListDevicesRequest) Reset() {
 	*x = ListDevicesRequest{}
-	mi := &file_identity_v1_identity_proto_msgTypes[10]
+	mi := &file_identity_v1_identity_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +711,7 @@ func (x *ListDevicesRequest) String() string {
 func (*ListDevicesRequest) ProtoMessage() {}
 
 func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[10]
+	mi := &file_identity_v1_identity_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +724,7 @@ func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{10}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListDevicesRequest) GetPageSize() int32 {
@@ -655,7 +751,7 @@ type ListDevicesResponse struct {
 
 func (x *ListDevicesResponse) Reset() {
 	*x = ListDevicesResponse{}
-	mi := &file_identity_v1_identity_proto_msgTypes[11]
+	mi := &file_identity_v1_identity_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +763,7 @@ func (x *ListDevicesResponse) String() string {
 func (*ListDevicesResponse) ProtoMessage() {}
 
 func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[11]
+	mi := &file_identity_v1_identity_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +776,7 @@ func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{11}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListDevicesResponse) GetDevices() []*Device {
@@ -708,7 +804,7 @@ type RevokeDeviceRequest struct {
 
 func (x *RevokeDeviceRequest) Reset() {
 	*x = RevokeDeviceRequest{}
-	mi := &file_identity_v1_identity_proto_msgTypes[12]
+	mi := &file_identity_v1_identity_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -720,7 +816,7 @@ func (x *RevokeDeviceRequest) String() string {
 func (*RevokeDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[12]
+	mi := &file_identity_v1_identity_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -733,7 +829,7 @@ func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{12}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RevokeDeviceRequest) GetOperationId() string {
@@ -766,7 +862,7 @@ type RevokeDeviceResponse struct {
 
 func (x *RevokeDeviceResponse) Reset() {
 	*x = RevokeDeviceResponse{}
-	mi := &file_identity_v1_identity_proto_msgTypes[13]
+	mi := &file_identity_v1_identity_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -778,7 +874,7 @@ func (x *RevokeDeviceResponse) String() string {
 func (*RevokeDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[13]
+	mi := &file_identity_v1_identity_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -791,7 +887,7 @@ func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{13}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RevokeDeviceResponse) GetDevice() *Device {
@@ -805,13 +901,14 @@ var File_identity_v1_identity_proto protoreflect.FileDescriptor
 
 const file_identity_v1_identity_proto_rawDesc = "" +
 	"\n" +
-	"\x1aidentity/v1/identity.proto\x12\videntity.v1\"p\n" +
+	"\x1aidentity/v1/identity.proto\x12\videntity.v1\"\x8d\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x03 \x01(\tR\tcreatedAt\x12!\n" +
-	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\"\xb0\x01\n" +
+	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1b\n" +
+	"\tavatar_id\x18\x05 \x01(\tR\bavatarId\"\xb0\x01\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
 	"\bplatform\x18\x02 \x01(\x0e2\x15.identity.v1.PlatformR\bplatform\x12\x12\n" +
@@ -830,6 +927,10 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\x18UpdateDisplayNameRequest\x12!\n" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\"B\n" +
 	"\x19UpdateDisplayNameResponse\x12%\n" +
+	"\x04user\x18\x01 \x01(\v2\x11.identity.v1.UserR\x04user\"2\n" +
+	"\x13UpdateAvatarRequest\x12\x1b\n" +
+	"\tavatar_id\x18\x01 \x01(\tR\bavatarId\"=\n" +
+	"\x14UpdateAvatarResponse\x12%\n" +
 	"\x04user\x18\x01 \x01(\v2\x11.identity.v1.UserR\x04user\"\xaa\x01\n" +
 	"\x15RegisterDeviceRequest\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12'\n" +
@@ -855,12 +956,13 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\x14PLATFORM_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0ePLATFORM_MACOS\x10\x01\x12\x14\n" +
 	"\x10PLATFORM_WINDOWS\x10\x02\x12\x10\n" +
-	"\fPLATFORM_IOS\x10\x032\x86\x04\n" +
+	"\fPLATFORM_IOS\x10\x032\xdb\x04\n" +
 	"\x0fIdentityService\x12M\n" +
 	"\n" +
 	"EnsureUser\x12\x1e.identity.v1.EnsureUserRequest\x1a\x1f.identity.v1.EnsureUserResponse\x12>\n" +
 	"\x05GetMe\x12\x19.identity.v1.GetMeRequest\x1a\x1a.identity.v1.GetMeResponse\x12b\n" +
-	"\x11UpdateDisplayName\x12%.identity.v1.UpdateDisplayNameRequest\x1a&.identity.v1.UpdateDisplayNameResponse\x12Y\n" +
+	"\x11UpdateDisplayName\x12%.identity.v1.UpdateDisplayNameRequest\x1a&.identity.v1.UpdateDisplayNameResponse\x12S\n" +
+	"\fUpdateAvatar\x12 .identity.v1.UpdateAvatarRequest\x1a!.identity.v1.UpdateAvatarResponse\x12Y\n" +
 	"\x0eRegisterDevice\x12\".identity.v1.RegisterDeviceRequest\x1a#.identity.v1.RegisterDeviceResponse\x12P\n" +
 	"\vListDevices\x12\x1f.identity.v1.ListDevicesRequest\x1a .identity.v1.ListDevicesResponse\x12S\n" +
 	"\fRevokeDevice\x12 .identity.v1.RevokeDeviceRequest\x1a!.identity.v1.RevokeDeviceResponseB@Z>github.com/jphacks/tkb_2622/backend/gen/identity/v1;identityv1b\x06proto3"
@@ -878,7 +980,7 @@ func file_identity_v1_identity_proto_rawDescGZIP() []byte {
 }
 
 var file_identity_v1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_identity_v1_identity_proto_goTypes = []any{
 	(Platform)(0),                     // 0: identity.v1.Platform
 	(*User)(nil),                      // 1: identity.v1.User
@@ -889,39 +991,44 @@ var file_identity_v1_identity_proto_goTypes = []any{
 	(*GetMeResponse)(nil),             // 6: identity.v1.GetMeResponse
 	(*UpdateDisplayNameRequest)(nil),  // 7: identity.v1.UpdateDisplayNameRequest
 	(*UpdateDisplayNameResponse)(nil), // 8: identity.v1.UpdateDisplayNameResponse
-	(*RegisterDeviceRequest)(nil),     // 9: identity.v1.RegisterDeviceRequest
-	(*RegisterDeviceResponse)(nil),    // 10: identity.v1.RegisterDeviceResponse
-	(*ListDevicesRequest)(nil),        // 11: identity.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),       // 12: identity.v1.ListDevicesResponse
-	(*RevokeDeviceRequest)(nil),       // 13: identity.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),      // 14: identity.v1.RevokeDeviceResponse
+	(*UpdateAvatarRequest)(nil),       // 9: identity.v1.UpdateAvatarRequest
+	(*UpdateAvatarResponse)(nil),      // 10: identity.v1.UpdateAvatarResponse
+	(*RegisterDeviceRequest)(nil),     // 11: identity.v1.RegisterDeviceRequest
+	(*RegisterDeviceResponse)(nil),    // 12: identity.v1.RegisterDeviceResponse
+	(*ListDevicesRequest)(nil),        // 13: identity.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),       // 14: identity.v1.ListDevicesResponse
+	(*RevokeDeviceRequest)(nil),       // 15: identity.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),      // 16: identity.v1.RevokeDeviceResponse
 }
 var file_identity_v1_identity_proto_depIdxs = []int32{
 	0,  // 0: identity.v1.Device.platform:type_name -> identity.v1.Platform
 	1,  // 1: identity.v1.EnsureUserResponse.user:type_name -> identity.v1.User
 	1,  // 2: identity.v1.GetMeResponse.user:type_name -> identity.v1.User
 	1,  // 3: identity.v1.UpdateDisplayNameResponse.user:type_name -> identity.v1.User
-	0,  // 4: identity.v1.RegisterDeviceRequest.platform:type_name -> identity.v1.Platform
-	2,  // 5: identity.v1.RegisterDeviceResponse.device:type_name -> identity.v1.Device
-	2,  // 6: identity.v1.ListDevicesResponse.devices:type_name -> identity.v1.Device
-	2,  // 7: identity.v1.RevokeDeviceResponse.device:type_name -> identity.v1.Device
-	3,  // 8: identity.v1.IdentityService.EnsureUser:input_type -> identity.v1.EnsureUserRequest
-	5,  // 9: identity.v1.IdentityService.GetMe:input_type -> identity.v1.GetMeRequest
-	7,  // 10: identity.v1.IdentityService.UpdateDisplayName:input_type -> identity.v1.UpdateDisplayNameRequest
-	9,  // 11: identity.v1.IdentityService.RegisterDevice:input_type -> identity.v1.RegisterDeviceRequest
-	11, // 12: identity.v1.IdentityService.ListDevices:input_type -> identity.v1.ListDevicesRequest
-	13, // 13: identity.v1.IdentityService.RevokeDevice:input_type -> identity.v1.RevokeDeviceRequest
-	4,  // 14: identity.v1.IdentityService.EnsureUser:output_type -> identity.v1.EnsureUserResponse
-	6,  // 15: identity.v1.IdentityService.GetMe:output_type -> identity.v1.GetMeResponse
-	8,  // 16: identity.v1.IdentityService.UpdateDisplayName:output_type -> identity.v1.UpdateDisplayNameResponse
-	10, // 17: identity.v1.IdentityService.RegisterDevice:output_type -> identity.v1.RegisterDeviceResponse
-	12, // 18: identity.v1.IdentityService.ListDevices:output_type -> identity.v1.ListDevicesResponse
-	14, // 19: identity.v1.IdentityService.RevokeDevice:output_type -> identity.v1.RevokeDeviceResponse
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 4: identity.v1.UpdateAvatarResponse.user:type_name -> identity.v1.User
+	0,  // 5: identity.v1.RegisterDeviceRequest.platform:type_name -> identity.v1.Platform
+	2,  // 6: identity.v1.RegisterDeviceResponse.device:type_name -> identity.v1.Device
+	2,  // 7: identity.v1.ListDevicesResponse.devices:type_name -> identity.v1.Device
+	2,  // 8: identity.v1.RevokeDeviceResponse.device:type_name -> identity.v1.Device
+	3,  // 9: identity.v1.IdentityService.EnsureUser:input_type -> identity.v1.EnsureUserRequest
+	5,  // 10: identity.v1.IdentityService.GetMe:input_type -> identity.v1.GetMeRequest
+	7,  // 11: identity.v1.IdentityService.UpdateDisplayName:input_type -> identity.v1.UpdateDisplayNameRequest
+	9,  // 12: identity.v1.IdentityService.UpdateAvatar:input_type -> identity.v1.UpdateAvatarRequest
+	11, // 13: identity.v1.IdentityService.RegisterDevice:input_type -> identity.v1.RegisterDeviceRequest
+	13, // 14: identity.v1.IdentityService.ListDevices:input_type -> identity.v1.ListDevicesRequest
+	15, // 15: identity.v1.IdentityService.RevokeDevice:input_type -> identity.v1.RevokeDeviceRequest
+	4,  // 16: identity.v1.IdentityService.EnsureUser:output_type -> identity.v1.EnsureUserResponse
+	6,  // 17: identity.v1.IdentityService.GetMe:output_type -> identity.v1.GetMeResponse
+	8,  // 18: identity.v1.IdentityService.UpdateDisplayName:output_type -> identity.v1.UpdateDisplayNameResponse
+	10, // 19: identity.v1.IdentityService.UpdateAvatar:output_type -> identity.v1.UpdateAvatarResponse
+	12, // 20: identity.v1.IdentityService.RegisterDevice:output_type -> identity.v1.RegisterDeviceResponse
+	14, // 21: identity.v1.IdentityService.ListDevices:output_type -> identity.v1.ListDevicesResponse
+	16, // 22: identity.v1.IdentityService.RevokeDevice:output_type -> identity.v1.RevokeDeviceResponse
+	16, // [16:23] is the sub-list for method output_type
+	9,  // [9:16] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_identity_v1_identity_proto_init() }
@@ -935,7 +1042,7 @@ func file_identity_v1_identity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_identity_v1_identity_proto_rawDesc), len(file_identity_v1_identity_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
