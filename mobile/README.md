@@ -2,7 +2,7 @@
 
 ## 位置づけ
 
-このディレクトリを本番向けiOSアプリのSwift / SwiftUI実装場所とする。現在ここにXcodeプロジェクトやアプリコードはなく、画面のHTMLモックは [`docs/UI/`](../docs/UI/) にある。実機での技術検証用アプリは [`poc/ios-reward-time/`](../poc/ios-reward-time/) に分けて置く。
+このディレクトリを本番向けiOSアプリのSwift / SwiftUI実装場所とする。画面のHTMLモックは [`docs/UI/`](../docs/UI/) にあり、実機での技術検証用アプリは [`poc/ios-reward-time/`](../poc/ios-reward-time/) に分けて置く。
 
 画面の見た目はモックを参考にするが、残高・セッション・利用枠などの業務動作は [`docs/spec/3.API仕様書.md`](../docs/spec/3.API仕様書.md) と [`docs/spec/4.ドメインモデル定義.md`](../docs/spec/4.ドメインモデル定義.md) を正とする。モックと仕様に食い違いがある場合、実装側で解釈して埋めず、モックまたは仕様を更新してから着手する。
 
@@ -19,14 +19,14 @@
 
 ## 依存の境界
 
-最初は標準のSwift / SwiftUIとFoundationを使い、外部パッケージを追加しない。
+標準のSwift / SwiftUIとFoundationを使い、外部パッケージを追加しない。
 
 ```text
 SwiftUI画面
   ↓
 画面状態・ユースケース
   ↓
-RewardRepository（取得・更新の境界）
+HomeRepository（ホーム情報取得の境界）
   ├─ 仮データ実装（画面開発用）
   └─ API実装（契約確定後）
 
@@ -35,15 +35,47 @@ RewardRepository（取得・更新の境界）
 
 画面はHTTP通信やOS制限APIを直接呼ばない。APIのDTOと画面表示用モデルを分け、サーバー残高をiPhoneから直接書き換えない。仮データ実装は実APIの結果を偽装せず、開発用であることが分かる形にする。
 
-## 最初の実装単位
+## 現在の実装
 
-最初のPRは「SwiftUIアプリの起動土台 + iPhone作業中ホームの読み取り表示 + 差し替え可能な仮データ供給」に絞る。残高消費、認証、FamilyControls、通知、グループ、履歴は含めない。ホーム表示の内容とAPIの取得範囲を照合し、未決のAPI契約が必要ならその部分は仮データのままにする。
+`ios-reward-time.xcodeproj` にSwiftUIアプリの土台を作成し、`HomeRepository` の仮データ実装を通してiPhone作業中ホームを表示する。作業状態・報酬残高・iPhone制限状態・最終更新時刻は表示専用で、操作による残高変更や制限解除は行わない。画面には仮データであることを明示する。
+
+最初のコード単位はここまでとし、次はAPI仕様で必要な取得契約が確定した範囲から通信実装へ置き換える。残高消費、認証、FamilyControls、通知、グループ、履歴はこの段階に含めない。
+
+## ソース構成
+
+```text
+mobile/
+├── ios-reward-time.xcodeproj/
+└── RewardTime/
+    ├── RewardTimeApp.swift
+    ├── Domain/MobileHomeSnapshot.swift
+    ├── Data/HomeRepository.swift
+    └── Features/Home/
+        ├── HomeView.swift
+        └── HomeViewModel.swift
+```
+
+## ビルドと起動
+
+Schemeは `RewardTime`。Xcodeで `mobile/ios-reward-time.xcodeproj` を開き、iOS Simulatorを選んで実行する。CLIでは次のようにSimulator向けビルドを行える。
+
+```sh
+xcodebuild \
+  -project mobile/ios-reward-time.xcodeproj \
+  -scheme RewardTime \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /private/tmp/tkb2622-mobile-deriveddata \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+プロジェクトのiOS Deployment Targetは現時点で16.0に仮設定している。対応OSの正式決定時に見直す。Bundle Identifierも開発用の仮値であり、署名・実機配布前にチームの設定へ置き換える。
 
 ## 確認方法
 
 - XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
-- プロジェクトのSchemeが作成された時点で、実際のScheme名とSimulator名を使う `xcodebuild` コマンドを本書に追記する。
+- iOS Simulatorで起動し、仮データ表示と状態カードを確認する。Simulatorが使えない場合はXcodeのエラーを記録し、CLIビルドまで確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
 
 ## 未決事項
