@@ -24,7 +24,9 @@ Mac担当者が共通基盤を先に作り，その後にMac担当者とWindows�
 | Windows UI | `frontend/src/platforms/windows`．Windowsの外枠・配置・スタイル |
 | Go | セッション状態・コマンド・イベント契約は共通．OS別起動設定は分離 |
 
-`internal/session`はプロセス内だけで動くデモ状態管理であり，ディスク保存，サーバー同期，API，計測，権限，通知，トレイは未接続．アプリ終了後にGo側のデモ状態は初期化される．ブラウザプレビューのローカル保存はデモ専用である．
+ブラウザプレビューは従来どおり`DemoBridge`を使い，表示確認用データだけを扱う．macOSのWailsアプリはローカル計測モードで起動し，作業状態をユーザー設定フォルダーの`Focus Link/desktop-state.json`へ保存する．観測記録は同じフォルダーの`sessions/<session-id>.jsonl`へ保存する．保存ディレクトリは`0700`，ファイルは`0600`で作成する．
+
+macOSでは既存のネイティブPoCから前面アプリ名・アプリID・入力アイドル時間・対応ブラウザーのドメインを取得する．raw URL，ページタイトル，キー入力内容，画面画像，ブラウザーのタブIDは保存しない．分類評価，報酬API，iPhone制限は未接続である．Windowsは引き続きデモモードである．
 
 ### 着手順序
 
@@ -47,19 +49,23 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．Wailsで起動する場合は`cd desktop`の後に`wails dev`を実行する．リリース向けビルドは同じ場所で`wails build`を実行する．
+ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．ブラウザーは従来どおりデモ表示である．macOSでWailsを起動するときは，ヘルパーを先にビルドするスクリプトを使う．
 
 ```sh
-cd desktop/frontend
-npm run typecheck
-npm test
-npm run build
-cd ..
-go test -race ./...
-go vet ./...
+cd desktop
+sh build/dev-macos.sh
 ```
 
-確認できた範囲：macOS arm64でWails v2の起動，Goメソッド呼び出し，Goイベントの購読・解除，アプリビルド．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
+配布用のmacOSアプリは次のコマンドでビルドする．ビルド後，`native-collector`はアプリバンドル内へコピーされる．
+
+```sh
+cd desktop
+sh build/build-macos-app.sh
+```
+
+対応ブラウザーのドメイン取得にはmacOSのオートメーション許可が必要になる場合がある．許可しない場合もアプリ名とアイドル時間の観測を続け，取得できなかったサンプルは報酬評価に使わない．
+
+共通基盤の過去確認ではmacOS arm64のWails起動・Go呼び出し・イベント購読とアプリビルドが通っている．このローカル計測モードを追加した後のWailsビルドとmacOS権限の実機確認は，ビルド環境で確認する．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
 
 一時的な実行ログ・実機検証結果はPRなどに記録し，本READMEには継続利用する手順を残す．
 
@@ -81,7 +87,7 @@ Wailsの採用だけで，他アプリの最前面情報・入力・アイドル
 
 GoとNode.js / npmに加えて，macOSの開発にはXcode Command Line Tools，Windowsでの動作にはWebView2 Runtimeが必要．詳細は[Wails v2のインストール手順](https://wails.io/docs/gettingstarted/installation/)を参照する．Wailsはv2系を使用し，具体的なバージョンはプロジェクト初期化時に固定する．
 
-現時点の画面は共通基盤のデモである．実API・永続化・ネイティブ計測・メニューバー常駐・iPhone連携を実装済みとは扱わない．
+macOSのローカル観測と作業状態の保存を実装している．実API，活動分類，報酬確定，メニューバー常駐，iPhone連携は未接続として扱う．
 
 ## 公式資料
 
