@@ -361,25 +361,19 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 static FocusLinkPopoverViewController *focusLinkPopoverViewController;
 
 static void FLUpdatePopoverOnMainThread(NSDictionary *state) {
-    if (focusLinkPopoverViewController == nil) return;
+    if (state == nil || focusLinkPopoverViewController == nil) return;
 
-    void (^update)(void) = ^{
-        [focusLinkPopoverViewController updateWithState:state];
-        CGFloat height = [focusLinkPopoverViewController preferredHeightForState:state];
-        if (focusLinkPopover != nil && focusLinkPopover.contentSize.height != height) {
-            focusLinkPopover.contentSize = NSMakeSize(360, height);
-        }
-    };
-    if ([NSThread isMainThread]) {
-        update();
-        return;
-    }
+    // Go の Cgo コールバック中に AppKit のビューを同期更新すると、イベント処理へ再入する。
     NSDictionary *retainedState = [state copy];
     dispatch_async(dispatch_get_main_queue(), ^{
-        [focusLinkPopoverViewController updateWithState:retainedState];
-        CGFloat height = [focusLinkPopoverViewController preferredHeightForState:retainedState];
-        if (focusLinkPopover != nil && focusLinkPopover.contentSize.height != height) {
-            focusLinkPopover.contentSize = NSMakeSize(360, height);
+        FocusLinkPopoverViewController *viewController = focusLinkPopoverViewController;
+        NSPopover *popover = focusLinkPopover;
+        if (viewController != nil) {
+            [viewController updateWithState:retainedState];
+            CGFloat height = [viewController preferredHeightForState:retainedState];
+            if (popover != nil && popover.contentSize.height != height) {
+                popover.contentSize = NSMakeSize(360, height);
+            }
         }
         [retainedState release];
     });
@@ -412,13 +406,9 @@ void FocusLinkUpdatePopover(const char *stateJSON) {
 }
 
 void FocusLinkSetPopoverBusy(int busy) {
-    if (focusLinkPopoverViewController == nil) return;
     BOOL value = busy != 0;
-    if ([NSThread isMainThread]) {
-        [focusLinkPopoverViewController setBusy:value];
-        return;
-    }
     dispatch_async(dispatch_get_main_queue(), ^{
-        [focusLinkPopoverViewController setBusy:value];
+        FocusLinkPopoverViewController *viewController = focusLinkPopoverViewController;
+        [viewController setBusy:value];
     });
 }
