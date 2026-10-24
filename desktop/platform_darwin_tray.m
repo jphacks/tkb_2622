@@ -1,11 +1,14 @@
 //go:build darwin
 
 #import <AppKit/AppKit.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "platform_darwin_tray.h"
 #include "platform_darwin_popover.h"
 
 extern void FocusLinkShowPopover(void);
+extern void FocusLinkPopoverAction(char *action, char *name);
 extern void FocusLinkOpenPage(char *page);
 extern void FocusLinkQuit(void);
 
@@ -88,7 +91,7 @@ static FocusLinkStatusController *focusLinkStatusController;
 
 - (void)showWindow:(id)sender {
     [self closePopover];
-    FocusLinkOpenPage("session");
+    FocusLinkDispatchOpenPage("session");
 }
 
 - (void)presentPopover {
@@ -107,7 +110,7 @@ static FocusLinkStatusController *focusLinkStatusController;
 }
 
 - (void)quitApplication:(id)sender {
-    FocusLinkQuit();
+    FocusLinkDispatchQuit();
 }
 
 - (void)dealloc {
@@ -137,4 +140,42 @@ void FocusLinkClosePopover(void) {
     @autoreleasepool {
         [focusLinkStatusController performSelectorOnMainThread:@selector(closePopover) withObject:nil waitUntilDone:NO];
     }
+}
+
+void FocusLinkDispatchPopoverAction(const char *action, const char *name) {
+    if (action == NULL || name == NULL) return;
+    char *actionCopy = strdup(action);
+    char *nameCopy = strdup(name);
+    if (actionCopy == NULL || nameCopy == NULL) {
+        free(actionCopy);
+        free(nameCopy);
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            FocusLinkPopoverAction(actionCopy, nameCopy);
+        }
+        free(actionCopy);
+        free(nameCopy);
+    });
+}
+
+void FocusLinkDispatchOpenPage(const char *page) {
+    if (page == NULL) return;
+    char *pageCopy = strdup(page);
+    if (pageCopy == NULL) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            FocusLinkOpenPage(pageCopy);
+        }
+        free(pageCopy);
+    });
+}
+
+void FocusLinkDispatchQuit(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            FocusLinkQuit();
+        }
+    });
 }

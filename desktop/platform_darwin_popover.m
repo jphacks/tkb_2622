@@ -2,9 +2,7 @@
 
 #import <AppKit/AppKit.h>
 #import "platform_darwin_popover.h"
-
-extern void FocusLinkPopoverAction(char *action, char *name);
-extern void FocusLinkOpenPage(char *page);
+#import "platform_darwin_tray.h"
 
 enum {
     FLPopoverActionStart = 1,
@@ -324,34 +322,34 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
             }
             return;
         case FLPopoverActionStart:
-            FocusLinkPopoverAction("start", (char *)[_nameField.stringValue UTF8String]);
+            FocusLinkDispatchPopoverAction("start", [_nameField.stringValue UTF8String]);
             return;
         case FLPopoverActionPause:
-            FocusLinkPopoverAction("pause", "");
+            FocusLinkDispatchPopoverAction("pause", "");
             return;
         case FLPopoverActionResume:
-            FocusLinkPopoverAction("resume", "");
+            FocusLinkDispatchPopoverAction("resume", "");
             return;
         case FLPopoverActionFinish:
-            FocusLinkPopoverAction("finish", "");
+            FocusLinkDispatchPopoverAction("finish", "");
             return;
         case FLPopoverActionAbort:
-            FocusLinkPopoverAction("abort", "");
+            FocusLinkDispatchPopoverAction("abort", "");
             return;
         case FLPopoverActionRetry:
-            FocusLinkPopoverAction("retry", "");
+            FocusLinkDispatchPopoverAction("retry", "");
             return;
         case FLPopoverOpenDashboard:
-            FocusLinkOpenPage("session");
+            FocusLinkDispatchOpenPage("session");
             return;
         case FLPopoverOpenHistory:
-            FocusLinkOpenPage("history");
+            FocusLinkDispatchOpenPage("history");
             return;
         case FLPopoverOpenSettings:
-            FocusLinkOpenPage("settings");
+            FocusLinkDispatchOpenPage("settings");
             return;
         case FLPopoverOpenFeedback:
-            FocusLinkOpenPage("feedback");
+            FocusLinkDispatchOpenPage("feedback");
             return;
         default:
             return;

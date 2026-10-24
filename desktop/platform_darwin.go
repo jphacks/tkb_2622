@@ -314,15 +314,16 @@ func FocusLinkOpenPage(cPage *C.char) {
 		if state.Result == nil {
 			return
 		}
+		C.FocusLinkClosePopover()
+		wailsruntime.Show(ctx)
+		wailsruntime.WindowShow(ctx)
+		wailsruntime.EventsEmit(ctx, "desktop:show-feedback", state.Result)
+		return
 	}
 	C.FocusLinkClosePopover()
 	wailsruntime.Show(ctx)
 	wailsruntime.WindowShow(ctx)
-	if page == "feedback" {
-		wailsruntime.EventsEmit(ctx, "desktop:show-feedback", host.CurrentSnapshot().Result)
-	} else {
-		wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
-	}
+	wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
 }
 
 //export FocusLinkQuit
