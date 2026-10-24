@@ -12,7 +12,7 @@
 - Mobile／DesktopともメールOTPを使い、Mobileは新規Auth user作成を許可する。OTP成功後、Mobileは`EnsureUser`と`GetMe`を呼び、Desktopも認証後に業務Userの確認を行う。同じSupabase project・backend環境・アカウントであれば同じsubjectから同じ業務Userへ対応する設計で、端末ペアリングコードはない。
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plist／Build Settingsから公開設定値を読み、利用者の手入力を要求しない構造。Desktopは起動時の`FOCUS_LINK_*`環境変数を読む。Release値の実際の配布設定・環境一致は未確認。
 - 認証と業務User同期が分離していた。起動時の`RootTabView`はSupabase sessionだけでauthenticated tabへ進めていたため、今回`EnsureUser`／`GetMe`成功を起動条件に追加した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のテストを追加し、同期失敗後の実backend復旧は今後Simulatorで確認する。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestが追加され、SimulatorでAPI通信・起動状態テスト5件が通過した。通知画面のrefreshは画面表示、APNs token受信、認証変更、foreground復帰、手動再同期から別々に開始される。重複通信が実際にAPI失敗を起こすかは未検証で、テストなしに単一flight化などの変更はしない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、SimulatorでAPI通信・起動状態・通知登録ゲートテスト7件が通過した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -29,10 +29,10 @@
 
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
-| 通知画面の再読込時などにAPI error `not_found`／`internal` | 過去のbackend logでは`RegisterNotificationEndpoint`（operation=`register`）とSQLSTATE 2201Bが記録された。現在のcheckoutではbackend logに該当行がなく、エラーを再現できていない | 発生時刻に合わせて以下のAPIログを取得し、画面／操作とConnect codeを対応づける。token・メール・URL・DB接続文字列は含めない |
+| 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、今回の読み取り確認でlocal DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない | 成功済み同一tokenの重複要求を抑止するXCTestを追加済み。`not_found`が端末未登録か別原因かは、次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
 | Group作成時の`internal` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認 | `CreateGroup`の要求受信／失敗ログとmigration状態を照合する |
 
-発生時のサーバーログは次で絞る（プロジェクトrootから実行）：
+発生時のサーバーログは次で絞る（プロジェクトrootから実行。migration状態は`make -C backend migrate-status`で読み取り確認）：
 
 ```sh
 docker compose --project-directory backend -f backend/compose.local.yaml logs --since=10m api \
@@ -69,8 +69,8 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 3. **現在報告されている通知画面の再読込エラー**
    - `.task`、scene復帰、認証変更、APNs token callbackによる重複refresh／重複登録をテストで確認する。
-   - 同じtokenの並行登録、API失敗後の再試行、未ログイン・設定不足、許可拒否時の解除を確認する。
-   - 競合や重複要求が再現した場合に限り、in-flightの集約や状態遷移を修正する。
+   - 同じtokenの並行／成功後の重複登録、明示的な再試行、未ログイン・設定不足、許可拒否時の解除を確認する。
+   - 同じtokenのin-flightと成功済み再読込はgateとSimulator testで対応。未ログイン／設定不足と許可拒否はAPI結合で引き続き確認する。
    - エラーコードは画面と診断ログで特定でき、token・access token等は表示／記録しない。
 
 4. **認証・Connect transport**
@@ -128,7 +128,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
-| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 原因を再現できるbackend logと操作を紐づける。正確な操作が未確定の分は質問・必要ログをこの文書に記録 | 再現待ち |
+| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | register重複は抑止し、旧regex障害migrationは適用済み。`not_found`の現在原因は未特定のため、再発時にbackend logと画面操作を紐づける | 一部修正、再現待ち |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
 
 ## テスト実行

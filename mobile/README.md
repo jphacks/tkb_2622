@@ -105,6 +105,15 @@ xcodebuild \
 - XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。各画面のSwiftUI Previewでも状態を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
+- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止のXCTestはiOS Simulator上で実行する。`xcrun simctl list devices available`でUDIDを選び、次を実行する。
+
+  ```sh
+  cd mobile/RewardTimeTests
+  xcodebuild -scheme ConnectJSONClient \
+    -destination 'platform=iOS Simulator,id=<Simulator UDID>' \
+    -derivedDataPath /private/tmp/tkb2622-connect-tests-derived \
+    CODE_SIGNING_ALLOWED=NO test
+  ```
 
 ## 未決事項
 

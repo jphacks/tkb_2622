@@ -1,4 +1,5 @@
 import Combine
+import CryptoKit
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -8,13 +9,14 @@ private final class NotificationSettingsViewModel: ObservableObject {
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var isRequesting = false
     @Published private(set) var apiStatusMessage = "サーバー登録を確認中です。"
+    private let registrationGate = NotificationEndpointRegistrationGate()
 
-    func refresh() async {
+    func refresh(forceRegistration: Bool = false) async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
         if isAllowed {
             if let token = UserDefaults.standard.string(forKey: "mobile.apns.token"), !token.isEmpty {
-                await register(token: token)
+                await register(token: token, force: forceRegistration)
             } else {
                 UIApplication.shared.registerForRemoteNotifications()
                 apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
@@ -22,6 +24,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
         } else if authorizationStatus == .denied {
             do {
                 try await ConfiguredNotificationEndpointRepository().delete()
+                invalidateRegistrationCache()
                 apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
             } catch {
                 apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
@@ -36,21 +39,65 @@ private final class NotificationSettingsViewModel: ObservableObject {
         isRequesting = true
         defer { isRequesting = false }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
-        await refresh()
+        await refresh(forceRegistration: true)
     }
 
-    func register(token: String) async {
+    func register(token: String, force: Bool = true) async {
         #if DEBUG
         let environment = "development"
         #else
         let environment = "production"
         #endif
+        let fingerprint = registrationFingerprint(token: token, environment: environment)
+        let decision = fingerprint.map {
+            registrationGate.beginRegistration(for: $0, force: force)
+        } ?? .start
+        switch decision {
+        case .alreadyRegistered:
+            apiStatusMessage = "通知先をサーバーに登録しました。"
+            return
+        case .inFlight:
+            return
+        case .start:
+            break
+        }
+
         do {
             try await ConfiguredNotificationEndpointRepository().register(token: token, environment: environment)
+            if let fingerprint {
+                registrationGate.finishRegistration(for: fingerprint, succeeded: true)
+            }
             apiStatusMessage = "通知先をサーバーに登録しました。"
         } catch {
+            if let fingerprint {
+                registrationGate.finishRegistration(for: fingerprint, succeeded: false)
+            }
             apiStatusMessage = "通知先の登録に失敗しました: \(error.localizedDescription)"
         }
+    }
+
+    private func registrationFingerprint(token: String, environment: String) -> String? {
+        guard let userID = MobileAppConfiguration.makeAuthService()?.authenticatedUserID else {
+            return nil
+        }
+        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
+        let input = "\(userID)|\(registrationID)|\(environment)|\(token)"
+        return SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private func invalidateRegistrationCache() {
+        #if DEBUG
+        let environment = "development"
+        #else
+        let environment = "production"
+        #endif
+        guard let token = UserDefaults.standard.string(forKey: "mobile.apns.token"),
+              let fingerprint = registrationFingerprint(token: token, environment: environment) else {
+            return
+        }
+        registrationGate.invalidateRegistration(for: fingerprint)
     }
 
     func apnsRegistrationFailed() {
@@ -134,7 +181,7 @@ struct NotificationSettingsView: View {
                     .buttonStyle(.bordered)
                 } else if model.isAllowed {
                     Button {
-                        Task { await model.refresh() }
+                        Task { await model.refresh(forceRegistration: true) }
                     } label: {
                         Label("通知先を再同期", systemImage: "arrow.clockwise")
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -147,13 +194,13 @@ struct NotificationSettingsView: View {
         .task { await model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsTokenReceived)) { notification in
             guard let token = notification.object as? String else { return }
-            Task { await model.register(token: token) }
+            Task { await model.register(token: token, force: true) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsRegistrationFailed)) { _ in
             model.apnsRegistrationFailed()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-            Task { await model.refresh() }
+            Task { await model.refresh(forceRegistration: true) }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
