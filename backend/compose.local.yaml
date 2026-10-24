@@ -32,6 +32,7 @@ services:
       SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:?Set SUPABASE_JWT_ISSUER}
       SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
       AUTH_ALLOW_LOCAL_HTTP: ${AUTH_ALLOW_LOCAL_HTTP:-false}
+      API_DOCS_ENABLED: "true"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

@@ -53,7 +53,7 @@ func run(logger *slog.Logger) error {
 	defer db.Close()
 	service := application.New(persistence.New(db))
 	srv := &http.Server{
-		Addr: net.JoinHostPort("", port), Handler: server.Handler(service, verifier),
+		Addr: net.JoinHostPort("", port), Handler: server.Handler(service, verifier, os.Getenv("API_DOCS_ENABLED") == "true"),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
 	done := make(chan error, 1)

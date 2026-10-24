@@ -33,8 +33,15 @@ HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を
 | `make -C backend build` | イメージをビルド |
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
+| `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
 
 SQLiteは名前付きボリューム`tkb-backend-local_sqlite-data`の`/data/app.db`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
+
+## APIドキュメント（Swagger UI）
+
+ローカル起動後，ブラウザで <http://localhost:8080/docs> を開くとRPCの一覧を確認・実行できます．仕様は`internal/docs/openapi.yaml`で，`make -C backend generate`がprotoから生成します．proto変更後は再生成してから`make -C backend up`で再ビルドしてください．
+
+RPCはSupabaseのアクセストークンが必要です．画面右上の「Authorize」にトークン（`Bearer`は不要）を入力してから「Try it out」で実行します．`/docs`は`API_DOCS_ENABLED=true`のときだけ公開し，`compose.local.yaml`でのみ有効にしています．
 
 ## 構成と環境変数
 
@@ -51,6 +58,7 @@ SQLiteは名前付きボリューム`tkb-backend-local_sqlite-data`の`/data/app
 | `SQLITE_PATH` | SQLiteのファイルパス．既定`app.db`，ローカルComposeでは`/data/app.db` |
 | `TURSO_DATABASE_URL` | libSQL互換Turso DBの`libsql://`または`https://` URL |
 | `TURSO_AUTH_TOKEN` | libSQL接続時に必須の認証トークン |
+| `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 
 Tursoは今回libSQL互換DBを対象とします．Tursoの別エンジンへの接続ドライバーは含みません．接続先や認証トークンをログへ出力しないよう，DBエラーは秘匿したメッセージに変換します．`.env`はコードから自動読み込みしません．必要な変数を実行環境から渡してください．

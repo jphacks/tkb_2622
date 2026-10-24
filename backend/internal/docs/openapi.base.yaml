@@ -1,0 +1,16 @@
+openapi: 3.1.0
+info:
+  title: tkb backend API
+  version: v1
+  description: Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない．
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Authのアクセストークン

@@ -1,0 +1,429 @@
+openapi: 3.1.0
+info:
+  title: tkb backend API
+  version: v1
+  description: Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない．
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Authのアクセストークン
+  schemas:
+    connect-protocol-version:
+      type: number
+      examples:
+        - 1
+      title: Connect-Protocol-Version
+      description: Define the version of the Connect protocol
+      const: 1
+    connect-timeout-header:
+      type: number
+      examples:
+        - 1000
+      title: Connect-Timeout-Ms
+      description: Define the timeout, in ms
+    connect.error:
+      type: object
+      properties:
+        code:
+          type: string
+          examples:
+            - not_found
+          enum:
+            - canceled
+            - unknown
+            - invalid_argument
+            - deadline_exceeded
+            - not_found
+            - already_exists
+            - permission_denied
+            - resource_exhausted
+            - failed_precondition
+            - aborted
+            - out_of_range
+            - unimplemented
+            - internal
+            - unavailable
+            - data_loss
+            - unauthenticated
+          description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+        message:
+          type: string
+          description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/connect.error_details.Any'
+          description: A list of messages that carry the error details. There is no limit on the number of messages.
+      title: Connect Error
+      additionalProperties: true
+      description: 'Error type returned by Connect: https://connectrpc.com/docs/go/errors/#http-representation'
+    connect.error_details.Any:
+      type: object
+      properties:
+        type:
+          type: string
+          description: 'A URL that acts as a globally unique identifier for the type of the serialized message. For example: `type.googleapis.com/google.rpc.ErrorInfo`.'
+        value:
+          type: string
+          format: byte
+          description: The Protobuf message, serialized as bytes and base64-encoded. The specific message type is identified by the `type` field.
+        debug:
+          type: object
+          title: Debug
+          additionalProperties: true
+          description: Deserialized error detail payload. The 'type' field indicates the schema. This field is for easier debugging and should not be relied upon for application logic.
+      additionalProperties: true
+      description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message, with an additional debug field for ConnectRPC error details.
+    identity.v1.Device:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        platform:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.Platform'
+          title: platform
+        name:
+          type: string
+          title: name
+        status:
+          type: string
+          title: status
+        version:
+          type: string
+          title: version
+          format: int64
+        createdAt:
+          type: string
+          title: created_at
+      title: Device
+      additionalProperties: false
+    identity.v1.EnsureUserRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+      title: EnsureUserRequest
+      additionalProperties: false
+    identity.v1.EnsureUserResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.User'
+          title: user
+      title: EnsureUserResponse
+      additionalProperties: false
+    identity.v1.GetMeRequest:
+      type: object
+      title: GetMeRequest
+      additionalProperties: false
+    identity.v1.GetMeResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.User'
+          title: user
+      title: GetMeResponse
+      additionalProperties: false
+    identity.v1.ListDevicesRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListDevicesRequest
+      additionalProperties: false
+    identity.v1.ListDevicesResponse:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/identity.v1.Device'
+          title: devices
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListDevicesResponse
+      additionalProperties: false
+    identity.v1.Platform:
+      type: string
+      title: Platform
+      enum:
+        - PLATFORM_UNSPECIFIED
+        - PLATFORM_MACOS
+        - PLATFORM_WINDOWS
+        - PLATFORM_IOS
+    identity.v1.RegisterDeviceRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        registrationId:
+          type: string
+          title: registration_id
+        platform:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.Platform'
+          title: platform
+        name:
+          type: string
+          title: name
+      title: RegisterDeviceRequest
+      additionalProperties: false
+    identity.v1.RegisterDeviceResponse:
+      type: object
+      properties:
+        device:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.Device'
+          title: device
+      title: RegisterDeviceResponse
+      additionalProperties: false
+    identity.v1.RevokeDeviceRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        deviceId:
+          type: string
+          title: device_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+      title: RevokeDeviceRequest
+      additionalProperties: false
+    identity.v1.RevokeDeviceResponse:
+      type: object
+      properties:
+        device:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.Device'
+          title: device
+      title: RevokeDeviceResponse
+      additionalProperties: false
+    identity.v1.User:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        status:
+          type: string
+          title: status
+        createdAt:
+          type: string
+          title: created_at
+      title: User
+      additionalProperties: false
+paths:
+  /identity.v1.IdentityService/EnsureUser:
+    post:
+      tags:
+        - IdentityService
+      summary: EnsureUser
+      operationId: identity.v1.IdentityService.EnsureUser
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.EnsureUserRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.EnsureUserResponse'
+  /identity.v1.IdentityService/GetMe:
+    post:
+      tags:
+        - IdentityService
+      summary: GetMe
+      operationId: identity.v1.IdentityService.GetMe
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.GetMeRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.GetMeResponse'
+  /identity.v1.IdentityService/ListDevices:
+    post:
+      tags:
+        - IdentityService
+      summary: ListDevices
+      operationId: identity.v1.IdentityService.ListDevices
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.ListDevicesRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.ListDevicesResponse'
+  /identity.v1.IdentityService/RegisterDevice:
+    post:
+      tags:
+        - IdentityService
+      summary: RegisterDevice
+      operationId: identity.v1.IdentityService.RegisterDevice
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.RegisterDeviceRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.RegisterDeviceResponse'
+  /identity.v1.IdentityService/RevokeDevice:
+    post:
+      tags:
+        - IdentityService
+      summary: RevokeDevice
+      operationId: identity.v1.IdentityService.RevokeDevice
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.RevokeDeviceRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+tags:
+  - name: IdentityService
