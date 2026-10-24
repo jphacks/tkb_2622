@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
 	"github.com/jphacks/tkb_2622/backend/gen/focus/v1/focusv1connect"
+	"github.com/jphacks/tkb_2622/backend/gen/group/v1/groupv1connect"
 	"github.com/jphacks/tkb_2622/backend/gen/identity/v1/identityv1connect"
 	"github.com/jphacks/tkb_2622/backend/gen/restriction/v1/restrictionv1connect"
 	"github.com/jphacks/tkb_2622/backend/gen/reward/v1/rewardv1connect"
@@ -15,6 +16,8 @@ import (
 	"github.com/jphacks/tkb_2622/backend/internal/docs"
 	focusconnect "github.com/jphacks/tkb_2622/backend/internal/focus/adapter/connect"
 	focus "github.com/jphacks/tkb_2622/backend/internal/focus/application"
+	groupconnect "github.com/jphacks/tkb_2622/backend/internal/group/adapter/connect"
+	group "github.com/jphacks/tkb_2622/backend/internal/group/application"
 	identityconnect "github.com/jphacks/tkb_2622/backend/internal/identity/adapter/connect"
 	identity "github.com/jphacks/tkb_2622/backend/internal/identity/application"
 	restrictionconnect "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/connect"
@@ -28,6 +31,7 @@ type Deps struct {
 	Identity    *identity.Service
 	Verifier    identityconnect.Verifier
 	Focus       *focus.Service
+	Groups      *group.Service
 	Sessions    *workflow.Sessions
 	Wallets     *reward.Wallets
 	Restriction *restriction.Service
@@ -76,6 +80,22 @@ func Handler(d Deps) http.Handler {
 	mux.Handle(identityv1connect.NewIdentityServiceHandler(identityconnect.New(d.Identity), auth, connect.WithReadMaxBytes(64*1024)))
 	resolve := actor(d.Identity)
 	mux.Handle(focusv1connect.NewFocusServiceHandler(focusconnect.New(resolve, d.Focus, d.Sessions), auth, connect.WithReadMaxBytes(1024*1024)))
+	resolveGroupUser := func(ctx context.Context) (string, error) {
+		a, err := d.Identity.ResolveActor(ctx, identityconnect.PrincipalFromContext(ctx))
+		switch {
+		case errors.Is(err, identity.ErrUnauthenticated):
+			return "", apperr.ErrUnauthenticated
+		case errors.Is(err, identity.ErrForbidden):
+			return "", apperr.ErrForbidden
+		case errors.Is(err, identity.ErrNotFound):
+			return "", errors.Join(apperr.ErrPrecondition, errors.New("call EnsureUser first"))
+		case err != nil:
+			return "", err
+		default:
+			return a.UserID, nil
+		}
+	}
+	mux.Handle(groupv1connect.NewGroupServiceHandler(groupconnect.New(resolveGroupUser, d.Groups), auth, connect.WithReadMaxBytes(64*1024)))
 	mux.Handle(rewardv1connect.NewRewardServiceHandler(rewardconnect.New(func(ctx context.Context) (string, error) {
 		a, err := resolve(ctx)
 		if err != nil {

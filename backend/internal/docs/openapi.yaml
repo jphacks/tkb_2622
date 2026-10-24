@@ -761,6 +761,52 @@ components:
         - "2024-12-25T12:00:00Z"
       format: date-time
       description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
+    group.v1.Group:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        name:
+          type: string
+          title: name
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: created_at
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/group.v1.GroupMember'
+          title: members
+      title: Group
+      additionalProperties: false
+    group.v1.GroupMember:
+      type: object
+      properties:
+        isCurrentUser:
+          type: boolean
+          title: is_current_user
+        joinedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: joined_at
+      title: GroupMember
+      additionalProperties: false
+    group.v1.ListGroupsRequest:
+      type: object
+      title: ListGroupsRequest
+      additionalProperties: false
+    group.v1.ListGroupsResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/group.v1.Group'
+          title: groups
+      title: ListGroupsResponse
+      additionalProperties: false
     identity.v1.Device:
       type: object
       properties:
@@ -1940,6 +1986,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.UploadActivityBatchResponse'
+  /group.v1.GroupService/ListGroups:
+    post:
+      tags:
+        - GroupService
+      summary: ListGroups
+      operationId: group.v1.GroupService.ListGroups
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.ListGroupsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.ListGroupsResponse'
   /identity.v1.IdentityService/EnsureUser:
     post:
       tags:
@@ -2479,4 +2563,5 @@ tags:
   - name: RestrictionService
     description: Apple selection tokens stay on the iPhone; this API only handles metadata, grants and reports.
   - name: FocusService
+  - name: GroupService
   - name: IdentityService

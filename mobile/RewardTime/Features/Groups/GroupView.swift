@@ -1,106 +1,91 @@
 import SwiftUI
 
-private struct SampleGroupPerson: Identifiable {
-    let id: String
-    let name: String
-    let initial: String
-    let color: Color
-}
-
 struct GroupView: View {
-    private let people = [
-        SampleGroupPerson(id: "self", name: "あなた", initial: "あ", color: AppTheme.primary),
-        SampleGroupPerson(id: "member-1", name: "はると", initial: "は", color: AppTheme.lavender),
-        SampleGroupPerson(id: "member-2", name: "みお", initial: "み", color: AppTheme.mint),
-        SampleGroupPerson(id: "member-3", name: "そうた", initial: "そ", color: AppTheme.yellow)
-    ]
+    @StateObject private var model = GroupViewModel(repository: ConfiguredGroupRepository())
 
     var body: some View {
         ScreenContainer {
-            SampleNotice(title: "グループ画面案・API未接続")
-
-            SurfaceCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("研究室")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AppTheme.secondaryInk)
-                        Text("JPHACKS チーム")
-                            .font(.title3.weight(.bold))
-                    }
-                    Spacer()
-                    Button { } label: {
-                        Label("招待", systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(true)
+            switch model.state {
+            case .loading:
+                SurfaceCard {
+                    ProgressView("グループを読み込み中…")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
-
-            SurfaceCard {
-                sectionTitle("最近の作業開始", icon: "bolt.fill")
-                activityRow(initial: "は", name: "はると", time: "今日 8:50", color: AppTheme.lavender)
-                Divider()
-                activityRow(initial: "み", name: "みお", time: "今日 8:32", color: AppTheme.mint)
-                Divider()
-                activityRow(initial: "そ", name: "そうた", time: "昨日 21:05", color: AppTheme.yellow)
-                Text("共有されるのは「作業を始めた」ことだけです。作業記録や残高は共有されません。")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
-            }
-
-            SurfaceCard {
-                sectionTitle("メンバー（\(people.count)人）", icon: "person.2")
-                ForEach(people) { person in
-                    HStack(spacing: 12) {
-                        Text(person.initial)
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(person.id == "self" ? .white : AppTheme.ink)
-                            .frame(width: 38, height: 38)
-                            .background(person.color, in: Circle())
-                        Text(person.name)
-                            .font(.subheadline.weight(.medium))
-                        if person.id == "self" {
-                            Text("本人")
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.secondaryInk)
-                        }
+            case .failed:
+                SurfaceCard {
+                    Label("グループを読み込めませんでした", systemImage: "wifi.exclamationmark")
+                        .font(.headline)
+                    Text("ログイン状態とAPI設定を確認して、もう一度お試しください。")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                    Button("再読み込み") {
+                        Task { await model.load() }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.primary)
                 }
-                Divider()
-                Button("このグループから退出") { }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.red)
-                    .disabled(true)
+            case .loaded(let groups) where groups.isEmpty:
+                SurfaceCard {
+                    Label("所属グループはありません", systemImage: "person.2")
+                        .font(.headline)
+                    Text("グループへの参加後、ここに一覧が表示されます。")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+            case .loaded(let groups):
+                ForEach(groups) { group in
+                    groupCard(group)
+                }
+
+                SurfaceCard {
+                    Label("表示できる情報", systemImage: "info.circle")
+                        .font(.subheadline.weight(.bold))
+                    Text("グループ名と参加メンバーをサーバーから取得しています。メンバー名と作業開始履歴は、対応するAPIがまだないため表示していません。")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+        .refreshable { await model.load() }
+        .task { await model.load() }
         .navigationTitle("グループ")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func sectionTitle(_ title: String, icon: String) -> some View {
-        Label(title, systemImage: icon)
-            .font(.subheadline.weight(.bold))
-    }
-
-    private func activityRow(initial: String, name: String, time: String, color: Color) -> some View {
-        HStack(spacing: 11) {
-            Text(initial)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(AppTheme.ink)
-                .frame(width: 36, height: 36)
-                .background(color, in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(name)さんが作業を始めました")
-                    .font(.subheadline.weight(.medium))
-                Text(time)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryInk)
+    private func groupCard(_ group: MobileGroup) -> some View {
+        SurfaceCard {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(group.name)
+                        .font(.title3.weight(.bold))
+                    Text("メンバー \(group.members.count)人")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: "person.2.fill")
+                    .foregroundStyle(AppTheme.primary)
+                    .padding(10)
+                    .background(AppTheme.lavender, in: Circle())
             }
-            Spacer(minLength: 0)
+
+            Divider()
+
+            ForEach(Array(group.members.enumerated()), id: \.offset) { _, member in
+                HStack(spacing: 11) {
+                    Image(systemName: member.isCurrentUser ? "person.crop.circle.fill" : "person.crop.circle")
+                        .font(.title2)
+                        .foregroundStyle(member.isCurrentUser ? AppTheme.primary : AppTheme.secondaryInk)
+                    Text(member.isCurrentUser ? "あなた" : "メンバー")
+                        .font(.subheadline.weight(.medium))
+                    if member.isCurrentUser {
+                        Text("本人")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
+                }
+            }
         }
     }
 }

@@ -1,0 +1,24 @@
+syntax = "proto3";
+package group.v1;
+option go_package = "github.com/jphacks/tkb_2622/backend/gen/group/v1;groupv1";
+
+import "google/protobuf/timestamp.proto";
+
+service GroupService {
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+}
+
+message GroupMember {
+  bool is_current_user = 1;
+  google.protobuf.Timestamp joined_at = 2;
+}
+
+message Group {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  repeated GroupMember members = 4;
+}
+
+message ListGroupsRequest {}
+message ListGroupsResponse { repeated Group groups = 1; }
