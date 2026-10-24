@@ -8,6 +8,9 @@ services:
       POSTGRES_DB: tkb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: local-migration-only
+    # DBクライアントから確認するため，ホストのループバックにだけ公開する
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./dev/postgres/001_roles.sql:/docker-entrypoint-initdb.d/001_roles.sql:ro
