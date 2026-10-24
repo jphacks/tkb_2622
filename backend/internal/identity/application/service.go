@@ -39,6 +39,7 @@ type Repository interface {
 	EnsureUser(context.Context, Principal, string) (domain.User, error)
 	GetMe(context.Context, Principal) (domain.User, error)
 	UpdateDisplayName(context.Context, Principal, string) (domain.User, error)
+	UpdateAvatar(context.Context, Principal, string) (domain.User, error)
 	RegisterDevice(context.Context, Principal, RegisterInput) (domain.Device, error)
 	ListDevices(context.Context, Principal, string, int) (DevicePage, error)
 	RevokeDevice(context.Context, Principal, RevokeInput) (domain.Device, error)
@@ -78,6 +79,15 @@ func (s *Service) UpdateDisplayName(ctx context.Context, p Principal, displayNam
 		return domain.User{}, ErrInvalid
 	}
 	return s.repo.UpdateDisplayName(ctx, p, displayName)
+}
+func (s *Service) UpdateAvatar(ctx context.Context, p Principal, avatarID string) (domain.User, error) {
+	if !validPrincipal(p) {
+		return domain.User{}, ErrUnauthenticated
+	}
+	if !domain.ValidAvatarID(avatarID) {
+		return domain.User{}, ErrInvalid
+	}
+	return s.repo.UpdateAvatar(ctx, p, avatarID)
 }
 func (s *Service) RegisterDevice(ctx context.Context, p Principal, in RegisterInput) (domain.Device, error) {
 	if !validPrincipal(p) {

@@ -902,6 +902,9 @@ components:
         displayName:
           type: string
           title: display_name
+        avatarId:
+          type: string
+          title: avatar_id
       title: GroupMember
       additionalProperties: false
     group.v1.LeaveGroupRequest:
@@ -1076,6 +1079,23 @@ components:
           title: device
       title: RevokeDeviceResponse
       additionalProperties: false
+    identity.v1.UpdateAvatarRequest:
+      type: object
+      properties:
+        avatarId:
+          type: string
+          title: avatar_id
+      title: UpdateAvatarRequest
+      additionalProperties: false
+    identity.v1.UpdateAvatarResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.User'
+          title: user
+      title: UpdateAvatarResponse
+      additionalProperties: false
     identity.v1.UpdateDisplayNameRequest:
       type: object
       properties:
@@ -1108,6 +1128,9 @@ components:
         displayName:
           type: string
           title: display_name
+        avatarId:
+          type: string
+          title: avatar_id
       title: User
       additionalProperties: false
     restriction.v1.DesiredMode:
@@ -2606,6 +2629,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+  /identity.v1.IdentityService/UpdateAvatar:
+    post:
+      tags:
+        - IdentityService
+      summary: UpdateAvatar
+      operationId: identity.v1.IdentityService.UpdateAvatar
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.UpdateAvatarRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.UpdateAvatarResponse'
   /identity.v1.IdentityService/UpdateDisplayName:
     post:
       tags:

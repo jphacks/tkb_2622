@@ -40,6 +40,7 @@ API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
 | `SEED_AUTH_SUBJECT=<UUID> make -C backend seed` | 登録済みiOS開発ユーザー用のモックデータをローカルDBへ投入 |
+| `SEED_AUTH_SUBJECT=<UUID> make -C backend seed-group-profile` | アカウント設定を変えず，2人のプロフィールとグループだけを投入 |
 | `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
 
 ### 開発用モックデータ
@@ -50,7 +51,13 @@ API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
 SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed
 ```
 
-作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，グループを投入します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
+作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，2人分のグループを投入します。グループ用のfixtureメンバーには表示名「こむぎ」とアイコン`puppy`を設定し，ログイン中の利用者は自分のプロフィールアイコンで表示します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
+
+すでに利用中の開発アカウントでプロフィールとグループだけを確認する場合は，次のコマンドを使います。このfixtureはローカルCompose DB専用で，フォーカス・報酬・制限データを書き換えません。
+
+```sh
+SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed-group-profile
+```
 
 ローカルのPostgreSQL（`postgres:17.7-bookworm`）は名前付きボリューム`tkb-backend-local_postgres-data`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
 
@@ -95,7 +102,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 
 | テーブル | 内容 |
 | --- | --- |
-| `app.users` | 業務User．`id`（UUID），`auth_provider`（`supabase`のみ），`auth_subject`（Supabase AuthのユーザーID）．プロバイダーとsubjectの組み合わせは一意．状態は`ACTIVE`／`DISABLED` |
+| `app.users` | 業務User．`id`（UUID），`auth_provider`（`supabase`のみ），`auth_subject`（Supabase AuthのユーザーID），公開表示名，プロフィール画像カタログID．プロバイダーとsubjectの組み合わせは一意．状態は`ACTIVE`／`DISABLED` |
 | `app.devices` | 登録端末．プラットフォームは`MACOS`／`WINDOWS`／`IOS`．有効なiPhoneはUserごとに1台 |
 | `app.identity_operations` | 再送を同じ結果で返すための操作記録 |
 

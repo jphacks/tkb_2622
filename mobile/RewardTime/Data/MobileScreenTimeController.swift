@@ -135,7 +135,7 @@ final class MobileScreenTimeController: ObservableObject {
 
     var appliedRestrictionLabel: String {
         switch appliedRestrictionMode {
-        case .selectedApplications: "選んだアプリを適用中"
+        case .selectedApplications: "指定したアプリを制限中"
         case .entireDevice: "標準以外を制限中"
         case nil: "制限は適用されていません"
         }
@@ -375,22 +375,15 @@ enum LocalRestrictionMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .selectedApplications: "選んだアプリを制限"
-        case .entireDevice: "標準以外を制限"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .selectedApplications: "下で選んだアプリにShieldを設定します。"
-        case .entireDevice: "常時許可する標準アプリを選び、その他を制限します。iPhone自体をロックする機能ではありません。"
+        case .selectedApplications: "指定したアプリのみ制限"
+        case .entireDevice: "標準アプリ以外を制限"
         }
     }
 
     var appliedDescription: String {
         switch self {
-        case .selectedApplications: "選択したアプリの制限"
-        case .entireDevice: "標準以外のアプリ制限"
+        case .selectedApplications: "指定アプリのみ制限"
+        case .entireDevice: "標準アプリ以外を制限"
         }
     }
 }
