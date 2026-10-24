@@ -72,7 +72,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、利用枠の確定拒否／結果不明時のoperation ID保持・破棄、サーバーで残高が減った後も保留予約を再試行できる条件を検証する。認証状態テストはresolverの分岐であり、SwiftUIログイン画面の表示確認や実Supabase OTP試験ではない。
+Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、利用枠の確定拒否／結果不明時のoperation ID保持・破棄、サーバーで残高が減った後も保留予約を再試行できる条件を検証する。新規Simulatorで初回歓迎画面を目視したが、画面状態をassertするUI testと実Supabase OTP試験はない。
 
 ## ソース構成
 

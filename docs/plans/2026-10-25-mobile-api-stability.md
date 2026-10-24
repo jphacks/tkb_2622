@@ -57,7 +57,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
    | シナリオ | 期待結果 | 現在の確認状況 |
    | --- | --- | --- |
-   | 初回起動・未ログイン | 歓迎／ログイン画面を表示。OTP送信前に公開名・アイコンを選択できる | `AuthenticationEntryState` resolver testのみ。SwiftUI画面は未確認 |
+   | 初回起動・未ログイン | 歓迎／ログイン画面を表示。OTP送信前に公開名・アイコンを選択できる | iPhone 18 Pro / iOS 27.0の新規Simulatorで歓迎画面・アイコン一覧・メール欄・コード送信ボタンを目視。接続値なしのため送信ボタンは無効。画面をassertするUI testとOTP送信は未確認 |
    | 新規利用者 | OTP成功後にAuth userを作成し、`EnsureUser`／`GetMe`完了後にアプリ機能へ入る | コード上の新規許可と状態resolverを確認。実Supabase／API E2E未確認 |
    | 既存利用者 | OTPで既存Auth userに入り、保存sessionを次回起動で復元 | コード経路を確認。実メールOTP・session refresh E2E未確認 |
    | Desktop + Mobile | 同じSupabase project・backend・アカウントなら同じ業務User。ペアリング操作なし | コード／契約を確認。両アプリ同時の実接続未確認 |
@@ -138,7 +138,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、予約エラー分類・残高減少後の再試行可否をテストするSwift Package、およびiOS SimulatorでDevice失効Repository・Group API error／作業フィード・AuthenticationEntryState・予約再試行方針を実行するtargetを追加 | host 27件・Simulator 9件通過。画面全体・認証付き実backend連携は未検証 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、予約エラー分類・残高減少後の再試行可否をテストするSwift Package、およびiOS SimulatorでDevice失効Repository・Group API error／作業フィード・AuthenticationEntryState・予約再試行方針を実行するtargetを追加 | host 27件・Simulator 9件通過。初回歓迎画面は新規Simulatorで目視。画面全体・認証付き実backend連携は未検証 |
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
