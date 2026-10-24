@@ -7,15 +7,27 @@ TF = terraform -chdir="$(INFRA_DIR)$(STACK)"
 # bootstrap はローカル state，それ以外は envs/backend.hcl の GCS バケットを使う
 BACKEND_ARGS = $(if $(filter bootstrap,$(STACK)),,-backend-config="$(INFRA_DIR)envs/backend.hcl")
 
-.PHONY: init plan apply output fmt validate lock check-stack
+.PHONY: setup init plan apply output fmt validate lock check-stack check-vars
+
+# terraform.tfvars・backend.hcl は .gitignore 済み．*.example から作成し，既存のファイルは上書きしない
+setup:
+	@for f in $$(find "$(INFRA_DIR)" -name '*.example' -not -path '*/.terraform/*'); do \
+		dest=$${f%.example}; \
+		if [ -e "$$dest" ]; then echo "skip   $${dest#$(INFRA_DIR)}"; \
+		else cp "$$f" "$$dest" && echo "create $${dest#$(INFRA_DIR)}"; fi; \
+	done
 
 check-stack:
 	@test -n "$(filter $(STACK),$(STACKS))" || { echo "STACK を指定してください: $(STACKS)"; exit 1; }
 
-init: check-stack
+check-vars: check-stack
+	@test -f "$(INFRA_DIR)$(STACK)/terraform.tfvars" || { echo "$(STACK)/terraform.tfvars がありません．make -C infra setup で作成し，値を設定してください"; exit 1; }
+	@test -n "$(filter bootstrap,$(STACK))" || test -f "$(INFRA_DIR)envs/backend.hcl" || { echo "envs/backend.hcl がありません．make -C infra setup で作成し，bucket を設定してください"; exit 1; }
+
+init: check-vars
 	$(TF) init $(BACKEND_ARGS)
 
-plan: check-stack
+plan: check-vars
 	$(TF) plan -out=tfplan
 
 apply: check-stack

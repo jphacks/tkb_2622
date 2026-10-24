@@ -21,4 +21,8 @@ infra/**/*.tfstate
 infra/**/*.tfstate.*
 infra/**/tfplan
 infra/**/*.secret.tfvars
+# 環境ごとの値（プロジェクト ID・ゾーン ID 等）．雛形は *.example をコミットする
+infra/**/terraform.tfvars
+infra/**/*.auto.tfvars
+infra/envs/backend.hcl
 infra/**/crash.log
