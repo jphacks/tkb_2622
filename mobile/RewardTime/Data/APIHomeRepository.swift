@@ -120,6 +120,19 @@ struct APIHomeRepository: HomeRepository {
     }
 
     func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
+        for attempt in 0..<2 {
+            do {
+                return try await fetchConsistentSnapshot()
+            } catch APIHomeRepositoryError.inconsistentSessionIDs {
+                guard attempt == 0 else {
+                    throw APIHomeRepositoryError.inconsistentSessionIDs
+                }
+            }
+        }
+        throw APIHomeRepositoryError.inconsistentSessionIDs
+    }
+
+    private func fetchConsistentSnapshot() async throws -> MobileHomeSnapshot {
         async let sessionResponse: CurrentSessionResponse = call(
             service: "focus.v1.FocusService",
             method: "GetCurrentSession",

@@ -39,6 +39,34 @@ final class APIHomeRepositorySimulatorTests: XCTestCase {
         XCTAssertFalse(snapshot.isSampleData)
     }
 
+    func testRetriesOnceWhenSessionChangesBetweenParallelHomeReads() async throws {
+        let attempts = LockedRequestCounts()
+        APIHomeURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            let attempt = attempts.increment(method)
+            switch method {
+            case "GetCurrentSession":
+                let id = attempt == 1 ? "session-old" : "session-new"
+                return (200, #"{"session":{"id":"\#(id)","status":"SESSION_STATUS_RUNNING","version":"2","durations":{"activeMillis":"60000"}}}"#)
+            case "GetBalance":
+                let id = attempt == 1 ? "session-new" : "session-new"
+                return (200, #"{"balance":{"sessionId":"\#(id)","balanceSeconds":"300"}}"#)
+            case "GetRestrictionState":
+                let id = attempt == 1 ? "session-old" : "session-new"
+                return (200, #"{"state":{"sessionId":"\#(id)","deviceId":"device-1","controlRevision":"1","desiredMode":"DESIRED_MODE_UNRESTRICTED","appliedRevision":"1","shieldStatus":"SHIELD_STATUS_UNSHIELDED","permissionStatus":"PERMISSION_STATUS_GRANTED"}}"#)
+            default:
+                return (404, #"{"code":"not_found","message":"unknown route"}"#)
+            }
+        }
+
+        let snapshot = try await repository().fetchCurrentSnapshot()
+
+        XCTAssertEqual(snapshot.sessionID, "session-new")
+        XCTAssertEqual(attempts.value(for: "GetCurrentSession"), 2)
+        XCTAssertEqual(attempts.value(for: "GetBalance"), 2)
+        XCTAssertEqual(attempts.value(for: "GetRestrictionState"), 2)
+    }
+
     func testEachFailedHomeAPIIncludesItsOperationAndNeverReturnsPartialSnapshot() async {
         let operations = [
             (method: "GetCurrentSession", path: "focus.v1.FocusService/GetCurrentSession"),
@@ -102,6 +130,24 @@ private final class LockedMethods {
         lock.lock()
         defer { lock.unlock() }
         return storage
+    }
+}
+
+private final class LockedRequestCounts {
+    private let lock = NSLock()
+    private var counts: [String: Int] = [:]
+
+    func increment(_ method: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        counts[method, default: 0] += 1
+        return counts[method, default: 0]
+    }
+
+    func value(for method: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return counts[method, default: 0]
     }
 }
 

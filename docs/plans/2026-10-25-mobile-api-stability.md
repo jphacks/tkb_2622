@@ -5,6 +5,7 @@
 - P0: DesktopとiPhoneが同じSupabase project・Connect API環境・メールアカウントでログインし、Desktopの作業状態がiPhone Homeへ反映される実機E2Eを行う。Desktopから開始／一時停止／再開／終了し、通信断からの復帰も確認する。詳細な判定順は[Desktop・iPhone連携仕様](../spec/8.desktop-mobile連携の現状と課題.md#11-デモで最優先に成立させること)を参照。
 - コード調査では両端末のbackend経由の読書きと30秒ポーリングを確認したが、実機E2Eは未実施。同期できない場合はAuth session、`EnsureUser`／`GetMe`、接続環境、RPC応答、画面反映の境界を特定して修正する。
 - Desktop設定画面がiPhone連携を固定で「未接続」と表示する誤表示を、API認証状態とiPhone状態報告の表示へ分離した。Push通知とiOS制限適用は別の未受入機能として表示する。
+- HomeではDesktopのsession開始・終了と3本の並行読取が重なった際に、一時的なsession ID不一致を検出すると3 APIを1回だけ再取得する。修正前red／修正後greenのSimulatorテストで、2回目の整合取得と各APIの再要求を確認した。再取得後も不一致なら従来どおりエラーを返す。iPhone 17 Simulator全56件と初回ログインUI test 1件が通過。
 
 ## 目的
 
@@ -192,7 +193,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、認証済みAPI gate、通知未ログイン判定、予約エラー分類・残高減少後の再試行可否、HTTP／Connect／network／decode transport errorをテストするSwift Package、およびiOS SimulatorでIdentity `EnsureUser`／`GetMe`／`UpdateDisplayName`／`UpdateAvatar`のRPC別success/failure、Device登録・通知先Repository（登録／解除）・失効Repository（operation別error／retry）・制限ポリシー新規作成／各RPC失敗名／revision競合後の再取得・Group Repositoryの5 RPC／work-start cursor契約・error保持・Group ViewModel／一覧refresh失敗保持・History API RPC名／エラー保持・一覧／page失敗保持・AuthenticationEntryState・local-only時の端末API抑止・端末設定エラー表示・利用枠4 Repository method契約／operation状態解釈・予約再試行方針・Homeの3 API整合／部分失敗、OTP send／verify、期限切れsession refresh、refresh通信断後のsession保持、Root Home refresh重複抑止を実行するtargetを追加 | host 45件・Simulator 55件と初回ログインUI test Debug 1件が通過。実Supabase／Desktop同一アカウント接続は未検証 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、認証済みAPI gate、通知未ログイン判定、予約エラー分類・残高減少後の再試行可否、HTTP／Connect／network／decode transport errorをテストするSwift Package、およびiOS SimulatorでIdentity `EnsureUser`／`GetMe`／`UpdateDisplayName`／`UpdateAvatar`のRPC別success/failure、Device登録・通知先Repository（登録／解除）・失効Repository（operation別error／retry）・制限ポリシー新規作成／各RPC失敗名／revision競合後の再取得・Group Repositoryの5 RPC／work-start cursor契約・error保持・Group ViewModel／一覧refresh失敗保持・History API RPC名／エラー保持・一覧／page失敗保持・AuthenticationEntryState・local-only時の端末API抑止・端末設定エラー表示・利用枠4 Repository method契約／operation状態解釈・予約再試行方針・Homeの3 API整合／部分失敗／session IDずれ再取得、OTP send／verify、期限切れsession refresh、refresh通信断後のsession保持、Root Home refresh重複抑止を実行するtargetを追加 | host 45件・Simulator 56件と初回ログインUI test Debug 1件が通過。実Supabase／Desktop同一アカウント接続は未検証 |
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |

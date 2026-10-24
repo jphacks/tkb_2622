@@ -15,7 +15,7 @@
 1. **モック・仕様の対応を確認する**：対象画面、対応要件、状態ごとの表示、未決事項を [`docs/UI/README.md`](../docs/UI/README.md) で確認する。
 2. **アプリの土台を作る**：SwiftUIの起動・画面遷移と、画面が依存する状態・データの境界を用意する。
 3. **ホーム画面を仮データで表示する**：セッション状態、残高、制限状態を読み取り専用で表示する。仮データはリポジトリ経由で渡し、後から通信実装に置き換えられるようにする。
-4. **API契約が確定した範囲を接続する**：`APIHomeRepository` は現行proto案の読み取りAPIを呼び、session IDの食い違いを検出する。Connect DTOとstagingの実データ確認、版の整合規則は引き続き確認する。
+4. **API契約が確定した範囲を接続する**：`APIHomeRepository` は現行proto案の読み取りAPIを呼び、並行取得中にsession IDの食い違いを検出した場合は3 APIを1回だけ再取得する。再取得後も不一致ならエラーとして表示する。Connect DTOとstagingの実データ確認、版の整合規則は引き続き確認する。
 5. **小休憩の利用フローを接続する**：PAUSED中の利用枠確保、利用状態表示、実利用の報告をAPI契約に沿って扱う。終了・中止時は未使用残高を破棄する。
 6. **制限機能を独立して検証・接続する**：制限の要求状態とiPhoneでの適用確認を区別する。設定画面で本人認可・対象アプリ選択を行い、制限ポリシーをbackendと同期する。利用枠APIとDeviceActivity monitor extensionも接続済みだが、Screen Timeの許可、App Groupsの署名設定、実機での監視・期限動作は別途確認する。
 
@@ -89,7 +89,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で55件が通過し、Identity `EnsureUser`／`GetMe`／`UpdateAvatar`／`UpdateDisplayName`失敗時のRPC名とConnect code、Device登録・ポリシー読込／更新失敗時のRPC名表示とrevision競合再取得、サインアウト時の`ListDevices`／`RevokeDevice`／`DeleteNotificationEndpoint`失敗RPC名と同一operation再試行、端末失効、通知先登録／削除のAPI操作とエラー内のRPC名、operation IDを保持した応答喪失後の再試行、Homeの3 APIエラー時のRPC名表示とpartial snapshot抑止、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、HistoryのRPC名付きエラー・一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API全5 RPCの失敗時RPC名表示と、予約結果不明時に同じoperation IDを保つ再試行、保存済みgrant同期またはbackground Home状態取得の失敗RPCをホームに表示し、再試行できること、Home表示中のRootTab重複API取得を抑止すること、端末一覧に保存済みdevice IDが見つからない場合も通知先解除を行い、失敗時にログアウトとID消去を止めること、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 55件、ログイン画面UI testをDebugで1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
+Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で56件が通過し、Identity `EnsureUser`／`GetMe`／`UpdateAvatar`／`UpdateDisplayName`失敗時のRPC名とConnect code、Device登録・ポリシー読込／更新失敗時のRPC名表示とrevision競合再取得、サインアウト時の`ListDevices`／`RevokeDevice`／`DeleteNotificationEndpoint`失敗RPC名と同一operation再試行、端末失効、通知先登録／削除のAPI操作とエラー内のRPC名、operation IDを保持した応答喪失後の再試行、Homeの3 APIエラー時のRPC名表示とpartial snapshot抑止およびsession ID不一致時の一度だけ再取得、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、HistoryのRPC名付きエラー・一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API全5 RPCの失敗時RPC名表示と、予約結果不明時に同じoperation IDを保つ再試行、保存済みgrant同期またはbackground Home状態取得の失敗RPCをホームに表示し、再試行できること、Home表示中のRootTab重複API取得を抑止すること、端末一覧に保存済みdevice IDが見つからない場合も通知先解除を行い、失敗時にログアウトとID消去を止めること、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 56件、ログイン画面UI testをDebugで1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
 
 ## ソース構成
 
