@@ -258,10 +258,13 @@ struct SettingsView: View {
 
     @MainActor
     private func performDeviceSettingsSync() async {
+        let isAuthenticated = MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil
         do {
-            _ = try await ConfiguredDeviceSettingsRepository().sync(
-                settings: screenTime.backendRestrictionSettings
-            )
+            try await AuthenticatedAPISyncFlow.run(isAuthenticated: isAuthenticated) {
+                _ = try await ConfiguredDeviceSettingsRepository().sync(
+                    settings: screenTime.backendRestrictionSettings
+                )
+            }
             deviceSyncError = nil
         } catch DeviceSettingsRepositoryError.missingConfiguration {
             deviceSyncError = nil
