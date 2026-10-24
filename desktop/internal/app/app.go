@@ -652,6 +652,10 @@ func (a *App) finishMonitoring(outcome string, now time.Time) {
 }
 
 func (a *App) persistLocked(now time.Time) {
+	// デモモード（ローカル計測のないWindows等）は作業状態を保存しない．
+	if a.engine.Snapshot().Mode != "local-monitor" {
+		return
+	}
 	if a.store == nil || !a.stateLoaded {
 		a.engine.SetLocalStorageReady(false, now)
 		a.engine.SetFailure("local_storage_unavailable", "作業状態を読み込み・保存できません。保存先の権限と状態ファイルを確認してください。", false, now)
