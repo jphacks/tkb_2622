@@ -23,4 +23,27 @@ final class AuthenticationEntryStateTests: XCTestCase {
             .localOnly
         )
     }
+
+    func testDeferredLocalOnlySurvivesSavedAuthSessionWithoutCallingBusinessSync() {
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: true,
+                businessUserReady: false,
+                loginDeferred: true
+            ),
+            .localOnly
+        )
+        XCTAssertFalse(
+            AuthenticationEntryState.needsBusinessIdentitySync(
+                currentState: .localOnly,
+                loginDeferred: true
+            )
+        )
+        XCTAssertTrue(
+            AuthenticationEntryState.needsBusinessIdentitySync(
+                currentState: .identitySyncRequired,
+                loginDeferred: false
+            )
+        )
+    }
 }

@@ -132,7 +132,10 @@ struct RootTabView: View {
     defer { isRestoringAuthentication = false }
 
     let hasSession = await hasAuthenticatedSession()
-    let needsIdentitySync = entryState == .checking || entryState == .identitySyncRequired
+    let needsIdentitySync = AuthenticationEntryState.needsBusinessIdentitySync(
+      currentState: entryState,
+      loginDeferred: loginDeferred
+    )
     var identityReady = !needsIdentitySync
     if hasSession && needsIdentitySync {
       identitySyncError = await synchronizeBusinessIdentity()

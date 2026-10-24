@@ -178,6 +178,20 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
             ),
             .localOnly
         )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: true,
+                businessUserReady: false,
+                loginDeferred: true
+            ),
+            .localOnly
+        )
+        XCTAssertFalse(
+            AuthenticationEntryState.needsBusinessIdentitySync(
+                currentState: .localOnly,
+                loginDeferred: true
+            )
+        )
     }
 
     func testLocalOnlyStateSkipsAuthenticatedSettingsAPIRequest() async throws {

@@ -10,9 +10,15 @@ enum AuthenticationEntryState: Equatable {
     businessUserReady: Bool,
     loginDeferred: Bool
   ) -> Self {
+    if loginDeferred { return .localOnly }
     if hasValidSession {
       return businessUserReady ? .authenticated : .identitySyncRequired
     }
-    return loginDeferred ? .localOnly : .welcome
+    return .welcome
+  }
+
+  static func needsBusinessIdentitySync(currentState: Self, loginDeferred: Bool) -> Bool {
+    guard !loginDeferred else { return false }
+    return currentState == .checking || currentState == .identitySyncRequired
   }
 }
