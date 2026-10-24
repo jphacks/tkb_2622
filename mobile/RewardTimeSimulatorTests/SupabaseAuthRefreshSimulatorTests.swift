@@ -14,7 +14,7 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         super.tearDown()
     }
 
-    func testEmailOTPRequestAllowsNewAndExistingUsersThroughSameFlow() async throws {
+    func testEmailOTPRequestUsesSharedSignupCapableFlow() async throws {
         let requests = LockedAuthRequests()
         AuthRefreshURLProtocol.handler = { request in
             requests.append(request)
@@ -40,6 +40,37 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(payload["email"] as? String, "person@example.test")
         XCTAssertEqual(payload["create_user"] as? Bool, true)
+    }
+
+    func testEmailOTPVerificationUsesEmailTypeAndStoresSession() async throws {
+        let requests = LockedAuthRequests()
+        AuthRefreshURLProtocol.handler = { request in
+            requests.append(request)
+            return (200, Self.refreshedSessionJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AuthRefreshURLProtocol.self]
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://project.example.test")!,
+            supabaseKey: "simulator-publishable-key",
+            options: SupabaseClientOptions(
+                auth: .init(storage: LockedAuthLocalStorage(), autoRefreshToken: false),
+                global: .init(session: URLSession(configuration: configuration))
+            )
+        )
+        let service = SupabaseAuthService(client: client)
+
+        try await service.verifyEmailOTP(email: "person@example.test", code: "123456")
+        let accessToken = try await service.accessToken()
+
+        XCTAssertEqual(accessToken, "refreshed-simulator-access-token")
+        let request = try XCTUnwrap(requests.values.first)
+        XCTAssertEqual(request.url?.path, "/auth/v1/verify")
+        let body = try XCTUnwrap(request.httpBody ?? request.httpBodyStream.flatMap(read))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["email"] as? String, "person@example.test")
+        XCTAssertEqual(payload["token"] as? String, "123456")
+        XCTAssertEqual(payload["type"] as? String, "email")
     }
 
     func testExpiredStoredSessionRefreshesBeforeReturningAccessToken() async throws {
