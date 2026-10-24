@@ -24,7 +24,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
                 try await ConfiguredNotificationEndpointRepository().delete()
                 apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
             } catch {
-                apiStatusMessage = "サーバーの通知先を更新できません。ログイン状態と接続先を確認してください。"
+                apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
             }
         } else {
             apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
@@ -49,7 +49,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
             try await ConfiguredNotificationEndpointRepository().register(token: token, environment: environment)
             apiStatusMessage = "通知先をサーバーに登録しました。配信にはサーバー側のAPNs設定が必要です。"
         } catch {
-            apiStatusMessage = "通知先をサーバーに登録できません。ログイン状態と接続先を確認してください。"
+            apiStatusMessage = "通知先の登録に失敗しました: \(error.localizedDescription)"
         }
     }
 
