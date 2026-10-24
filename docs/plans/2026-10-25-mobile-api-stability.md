@@ -2,7 +2,7 @@
 
 ## 目的
 
-時間が限られているため、mobileのAPIエラーを優先して再現・修正する。ユニットテストを追加し、Simulator向けアプリbuildと分けて実行する。Simulator内でのXCTest実行targetは今後整備し、仕様・調査結果・未決事項をこの資料と関連資料へ反映する。
+時間が限られているため、mobileのAPIエラーを優先して再現・修正する。ユニットテストとSimulator向けXCTestを実行し、仕様・調査結果・未決事項をこの資料と関連資料へ反映する。
 
 作業ブランチは`fix/mobile-api-stability`。作業単位でローカルコミットし、pushしない。
 
@@ -32,7 +32,7 @@
 
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
-| 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない。コード上はendpoint登録前のDevice登録が保証されず、backendはregistration IDのDevice検索に失敗するとnot_foundを返すため、この経路も候補だった | 同一token重複抑止と「Device登録→通知先登録」の順序をXCTestで確認済み。以前のnot_foundとこの欠落が同一原因かは未確認。次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
+| 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。2026-10-25の読み取り確認では、直近90分にregister要求が9件あったが`operation failed`等のエラー記録はなく、現在の失敗は再現していない。成功完了ログもないため、要求の成否は断定できない。コード上はendpoint登録前のDevice登録が保証されず、backendはregistration IDのDevice検索に失敗するとnot_foundを返すため、この経路も候補だった | 同一token重複抑止と「Device登録→通知先登録」の順序をXCTestで確認済み。以前のnot_foundとこの欠落が同一原因かは未確認。次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
 | Group API操作時の`internal`／`not_found`／404 | 現在のlocal API containerは稼働中。migration statusで1〜14がすべてapplied。認証なしの読み取り専用`ListGroups` probeはHTTP 401／Connect `unauthenticated`となり、現在のbackendにGroup routeがあることを確認。過去エラーは再現していない。RPC名・DTOをGo handlerと静的照合。以前は一覧取得だけがerror helperを使い、作成・招待発行／受諾・退出は別の汎用表示を使っていたため、操作エラーの説明が揃わなかった | 全操作で共通のerror helperを使用するよう変更。Connect `unimplemented`・`internal`・`not_found`・`unauthenticated`等のhost 5件、Simulator経路1件が通過。実backendでの認証付き操作は未確認。再発時に`CreateGroup`等のoperation failureとSQLSTATEを照合する |
 | 利用枠予約の結果不明エラー | `UsageReservationViewModel`はHTTP／Connectエラーをすべて確定拒否として扱い、monitorを停止してpending operation ID・秒数を消していた。backend `Sessions.Reserve`はoperation IDでトランザクション結果をreplayするため、HTTP 5xx等の結果不明後に新規IDを作ると二重予約の恐れがある | 結果が不明なHTTP 5xx、Connect `internal`／`unavailable`、不正応答、認証token欠落ではpending requestとmonitorを保持し、同じ利用時間・operation IDで再試行する。明確な拒否4xxと端末内設定エラーは停止・解除する。host 3件とSimulator policy testで確認。実API応答喪失は未確認 |
 | 利用枠の保留予約が再試行できない | 前回応答不明後にサーバーだけ予約を確定すると、残高APIが減額済みの値を返す。画面は保留秒数を選択時間に復元する一方、通常の残高チェックで予約ボタンを無効化していた | 保留operation IDがあり、保存済みの秒数・選択時間が一致する場合は残高チェックを迂回して同じ操作を再送する。新規予約の残高制限と保留情報の整合性検証は維持する。host 3件とSimulator 1件で確認。実API応答喪失後のE2Eは未確認 |
@@ -50,10 +50,10 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 ### P0 — エラーを再現して直す
 
 0. **起動・認証・Desktop連携の導線を受け入れる**
-   - 初回起動で未ログインなら歓迎／ログイン画面が実際に表示され、ログインを後回しにした場合は明示的なローカル利用になることをSimulatorで確認する。現在ある自動テストは入口状態resolverまでで、SwiftUI画面の表示は未確認。
+   - 初回起動で未ログインなら歓迎／ログイン画面が表示されることを確認する。iPhone 18 Pro / iOS 27.0の新規Simulatorで画面を目視済み。ログインを後回しにした場合のローカル利用は状態resolverでテスト済みだが、SwiftUI画面をassertするUI testは未実施。
    - 新規メールと既存メールのOTPでSupabase Authへ入り、同じ環境のDesktopと同一の業務Userへ対応づくことを実機・Desktopで確認する。未登録メールが作成され、既存メールが既存アカウントへ入ることも別々に記録する。
    - 保存済みAuth sessionの再起動後復元、refresh、失効・ログアウト、EnsureUser／GetMe失敗後の再試行を確認する。
-   - 一般利用者がSupabase keyやAPI URLを手入力しないRelease経路と、開発者だけが設定するDebug経路を確認する。値自体は記録しない。Releaseへの値注入は未設定なので、配布構成を整えるまでは受け入れ未完了とする。
+   - 一般利用者がSupabase公開keyやAPI URLを手入力しないRelease経路と、開発者だけが設定するDebug経路を確認する。値自体は記録しない。MobileのRelease値をBuild Settings／CIから注入する設定とDesktop配布版の環境設定注入が未整備なので、配布構成を整えるまでは受け入れ未完了とする。
    - DesktopとiPhoneは同一メールOTPで直接認証する設計で、アプリ間ペアリングは不要。Desktopは現在起動時環境変数、Mobile Debugは開発者設定を使う。両方が同じSupabase projectとbackend環境を参照すること、およびDesktop配布版で利用者に環境変数設定を求めないことを確認する。
 
    | シナリオ | 期待結果 | 現在の確認状況 |
@@ -62,7 +62,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    | 新規利用者 | OTP成功後にAuth userを作成し、`EnsureUser`／`GetMe`完了後にアプリ機能へ入る | コード上の新規許可と状態resolverを確認。実Supabase／API E2E未確認 |
    | 既存利用者 | OTPで既存Auth userに入り、保存sessionを次回起動で復元 | コード経路を確認。実メールOTP・session refresh E2E未確認 |
    | Desktop + Mobile | 同じSupabase project・backend・アカウントなら同じ業務User。ペアリング操作なし | コード／契約を確認。両アプリ同時の実接続未確認 |
-   | 接続値入力 | Debugは開発者向け設定。Release一般利用者にはProject URL／公開key／API URL入力を要求しない | Release参照経路はあるがBuild Settings／CIへの値注入なし。配布受け入れ未完了 |
+   | 接続値入力 | Debugは開発者向け設定。Release一般利用者にはProject URL／公開key／API URL入力を要求しない | Release画面に入力欄はない。Release参照経路はあるがBuild Settings／CIへの値注入なし。Desktopも配布時の環境注入なし。利用者向け配布受け入れ未完了 |
 
 1. **API経路の棚卸し**
    - Auth／EnsureUser／GetMe
