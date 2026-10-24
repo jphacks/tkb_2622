@@ -7,10 +7,12 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
     override func setUp() {
         super.setUp()
         AuthRefreshURLProtocol.handler = nil
+        AuthRefreshURLProtocol.failure = nil
     }
 
     override func tearDown() {
         AuthRefreshURLProtocol.handler = nil
+        AuthRefreshURLProtocol.failure = nil
         super.tearDown()
     }
 
@@ -116,6 +118,45 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         XCTAssertEqual(persisted.refreshToken, "rotated-simulator-refresh-token")
     }
 
+    func testRefreshNetworkFailurePreservesSessionAndRetryableEntryState() async throws {
+        let storage = LockedAuthLocalStorage()
+        let storageKey = "simulator-retryable-session"
+        try storage.store(key: storageKey, value: JSONEncoder().encode(expiredSession()))
+        AuthRefreshURLProtocol.failure = URLError(.notConnectedToInternet)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AuthRefreshURLProtocol.self]
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://project.example.test")!,
+            supabaseKey: "simulator-publishable-key",
+            options: SupabaseClientOptions(
+                auth: .init(
+                    storage: storage,
+                    storageKey: storageKey,
+                    autoRefreshToken: false
+                ),
+                global: .init(session: URLSession(configuration: configuration))
+            )
+        )
+
+        do {
+            _ = try await SupabaseAuthService(client: client).accessToken()
+            XCTFail("A failed refresh must be surfaced for retry")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .notConnectedToInternet)
+        }
+
+        XCTAssertEqual(client.auth.currentSession?.refreshToken, "expired-simulator-refresh-token")
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: false,
+                sessionCheckFailed: true
+            ),
+            .identitySyncRequired
+        )
+    }
+
     private func expiredSession() -> Session {
         let now = Date()
         let user = User(
@@ -194,11 +235,16 @@ private final class LockedAuthRequests {
 
 private final class AuthRefreshURLProtocol: URLProtocol {
     static var handler: ((URLRequest) -> (Int, String))?
+    static var failure: Error?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        if let failure = Self.failure {
+            client?.urlProtocol(self, didFailWithError: failure)
+            return
+        }
         guard let url = request.url, let handler = Self.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
