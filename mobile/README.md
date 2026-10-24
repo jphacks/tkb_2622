@@ -62,7 +62,7 @@ backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Co
 
 Debugビルドのホームから「backendヘルスチェック」を開くと、指定URLの`GET /healthz`を確認できる。SimulatorからMac上のローカルbackendを確認する場合は既定値`http://127.0.0.1:8080`を使用する。iPhone実機からは、backend READMEの手順でComposeの公開先をMacのLAN IPv4に設定し、アプリのConnect API URLへ`http://<MacのLAN IPv4>:8080`を入力する。Debug構成だけローカルネットワーク接続を許可し、Release構成のATS設定は変更していない。ヘルスチェックは認証や業務データの読み書きを行わず、実API疎通を完了したことにはならない。
 
-API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorでは`RewardTimeSimulatorTests` schemeを使い、端末失効API、Group API error分類、認証入口状態resolver、利用枠再試行エラー分類を確認する。
+API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorでは`RewardTimeSimulatorTests` schemeを使い、端末失効API、Group API error分類、認証入口状態resolver、利用枠再試行エラー分類、`ReserveUsageGrant`のRepository要求・応答契約と`not_found` code保持を確認する。
 
 ```sh
 xcodebuild test \
@@ -72,7 +72,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、利用枠の確定拒否／結果不明時のoperation ID保持・破棄、サーバーで残高が減った後も保留予約を再試行できる条件を検証する。新規Simulatorで初回歓迎画面を目視したが、画面状態をassertするUI testと実Supabase OTP試験はない。
+Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、利用枠予約Repositoryのpath・認証header・ProtoJSON request/response・`not_found`保持、利用枠の確定拒否／結果不明時のoperation ID保持・破棄、サーバーで残高が減った後も保留予約を再試行できる条件を検証する。新規Simulatorで初回歓迎画面を目視したが、画面状態をassertするUI testと実Supabase OTP試験はない。
 
 ## ソース構成
 

@@ -124,6 +124,11 @@ struct ConfiguredUsageGrantRepository {
         )
     }
 
+    init(client: ConnectJSONClient, defaults: UserDefaults = .standard) {
+        self.client = client
+        self.defaults = defaults
+    }
+
     func reserve(
         operationID: String,
         sessionID: String,
