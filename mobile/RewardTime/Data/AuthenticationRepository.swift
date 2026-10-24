@@ -74,7 +74,11 @@ struct SupabaseAuthService: AccessTokenProviding {
     }
 
     func accessToken() async throws -> String? {
-        try await client.auth.session.accessToken
+        do {
+            return try await client.auth.session.accessToken
+        } catch AuthError.sessionMissing {
+            return nil
+        }
     }
 
     func signOutFromThisDevice() async throws {
