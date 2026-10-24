@@ -4,14 +4,16 @@ export interface Task { id: string; name: string; plannedSeconds: number; minimu
 export interface WorkSession { id: string; name: string; status: SessionStatus; task: Task; elapsedSeconds: number; evaluation: 'pending' | 'complete' | 'failed' }
 export interface Capability { allowed: boolean; reason: string }
 export interface Failure { code: string; message: string; retryable: boolean }
+export interface MonitorStatus { state: string; appName: string; browserName: string; domain: string; lastSample: string; sampleCount: number; message: string }
 export interface Classification { name: string; category: 'work' | 'distraction' | 'uncertain' }
 export interface Settings { tasks: Task[]; selectedTaskId: string; classifications: Classification[] }
 export interface Result { sessionId: string; name: string; status: SessionStatus; elapsedSeconds: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; earnedSeconds: number; usedSeconds: number; discardedSeconds: number }
 export type SessionAction = 'start' | 'pause' | 'resume' | 'finish' | 'abort' | 'retry';
 export interface Snapshot {
-  revision: number; platform: Platform; mode: 'demo'; updatedAt: string;
+  revision: number; platform: Platform; mode: 'demo' | 'local-monitor'; updatedAt: string;
   session: WorkSession | null; balanceSeconds: number | null;
   sync: 'synced' | 'pending' | 'failed'; permission: 'unknown' | 'denied'; online: boolean;
+  monitor?: MonitorStatus;
   restrictionDesired: 'unknown' | 'restricted' | 'unrestricted'; restrictionConfirmed: boolean;
   settings: Settings; history: Result[]; result: Result | null;
   actions: Record<SessionAction, Capability>; failure: Failure | null;

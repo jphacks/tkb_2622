@@ -36,6 +36,7 @@ export class DemoBridge implements DesktopBridge {
     this.state = {
       revision: 0, platform, mode: 'demo', updatedAt: new Date().toISOString(), session: null,
       balanceSeconds: null, sync: 'synced', permission: 'unknown', online: true,
+      monitor: { state: 'demo', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' },
       restrictionDesired: 'unknown', restrictionConfirmed: false,
       settings: { tasks: copy(defaultTasks), selectedTaskId: defaultTask.id, classifications: copy(defaultClassifications) },
       history: [], result: null, actions: {} as Snapshot['actions'], failure: null,

@@ -4,10 +4,11 @@ import type { PageProps } from './SessionPage';
 import { minimumDuration, plannedDuration } from '../components/format';
 import { taskPurposes } from '../fixtures';
 
-const emptyTask: Task = { id: '', name: '', minimumSeconds: 60, plannedSeconds: 1500 };
+const emptyTask: Task = { id: '', name: '', minimumSeconds: 300, plannedSeconds: 1500 };
 const emptyClassification: Classification = { name: '', category: 'work' };
 
 export function SettingsPage({ state, busy, execute }: PageProps) {
+	const monitor = state.monitor ?? { state: 'unavailable', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
   const [draft, setDraft] = useState<Settings>(() => structuredClone(state.settings));
   const [task, setTask] = useState<Task>(emptyTask);
   const [classification, setClassification] = useState<Classification>(emptyClassification);
@@ -16,6 +17,17 @@ export function SettingsPage({ state, busy, execute }: PageProps) {
   const stateSignature = JSON.stringify(state.settings);
   const draftIsValid = draft.tasks.length > 0 && draft.tasks.some(item => item.id === draft.selectedTaskId);
   const hasUnsavedChanges = JSON.stringify(draft) !== stateSignature;
+  const monitorStatus = {
+    ready: '利用可能',
+    running: '計測中',
+    paused: '一時停止中',
+    finished: '終了',
+    aborted: '中止',
+    error: '要確認',
+    unavailable: 'ヘルパー未準備',
+    unsupported: '未対応OS',
+    demo: 'デモ',
+  }[monitor.state] ?? monitor.state;
 
   useEffect(() => setDraft(structuredClone(state.settings)), [stateSignature]);
 
@@ -64,9 +76,9 @@ export function SettingsPage({ state, busy, execute }: PageProps) {
         {addingClassification && <div className="classification-form"><label>アプリ名・ドメイン<input autoFocus maxLength={200} placeholder="例：Notion" value={classification.name} onChange={event => setClassification({ ...classification, name: event.target.value })} /></label><select aria-label="追加する分類" value={classification.category} onChange={event => setClassification({ ...classification, category: event.target.value as Classification['category'] })}><option value="work">作業</option><option value="distraction">娯楽</option><option value="uncertain">保留</option></select><button type="button" className="button" disabled={busy || !classification.name.trim()} onClick={addClassification}>追加</button><button type="button" className="text-button" onClick={() => setAddingClassification(null)}>キャンセル</button></div>}
         <p className="settings-note">分類を実際の計測・判定に使う機能は未接続です。分類根拠のない時間は保留として扱います。</p>
       </section>
-      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>計測権限<small>アプリ・サイトの計測状態</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>アカウント<small>残高・報酬のサーバー同期</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>iPhone・通知<small>利用枠の反映と通知状態</small></span><span className="unavailable">未接続</span></div></section>
+      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>アカウント<small>残高・報酬のサーバー同期</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>iPhone・通知<small>利用枠の反映と通知状態</small></span><span className="unavailable">未接続</span></div></section>
       <section className="card settings-section compact-settings"><h2>通知</h2><div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>このMacとiPhoneに届きます</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div></section>
-      <section className="card settings-section"><h2>プライバシー</h2><div className="settings-row"><span>ブラウザのサイト（ドメイン）を判定に使う<small>この基盤ではブラウザ情報を取得しません</small></span><span className="unavailable">未接続</span></div><p className="settings-note">キー入力の内容や画面の画像は取得しません。アプリとサイトの計測自体が未接続です。</p></section>
+      <section className="card settings-section"><h2>プライバシー</h2><div className="settings-row"><span>観測する情報<small>前面アプリ名・アプリID、入力アイドル、対応ブラウザーのドメインをこのMacへ保存します</small></span><span>ローカル</span></div><p className="settings-note">キー入力の内容、raw URL、ページタイトル、画面画像、ブラウザーのタブIDは取得・保存しません。アプリ・ドメインの分類と報酬評価は未接続です。</p></section>
       <div className="settings-save"><button type="submit" className="button primary" disabled={busy || !draftIsValid || !hasUnsavedChanges}>保存</button></div>
     </form>
   </div>;

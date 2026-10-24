@@ -52,7 +52,7 @@ const categories = [
   { key: 'uncertain', label: '保留', color: colors.uncertain, background: '#F2EFF7', foreground: '#655B79' },
 ] as const;
 
-export function FeedbackPage({ result }: { result: Result | null }) {
+export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'demo' | 'local-monitor' }) {
   const categorySeconds = [
     result?.workSeconds ?? 0,
     result?.distractedSeconds ?? 0,
@@ -72,18 +72,18 @@ export function FeedbackPage({ result }: { result: Result | null }) {
           {result ? statusLabels[result.status] ?? '状態未取得' : '結果はありません'}
         </span>
         <span style={{ fontSize: 13, padding: '4px 12px', borderRadius: 99, background: '#F2EFF7', color: '#655B79', fontWeight: 700 }}>
-          同期・評価状態 未取得
+          {mode === 'local-monitor' ? 'ローカル計測を保存・活動評価と報酬は未接続' : '同期・評価状態 未取得'}
         </span>
       </div>
     </header>
 
     <section style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }} aria-label="報酬と集中スコア">
       <div style={{ flex: '1 1 260px', boxSizing: 'border-box', background: colors.purple, color: '#FFFFFF', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 13, color: '#E4E0FF' }}>獲得した報酬</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬（未確定）' : '獲得した報酬'}</div>
         <div style={{ fontWeight: 700, fontSize: 44, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
-          {result ? `+${duration(result.earnedSeconds)}` : '—'}
+          {mode === 'local-monitor' ? '—' : result ? `+${duration(result.earnedSeconds)}` : '—'}
         </div>
-        <div style={{ fontSize: 13, color: '#E4E0FF' }}>算定根拠・受取前後の残高：未取得</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '活動の分類・報酬APIは未接続です' : '算定根拠・受取前後の残高：未取得'}</div>
       </div>
       <div style={{ flex: '1 1 200px', boxSizing: 'border-box', background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ fontSize: 13, color: colors.muted }}>集中スコア</div>
@@ -127,7 +127,7 @@ export function FeedbackPage({ result }: { result: Result | null }) {
         </span>
         <span>終了時刻 —</span>
       </div>
-      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。</p>
+      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{mode === 'local-monitor' ? '観測データはこのMacに保存しました。アプリ・ドメインの分類と報酬評価は未接続です。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
     </section>
 
     <section style={{ ...cardStyle, gap: 12 }}>
