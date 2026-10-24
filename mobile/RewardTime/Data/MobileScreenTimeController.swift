@@ -12,11 +12,21 @@ final class MobileScreenTimeController: ObservableObject {
     @Published private(set) var isRequestingAuthorization = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
+    @Published var restrictionMode: LocalRestrictionMode {
+        didSet {
+            defaults.set(restrictionMode.rawValue, forKey: restrictionModeDefaultsKey)
+            errorMessage = nil
+        }
+    }
+    @Published private(set) var appliedRestrictionMode: LocalRestrictionMode?
 
     private let authorizationCenter: AuthorizationCenter
     private let settingsStore: ManagedSettingsStore
     private let defaults: UserDefaults
     private let selectionDefaultsKey = "mobile.screenTime.selection"
+    private let selectionConfiguredDefaultsKey = "mobile.screenTime.selectionConfigured"
+    private let restrictionModeDefaultsKey = "mobile.screenTime.restrictionMode"
+    @Published private(set) var hasSelectionBeenConfigured: Bool
 
     init(
         authorizationCenter: AuthorizationCenter = .shared,
@@ -27,9 +37,15 @@ final class MobileScreenTimeController: ObservableObject {
         self.settingsStore = settingsStore
         self.defaults = defaults
         authorizationStatus = authorizationCenter.authorizationStatus
-        selection = defaults.data(forKey: selectionDefaultsKey)
+        let storedSelection = defaults.data(forKey: selectionDefaultsKey)
             .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
             ?? FamilyActivitySelection()
+        selection = storedSelection
+        hasSelectionBeenConfigured = defaults.bool(forKey: selectionConfiguredDefaultsKey)
+            || !storedSelection.applicationTokens.isEmpty
+        restrictionMode = defaults.string(forKey: restrictionModeDefaultsKey)
+            .flatMap(LocalRestrictionMode.init(rawValue:)) ?? .selectedApplications
+        appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
     }
 
     var isAuthorized: Bool {
@@ -44,8 +60,27 @@ final class MobileScreenTimeController: ObservableObject {
         !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
     }
 
-    var canApplySelectedApps: Bool {
-        isAuthorized && selectedApplicationCount > 0 && !hasUnsupportedTargets
+    var applyRestrictionUnavailableReason: String? {
+        guard isAuthorized else {
+            return authorizationStatus == .denied
+                ? "iPhoneの設定でスクリーンタイムの許可状態を確認してください。"
+                : "先に「本人利用の許可を求める」を押してください。"
+        }
+        if restrictionMode == .selectedApplications && hasUnsupportedTargets {
+            return "カテゴリやWebサイトはまだ適用できません。選択内容をアプリだけにしてください。"
+        }
+        if restrictionMode == .selectedApplications && selectedApplicationCount == 0 {
+            return "先に制限するアプリを1つ以上選んでください。"
+        }
+        return nil
+    }
+
+    var appliedRestrictionLabel: String {
+        switch appliedRestrictionMode {
+        case .selectedApplications: "選んだアプリを適用中"
+        case .entireDevice: "標準以外を制限中"
+        case nil: "制限は適用されていません"
+        }
     }
 
     var authorizationStatusLabel: String {
@@ -62,6 +97,7 @@ final class MobileScreenTimeController: ObservableObject {
 
     func refreshAuthorizationStatus() {
         authorizationStatus = authorizationCenter.authorizationStatus
+        appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
     }
 
     func requestAuthorization() async {
@@ -79,16 +115,28 @@ final class MobileScreenTimeController: ObservableObject {
         }
     }
 
-    func applySelectedAppsForDebug() {
-        guard canApplySelectedApps else { return }
-        settingsStore.shield.applications = selection.applicationTokens
+    func applyRestriction() {
+        guard applyRestrictionUnavailableReason == nil else {
+            errorMessage = applyRestrictionUnavailableReason
+            return
+        }
+        switch restrictionMode {
+        case .selectedApplications:
+            settingsStore.shield.applicationCategories = nil
+            settingsStore.shield.applications = selection.applicationTokens
+        case .entireDevice:
+            settingsStore.shield.applications = nil
+            settingsStore.shield.applicationCategories = .all()
+        }
+        appliedRestrictionMode = restrictionMode
         errorMessage = nil
-        statusMessage = "選択したアプリにShieldを設定しました。対象アプリを開いて確認してください。"
+        statusMessage = "\(restrictionMode.appliedDescription)をiPhoneに設定しました。対象アプリを開いてShield画面が表示されるか確認してください。"
     }
 
-    func clearShieldForDebug() {
-        guard isAuthorized else { return }
+    func clearRestriction() {
         settingsStore.shield.applications = nil
+        settingsStore.shield.applicationCategories = nil
+        appliedRestrictionMode = nil
         errorMessage = nil
         statusMessage = "このアプリが設定したShieldを解除しました。"
     }
@@ -96,8 +144,45 @@ final class MobileScreenTimeController: ObservableObject {
     private func saveSelection() {
         do {
             defaults.set(try JSONEncoder().encode(selection), forKey: selectionDefaultsKey)
+            defaults.set(true, forKey: selectionConfiguredDefaultsKey)
+            hasSelectionBeenConfigured = true
+            errorMessage = nil
         } catch {
             errorMessage = "選択したアプリをこの端末に保存できませんでした。"
+        }
+    }
+
+    private static func readAppliedMode(from store: ManagedSettingsStore) -> LocalRestrictionMode? {
+        if store.shield.applicationCategories != nil { return .entireDevice }
+        if let applications = store.shield.applications, !applications.isEmpty { return .selectedApplications }
+        return nil
+    }
+}
+
+enum LocalRestrictionMode: String, CaseIterable, Identifiable {
+    case selectedApplications
+    case entireDevice
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .selectedApplications: "選んだアプリを制限"
+        case .entireDevice: "標準以外を制限"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .selectedApplications: "下で選んだアプリにShieldを設定します。"
+        case .entireDevice: "標準アプリ以外にShieldを設定します。iPhone自体をロックする機能ではありません。"
+        }
+    }
+
+    var appliedDescription: String {
+        switch self {
+        case .selectedApplications: "選択したアプリの制限"
+        case .entireDevice: "標準以外のアプリ制限"
         }
     }
 }

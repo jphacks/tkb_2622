@@ -43,11 +43,11 @@ HomeRepository（ホーム情報取得の境界）
 
 | モック | 実装場所・現在の動作 |
 | --- | --- |
-| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。Debugで接続設定がない場合は仮データ表示。小休憩へ進めるのは一時停止中だけ |
-| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビュー。設定画面からFamilyControlsで認可・アプリ選択を行い、Debugでは選択したアプリにOSのShieldを手動適用・解除できる。セッション状態に応じた自動制御は未接続 |
+| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenをアイコン・アプリ名付きで表示。Debugで接続設定がない場合は仮データ表示。小休憩へ進めるのは一時停止中だけ |
+| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビュー。設定画面からFamilyControlsで認可・対象選択を行い、選択したアプリまたは標準アプリ以外をManagedSettingsへ適用・解除できる。ホームと設定に端末側の適用設定を表示する。セッション状態に応じた自動制御は未接続 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。時間を選べるが、確保API未接続のため残高は変更しない |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。モック値の表示のみ。残り時間の計測・再制限は行わない |
-| 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択を実装し、選択tokenは端末内に保存。モード・端末同期は未接続 |
+| 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択、制限モードの端末内保存を実装。「選んだアプリを制限」を選ぶと直下にアプリ選択ボタンを表示し、「標準以外を制限」ではカテゴリ全体へShieldを適用する。自動適用と端末同期は未接続 |
 | 13 グループ | `Features/Groups/GroupView.swift`。サンプルメンバーと作業開始履歴を表示。招待・退出は未接続 |
 | 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く通知例。通知送信はしない |
 

@@ -3,13 +3,11 @@ import FamilyControls
 
 struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var screenTime = MobileScreenTimeController()
+    @ObservedObject var screenTime: MobileScreenTimeController
     @State private var isFamilyActivityPickerPresented = false
 
     var body: some View {
         ScreenContainer {
-            SampleNotice(title: "設定画面案・端末設定未接続")
-
             #if DEBUG
             AuthenticationSettingsSection()
             #endif
@@ -25,11 +23,11 @@ struct SettingsView: View {
                 }
 
                 if screenTime.isAuthorized {
-                    Text("許可後は下の「アプリ」から制限対象を選べます。")
+                    Label("スクリーンタイムを利用できます", systemImage: "checkmark.circle.fill")
                         .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
+                        .foregroundStyle(AppTheme.teal)
 
-                    if screenTime.hasUnsupportedTargets {
+                    if screenTime.restrictionMode == .selectedApplications && screenTime.hasUnsupportedTargets {
                         Text("現在はアプリだけを制限できます。選択画面でカテゴリとWebサイトを外してください。")
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -47,21 +45,6 @@ struct SettingsView: View {
                     .disabled(screenTime.isRequestingAuthorization)
                 }
 
-#if DEBUG
-                Divider()
-                Text("実機確認用")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.secondaryInk)
-                Button("選択したアプリを制限") {
-                    screenTime.applySelectedAppsForDebug()
-                }
-                .disabled(!screenTime.canApplySelectedApps)
-                Button("このアプリの制限を解除", role: .destructive) {
-                    screenTime.clearShieldForDebug()
-                }
-                .disabled(!screenTime.isAuthorized)
-#endif
-
                 if let statusMessage = screenTime.statusMessage {
                     Label(statusMessage, systemImage: "info.circle")
                         .font(.caption)
@@ -75,7 +58,7 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("アプリの選択はこの端末内に保存します。Shieldの自動適用はセッション状態APIとの接続後に有効になります。")
+                Text("選択したアプリはこのiPhoneに保存します。セッションに応じた自動制限は、バックエンド連携後に有効になります。")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
             }
@@ -83,58 +66,79 @@ struct SettingsView: View {
             SurfaceCard {
                 HStack {
                     sectionTitle("制限のしかた", icon: "slider.horizontal.3")
-                    Spacer()
-                    Text("仕様未確定")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(AppTheme.secondaryInk)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(AppTheme.background, in: Capsule())
+                    Spacer(minLength: 0)
                 }
-                modeOption(
-                    title: "選んだアプリを制限",
-                    detail: "登録したアプリを対象にする案",
-                    isSelected: true
-                )
-                modeOption(
-                    title: "スマホ全体を制限",
-                    detail: "対象範囲は仕様確定後に反映",
-                    isSelected: false
-                )
-            }
+                modeButton(.selectedApplications)
 
-            SurfaceCard {
-                sectionTitle("アプリ", icon: "square.grid.2x2")
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("制限するアプリ")
+                if screenTime.restrictionMode == .selectedApplications {
+                    Divider()
+                    sectionTitle("制限するアプリ", icon: "square.grid.2x2")
+                    HStack {
+                        Text("選択中のアプリ")
                             .font(.subheadline.weight(.semibold))
-                        Text(screenTime.isAuthorized ? "FamilyActivityPickerで選択したアプリ" : "スクリーンタイムの許可後に選べます")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Text("\(screenTime.selectedApplicationCount)個")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppTheme.primary)
                     }
-                    Spacer(minLength: 8)
-                    Text("\(screenTime.selectedApplicationCount)個")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.primary)
-                }
-                Button("アプリを選ぶ") {
-                    isFamilyActivityPickerPresented = true
-                }
+                    Button {
+                        isFamilyActivityPickerPresented = true
+                    } label: {
+                        Label("アプリを選ぶ", systemImage: "plus.app")
+                    }
                     .buttonStyle(.bordered)
                     .disabled(!screenTime.isAuthorized)
-                Divider()
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("いつでも使えるアプリ")
-                        .font(.subheadline.weight(.semibold))
-                    Text("iPhoneの標準アプリ（Safariを除く）")
-                        .font(.footnote)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                    Text("仕様案・端末には未適用")
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.secondaryInk)
+
+                    if !screenTime.selection.applicationTokens.isEmpty {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+                            ForEach(Array(screenTime.selection.applicationTokens), id: \.self) { token in
+                                Label(token)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                    } else {
+                        Text("制限するアプリを選んでください。")
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
                 }
+                modeButton(.entireDevice)
+
+                Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "lock.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(screenTime.appliedRestrictionMode == nil ? AppTheme.secondaryInk : AppTheme.teal)
+
+                Button {
+                    screenTime.applyRestriction()
+                } label: {
+                    Label(
+                        screenTime.appliedRestrictionMode == nil ? "この設定を適用" : "選択した設定を再適用",
+                        systemImage: "lock.iphone")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primary)
+
+                if let reason = screenTime.applyRestrictionUnavailableReason {
+                    Label(reason, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button("このアプリの制限を解除", role: .destructive) {
+                    screenTime.clearRestriction()
+                }
+                .disabled(screenTime.appliedRestrictionMode == nil)
+
+                Text("適用後、対象アプリを開いてiOSのShield画面が出ることを確認してください。解除ボタンからいつでも戻せます。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
 
             SurfaceCard {
@@ -184,6 +188,16 @@ struct SettingsView: View {
             .font(.subheadline.weight(.bold))
     }
 
+    private func modeButton(_ mode: LocalRestrictionMode) -> some View {
+        Button {
+            screenTime.restrictionMode = mode
+        } label: {
+            modeOption(title: mode.title, detail: mode.detail, isSelected: screenTime.restrictionMode == mode)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("restrictionMode_\(mode.rawValue)")
+    }
+
     private func modeOption(title: String, detail: String, isSelected: Bool) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
@@ -218,6 +232,6 @@ struct SettingsView: View {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack { SettingsView() }
+        NavigationStack { SettingsView(screenTime: MobileScreenTimeController()) }
     }
 }

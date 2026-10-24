@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct RootTabView: View {
+    @StateObject private var screenTime = MobileScreenTimeController()
+
     var body: some View {
         TabView {
             NavigationStack {
-                HomeView()
+                HomeView(screenTime: screenTime)
             }
             .tabItem { Label("ホーム", systemImage: "house") }
 
@@ -19,7 +21,7 @@ struct RootTabView: View {
             .tabItem { Label("履歴", systemImage: "chart.bar") }
 
             NavigationStack {
-                SettingsView()
+                SettingsView(screenTime: screenTime)
             }
             .tabItem { Label("設定", systemImage: "gearshape") }
         }
