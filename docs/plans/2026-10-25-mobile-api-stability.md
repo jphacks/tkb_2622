@@ -32,6 +32,18 @@
 
 ユーザー受け入れ時には「初回はログイン画面」「session復元済みの既存利用者はログイン画面を省略」「新規・既存メールとも同じOTP導線」「MobileとDesktopは同一Supabase／backend環境の同一アカウントで連携」「一般利用者は公開接続値を入力しない」を個別に確認する。初回画面とDebug／Releaseでの接続値入力欄の表示差はSimulator UI testで確認した。新規／既存メールでのAuth実接続とMobile・Desktopを並行した同一業務Userの確認、配布構成の接続値自動設定は未完了。Debugは開発者向けに手入力設定を提供する。
 
+認証・Desktop接続の受け入れ状況を、コード上の確認と実環境確認に分けて記録する：
+
+| 確認項目 | コード／Simulatorで確認済み | 実環境で残る確認 |
+| --- | --- | --- |
+| 初回起動のログイン画面 | 未ログイン・login deferredなしなら歓迎／メールOTP画面を出す。UI testでメール欄、後回し、接続未設定時の送信無効を確認 | SupabaseからOTPメールを受け取り、コード認証後にHomeへ進む |
+| 既存利用者の再起動 | 保存sessionをKeychainから復元できればログイン画面を省略。期限切れsession refreshと一時的refresh失敗の状態保持はstub testで確認 | 実Supabase sessionで再起動・期限切れ更新・通信復帰を確認 |
+| 新規／既存メール | Mobile／DesktopともメールOTPの新規作成を許可し、既存Auth userも同じOTP経路を使う実装 | 新規メールと既存メールを各1つ使い、両アプリで認証・EnsureUser/GetMeまで成功することを確認 |
+| DesktopとMobileのユーザー対応 | 同一Supabase project・同一backend環境ならJWT subjectに対応する業務Userを共有する設計。端末ペアリングコードはない | DesktopとiPhoneで同一アカウントへログインし、同一ユーザーの作業状態・残高を相互に確認。別アカウントの分離も確認 |
+| 接続値を利用者に入力させない | Release UIに接続値入力欄はない。Debugのみ開発者設定が表示される | 現行Xcode projectにはMobile Release用`.xcconfig`／CI注入とDesktop配布用環境設定がなく、配布成果物の環境設定は未完成。設定済み配布版で入力なし起動を確認 |
+
+ここでいう「同じアカウント」は、同じメール文字列だけでなく、同じSupabase projectで発行された同一Auth user／JWT subjectを指す。別Supabase projectや異なるbackend環境では同じメールを使っても別ユーザー・別データになる。接続値のBuild Settings注入は公開可能なProject URL、publishable key、HTTPS API URLだけとし、service-role key等の秘密は含めない。
+
 ### 既知のエラー報告と再現状況
 
 | 報告 | 現在の証拠 | 次の切り分け |
@@ -40,7 +52,7 @@
 | 設定タブ再表示時の未ログイン端末APIエラー | 設定画面の`.task`・前景復帰・Screen Time設定変更が、local-only中も`RegisterDevice`／制限ポリシー同期を開始しうる。認証なしの`ConnectJSONClient`はAPI送信前にtoken欠落エラーを返す | `AuthenticatedAPISyncFlow`を端末設定同期前に通し、未ログイン時は要求を実行しない。host testでsigned-out時0件、authenticated時1件のoperationを確認 |
 | 起動時に期限切れsession refreshが失敗すると歓迎画面へ戻る | `RootTabView.hasAuthenticatedSession()`が`try? await auth.accessToken()`でrefreshの通信エラーを握りつぶし、保存sessionが残る一時的な通信障害も未ログインとして解決していた | session取得失敗を認証失敗と区別し、再試行可能な`identitySyncRequired`へ進める。認証を後回しにしたlocal-only状態は優先して保つ。host tests 2件とSimulatorで通信断時もrefresh tokenが保存されたsessionを保持し、retry stateを解決するテストを確認。実Supabaseをオフラインにした起動E2Eは未確認 |
 | 端末設定APIの`not_found`／`internal`が一般的な同期失敗だけに見える | `SettingsView.performDeviceSettingsSync()`は接続エラーの種類を捨て、「端末設定を同期できません。」だけを表示していた | Connect error codeを含むLocalizedErrorの説明を表示し、未分類のエラーだけ安全な汎用文へ戻す。host 2件・Simulator 1件で確認。実API失敗の再発は未確認 |
-| Group API操作時の`internal`／`not_found`／404 | 2026-10-25再確認時、local APIとPostgres containerは稼働中（Postgres healthy）。`/healthz`はHTTP 200、認証なし`ListGroups`はHTTP 401／Connect `unauthenticated`。直近30分にAPIのstructured logなし。これはrouteと認証入口までの確認で、認証付き成功を示さない。以前は一覧取得だけがerror helperを使い、作成・招待発行／受諾・退出は別の汎用表示を使っていたため、操作エラーの説明が揃わなかった | 全操作で共通のerror helperを使用するよう変更。Connect `unimplemented`・`internal`・`not_found`・`unauthenticated`等のhost 5件、Simulator経路1件が通過。今回も実APIの認証付き要求がなく、過去エラーは再現できなかった。実backendでの認証付き操作は未確認。再発時に`CreateGroup`等のoperation failureとSQLSTATEを照合する |
+| Group API操作時の`internal`／`not_found`／404 | 2026-10-25再確認時、local APIは稼働中・Postgres healthy・migration 1〜14 applied。`/healthz`はHTTP 200、認証なし`ListGroups`はHTTP 401／Connect `unauthenticated`。直近24時間のAPI logは起動INFOのみで操作失敗なし。routeと認証入口までの確認で、認証付き成功は示さない。以前は一覧取得だけがerror helperを使い、作成・招待発行／受諾・退出は別の汎用表示を使っていたため、操作エラーの説明が揃わなかった | 全操作で共通のerror helperを使用するよう変更。Connect `unimplemented`・`internal`・`not_found`・`unauthenticated`等のhost 5件、Simulator経路1件が通過。今回も実APIの認証付き要求がなく、過去エラーは再現できなかった。実backendでの認証付き操作は未確認。再発時に`CreateGroup`等のoperation failureとSQLSTATEを照合する |
 | 業務User同期失敗後のlocal-only状態が復帰時に解除される | `RootTabView.restoreAuthentication()`が再起動・前景復帰後にSupabase sessionだけを見てlocal-only状態を認証済みに解決し、EnsureUser／GetMe成功なしで業務APIへ進める経路があった。設定のアカウント欄も保存sessionの復元時にbackend同期を自動再試行していた | `loginDeferred`を優先し、明示的に認証を再開するまでlocal-onlyを維持。sessionが残っていてもroot・設定・アカウント欄からbusiness APIを自動同期しない。アカウント欄は保存sessionを表示し、明示的な「アカウント情報を再同期」で同期する。host／Simulator testsで同期gateを確認 |
 | 利用枠予約の結果不明エラー | `UsageReservationViewModel`はHTTP／Connectエラーをすべて確定拒否として扱い、monitorを停止してpending operation ID・秒数を消していた。backend `Sessions.Reserve`はoperation IDでトランザクション結果をreplayするため、HTTP 5xx等の結果不明後に新規IDを作ると二重予約の恐れがある | 結果が不明なHTTP 5xx、Connect `internal`／`unavailable`、不正応答、認証token欠落ではpending requestとmonitorを保持し、同じ利用時間・operation IDで再試行する。明確な拒否4xxと端末内設定エラーは停止・解除する。host 3件とSimulator policy testで確認。実API応答喪失は未確認 |
 | 利用枠の保留予約が再試行できない | 前回応答不明後にサーバーだけ予約を確定すると、残高APIが減額済みの値を返す。画面は保留秒数を選択時間に復元する一方、通常の残高チェックで予約ボタンを無効化していた | 保留operation IDがあり、保存済みの秒数・選択時間が一致する場合は残高チェックを迂回して同じ操作を再送する。新規予約の残高制限と保留情報の整合性検証は維持する。host 3件とSimulator 1件で確認。実API応答喪失後のE2Eは未確認 |
@@ -49,8 +61,8 @@
 発生時のサーバーログは次で絞る（プロジェクトrootから実行。migration状態は`make -C backend migrate-status`で読み取り確認）：
 
 ```sh
-docker compose --project-directory backend -f backend/compose.local.yaml logs --since=10m api \
-  | jq -c 'try (fromjson | {time,level,msg,operation,error_type,sql_state,constraint,table,code}) catch empty'
+docker compose --project-directory backend -f backend/compose.local.yaml logs --since=10m --no-log-prefix api \
+  | jq -Rc 'try (fromjson | {time,level,msg,operation,error_type,sql_state,constraint,table,code}) catch empty'
 ```
 
 ## 優先順位
