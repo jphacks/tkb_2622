@@ -5,9 +5,10 @@
 ## 採用構成
 
 - 対象OS：macOS・Windows．対応バージョンとCPUアーキテクチャは実機検証後に確定する．
-- アプリ基盤：Wails v2．端末内の処理をGo，画面をReact・TypeScript・Viteで実装する．具体的なバージョンは初期化時に固定する．
+- アプリ基盤：Wails v2.17.0，Go 1.26.10，React 19，TypeScript 7，Vite 8．
 - 画面と端末内Go：Wailsのバインディングとイベントで連携する．
 - クラウドとの通信：端末内GoからConnect RPC / HTTPSでAPIへ接続する．DBへ直接接続せず，報酬の最終確定と残高管理はクラウド側で行う．
+- 画面・状態・接続契約は共通で，画面の見た目は[`docs/UI`](../docs/UI/)を基準にする．Mac・Windowsで異なるUI外枠は`frontend/src/platforms/`に置く．
 
 Wails v2はmacOS・Windowsをサポートし，GoとWeb UIを組み合わせられるため，今回のアプリ基盤として採用する．Goを利用していても，端末内の計測処理とクラウドの業務処理は分けて管理する．
 
@@ -21,9 +22,9 @@ Mac担当者が共通基盤を先に作り，その後にMac担当者とWindows�
 | 共通状態・接続 | `frontend/src/state`・`bridge`・`fixtures`．表示用の型，操作，イベント，デモシナリオ |
 | Mac UI | `frontend/src/platforms/macos`．Macの外枠・配置・スタイル |
 | Windows UI | `frontend/src/platforms/windows`．Windowsの外枠・配置・スタイル |
-| Go | セッション・保存・同期・API連携の境界は共通．起動設定・計測・権限・トレイなどのOS固有処理は分離 |
+| Go | セッション状態・コマンド・イベント契約は共通．OS別起動設定は分離 |
 
-上記は目標配置であり，現在の実装済みディレクトリを示すものではない．
+`internal/session`はプロセス内だけで動くデモ状態管理であり，ディスク保存，サーバー同期，API，計測，権限，通知，トレイは未接続．アプリ終了後にGo側のデモ状態は初期化される．ブラウザプレビューのローカル保存はデモ専用である．
 
 ### 着手順序
 
@@ -36,12 +37,29 @@ Mac担当者が共通基盤を先に作り，その後にMac担当者とWindows�
 
 ### 起動手順の整備
 
-アプリは未初期化のため，現時点でこのディレクトリから実行できるアプリ用コマンドはない．共通基盤の引き渡し時に，次を実装と照合して本READMEへ追加する．
+### 起動・確認
 
-- 固定したGo・Node.js・Wailsのバージョンと，各OSの前提条件．
-- 依存の導入，ブラウザでのデモ起動と表示OSの選択，Wailsでの起動・ビルド手順．
-- 型チェック・テスト・ビルドの実行手順，デモシナリオの選び方．
-- 各OSで確認済みの範囲と，実API・計測・トレイなどの未接続箇所の確認方法．
+Go 1.26.10，Node.js 22.12以上（推奨22または24），Wails CLI 2.17.0を用意する．MacでのWailsビルドにはXcode Command Line Toolsが必要．Windowsのビルド・起動にはWebView2 Runtimeが必要．
+
+```sh
+cd desktop/frontend
+npm ci
+npm run dev -- --host 127.0.0.1
+```
+
+ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．Wailsで起動する場合は`cd desktop`の後に`wails dev`を実行する．リリース向けビルドは同じ場所で`wails build`を実行する．
+
+```sh
+cd desktop/frontend
+npm run typecheck
+npm test
+npm run build
+cd ..
+go test -race ./...
+go vet ./...
+```
+
+確認できた範囲：macOS arm64でWails v2の起動，Goメソッド呼び出し，Goイベントの購読・解除，アプリビルド．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
 
 一時的な実行ログ・実機検証結果はPRなどに記録し，本READMEには継続利用する手順を残す．
 
@@ -63,7 +81,7 @@ Wailsの採用だけで，他アプリの最前面情報・入力・アイドル
 
 GoとNode.js / npmに加えて，macOSの開発にはXcode Command Line Tools，Windowsでの動作にはWebView2 Runtimeが必要．詳細は[Wails v2のインストール手順](https://wails.io/docs/gettingstarted/installation/)を参照する．Wailsはv2系を使用し，具体的なバージョンはプロジェクト初期化時に固定する．
 
-このディレクトリは仕様整理段階であり，アプリの初期化・実機検証は未実施．
+現時点の画面は共通基盤のデモである．実API・永続化・ネイティブ計測・メニューバー常駐・iPhone連携を実装済みとは扱わない．
 
 ## 公式資料
 
