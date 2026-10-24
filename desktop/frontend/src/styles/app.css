@@ -256,6 +256,9 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .selected-label { color: #3F2FB8; font-size: 12px; }
 .settings-task-form { display: grid; grid-template-columns: 2fr repeat(4, 1fr) auto; align-items: end; gap: 10px; }
 .settings-task-form label, .classification-form label { color: var(--muted); font-size: 12px; }
+.settings-task-form label { display: grid; grid-template-rows: 21px 44px; gap: 6px; min-width: 0; white-space: nowrap; }
+.settings-task-form input, .settings-task-form select { height: 44px; min-height: 44px; }
+.settings-task-form > .button { height: 44px; min-height: 44px; align-self: end; white-space: nowrap; }
 .account-auth-form { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 520px; }
 .account-auth-form label { color: var(--muted); font-size: 12px; }
 .account-auth-actions { display: flex; align-items: center; gap: 12px; }
