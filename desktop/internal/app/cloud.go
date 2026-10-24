@@ -212,7 +212,56 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	if balance != nil {
 		a.applyCloudBalance(balance.SessionID, *balance)
 	}
+	_ = a.refreshCloudHistory(ctx, *current)
 	a.fetchIPhoneRestrictionState(ctx, *current)
+	return nil
+}
+
+func (a *App) refreshCloudHistory(ctx context.Context, auth cloud.AuthSession) error {
+	entries, err := a.cloudClient.ListSessionHistory(ctx, auth)
+	if err != nil {
+		a.mu.Lock()
+		a.engine.SetHistoryError("作業履歴を更新できませんでした。接続を確認して「更新」を押してください。", time.Now())
+		a.persistLocked(time.Now())
+		snapshot := a.engine.Snapshot()
+		ctxApp := a.ctx
+		a.mu.Unlock()
+		if ctxApp != nil {
+			wailsruntime.EventsEmit(ctxApp, StateEvent, snapshot)
+		}
+		return err
+	}
+	history := make([]session.Result, 0, len(entries))
+	for _, entry := range entries {
+		work := entry.Session.Durations.WorkMillis / 1000
+		related := entry.Session.Durations.RelatedTransitionMillis / 1000
+		distracted := entry.Session.Durations.DistractionMillis / 1000
+		unknown := entry.Session.Durations.UnknownMillis / 1000
+		inactive := entry.Session.Durations.IdleMillis / 1000
+		result := session.Result{
+			SessionID: entry.Session.ID, Name: entry.Session.TaskSettings.Name,
+			Status: entry.Session.Status, StartedAt: entry.Session.StartedAt.Format(time.RFC3339Nano),
+			ElapsedSeconds: int(entry.Session.Durations.ActiveMillis / 1000),
+			TaskSeconds:    int(entry.Session.Durations.TaskMillis / 1000), RelatedSeconds: int(related),
+			WorkSeconds: int(work), DistractedSeconds: int(distracted), UncertainSeconds: int(unknown),
+			InactiveSeconds: int(inactive), EarnedSeconds: int(entry.EarnedSeconds),
+			UsedSeconds: int(entry.SpentSeconds), DiscardedSeconds: int(entry.DiscardedSeconds),
+			B100: entry.Session.FocusScore, Q: entry.Session.Quality, WorkRate: entry.Session.WorkRate,
+		}
+		if !entry.Session.EndedAt.IsZero() {
+			result.EndedAt = entry.Session.EndedAt.Format(time.RFC3339Nano)
+		}
+		history = append(history, result)
+	}
+	a.mu.Lock()
+	a.engine.SetCloudHistory(history, time.Now())
+	a.persistLocked(time.Now())
+	snapshot := a.engine.Snapshot()
+	ctxApp := a.ctx
+	a.mu.Unlock()
+	if ctxApp != nil {
+		wailsruntime.EventsEmit(ctxApp, StateEvent, snapshot)
+	}
 	return nil
 }
 

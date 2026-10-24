@@ -88,6 +88,8 @@ type Result struct {
 	SessionID         string   `json:"sessionId"`
 	Name              string   `json:"name"`
 	Status            string   `json:"status"`
+	StartedAt         string   `json:"startedAt,omitempty"`
+	EndedAt           string   `json:"endedAt,omitempty"`
 	ElapsedSeconds    int      `json:"elapsedSeconds"`
 	TaskSeconds       int      `json:"taskSeconds"`
 	RelatedSeconds    int      `json:"relatedSeconds"`
@@ -123,6 +125,7 @@ type Snapshot struct {
 	RestrictionConfirmed   bool                    `json:"restrictionConfirmed"`
 	Settings               Settings                `json:"settings"`
 	History                []Result                `json:"history"`
+	HistoryError           string                  `json:"historyError,omitempty"`
 	Result                 *Result                 `json:"result"`
 	Actions                map[string]Capability   `json:"actions"`
 	Failure                *Failure                `json:"failure"`

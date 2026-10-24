@@ -68,7 +68,18 @@ type Session struct {
 	AcceptedThroughSeq int64
 	Durations          Durations
 	StartedAt          time.Time
+	EndedAt            time.Time
+	FocusScore         *float64
+	Quality            *float64
+	WorkRate           *float64
 	Balance            Balance
+}
+
+type SessionHistoryEntry struct {
+	Session          Session
+	EarnedSeconds    int64
+	SpentSeconds     int64
+	DiscardedSeconds int64
 }
 
 type Durations struct {
@@ -484,6 +495,10 @@ type sessionMessage struct {
 	AcceptedThroughSeq protoInt64          `json:"acceptedThroughSeq"`
 	Durations          durationMessage     `json:"durations"`
 	StartedAt          string              `json:"startedAt"`
+	EndedAt            string              `json:"endedAt"`
+	FocusScore         *float64            `json:"focusScore"`
+	Quality            *float64            `json:"quality"`
+	WorkRate           *float64            `json:"workRate"`
 }
 
 type durationMessage struct {
@@ -498,6 +513,7 @@ type durationMessage struct {
 
 func sessionFromMessage(message sessionMessage) Session {
 	startedAt, _ := time.Parse(time.RFC3339Nano, message.StartedAt)
+	endedAt, _ := time.Parse(time.RFC3339Nano, message.EndedAt)
 	return Session{
 		ID: message.ID, DeviceID: message.DeviceID, TaskID: message.TaskID,
 		TaskSettings: TaskSettings{
@@ -509,14 +525,51 @@ func sessionFromMessage(message sessionMessage) Session {
 		},
 		Status: strings.TrimPrefix(message.Status, "SESSION_STATUS_"), Version: int64(message.Version),
 		TrackingOnly: message.TrackingOnly, AcceptedThroughSeq: int64(message.AcceptedThroughSeq),
+		FocusScore: message.FocusScore, Quality: message.Quality, WorkRate: message.WorkRate,
 		Durations: Durations{
 			TaskMillis: int64(message.Durations.TaskMillis), RelatedTransitionMillis: int64(message.Durations.RelatedTransitionMillis),
 			DistractionMillis: int64(message.Durations.DistractionMillis), UnknownMillis: int64(message.Durations.UnknownMillis),
 			IdleMillis: int64(message.Durations.IdleMillis), ActiveMillis: int64(message.Durations.ActiveMillis),
 			WorkMillis: int64(message.Durations.WorkMillis),
 		},
-		StartedAt: startedAt,
+		StartedAt: startedAt, EndedAt: endedAt,
 	}
+}
+
+func (c *Client) ListSessionHistory(ctx context.Context, auth AuthSession) ([]SessionHistoryEntry, error) {
+	entries := make([]SessionHistoryEntry, 0)
+	pageToken := ""
+	for page := 0; page < 100; page++ {
+		input := map[string]any{"pageSize": 100}
+		if pageToken != "" {
+			input["pageToken"] = pageToken
+		}
+		var response struct {
+			Entries []struct {
+				Session sessionMessage `json:"session"`
+				Reward  struct {
+					EarnedSeconds    protoInt64 `json:"earnedSeconds"`
+					SpentSeconds     protoInt64 `json:"spentSeconds"`
+					DiscardedSeconds protoInt64 `json:"discardedSeconds"`
+				} `json:"reward"`
+			} `json:"entries"`
+			NextPageToken string `json:"nextPageToken"`
+		}
+		if err := c.Connect(ctx, "focus.v1.FocusService/ListSessions", auth.AccessToken, input, &response); err != nil {
+			return nil, err
+		}
+		for _, item := range response.Entries {
+			entries = append(entries, SessionHistoryEntry{
+				Session: sessionFromMessage(item.Session), EarnedSeconds: int64(item.Reward.EarnedSeconds),
+				SpentSeconds: int64(item.Reward.SpentSeconds), DiscardedSeconds: int64(item.Reward.DiscardedSeconds),
+			})
+		}
+		if response.NextPageToken == "" {
+			return entries, nil
+		}
+		pageToken = response.NextPageToken
+	}
+	return nil, errors.New("session history exceeded the maximum page count")
 }
 
 func (c *Client) GetCurrentSession(ctx context.Context, session AuthSession) (*Session, error) {

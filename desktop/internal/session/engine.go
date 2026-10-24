@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -246,6 +247,38 @@ func (e *Engine) SetIPhoneRestrictionState(state *IPhoneRestrictionState, failur
 		e.state.IPhoneRestriction = &copy
 	}
 	e.state.IPhoneRestrictionError = failure
+	e.touch(now)
+}
+
+// SetCloudHistory merges the server's authoritative session summaries with
+// local-only history entries that have not been uploaded to the server.
+func (e *Engine) SetCloudHistory(history []Result, now time.Time) {
+	merged := append([]Result(nil), history...)
+	known := make(map[string]struct{}, len(history))
+	for _, item := range history {
+		known[item.SessionID] = struct{}{}
+	}
+	for _, item := range e.state.History {
+		if _, exists := known[item.SessionID]; !exists {
+			merged = append(merged, item)
+		}
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		if merged[i].StartedAt == "" {
+			return false
+		}
+		if merged[j].StartedAt == "" {
+			return true
+		}
+		return merged[i].StartedAt > merged[j].StartedAt
+	})
+	e.state.History = merged
+	e.state.HistoryError = ""
+	e.touch(now)
+}
+
+func (e *Engine) SetHistoryError(message string, now time.Time) {
+	e.state.HistoryError = message
 	e.touch(now)
 }
 
