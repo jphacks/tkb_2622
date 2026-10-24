@@ -20,13 +20,24 @@ struct ConfiguredNotificationEndpointRepository {
         let registrationId: String
     }
 
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     func register(token: String, environment: String) async throws {
         let client = try makeClient()
+        try await register(token: token, environment: environment, client: client)
+    }
+
+    func register(token: String, environment: String, client: ConnectJSONClient) async throws {
         let apnsEnvironment = environment == "development" ? "AP_NS_ENVIRONMENT_DEVELOPMENT" : "AP_NS_ENVIRONMENT_PRODUCTION"
-        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
+        let deviceSettings = ConfiguredDeviceSettingsRepository(defaults: defaults)
+        let registrationID = deviceSettings.stableRegistrationID()
         try await NotificationEndpointRegistrationFlow.register(
             ensureDevice: {
-                _ = try await ConfiguredDeviceSettingsRepository().ensureDeviceRegistered(client: client)
+                _ = try await deviceSettings.ensureDeviceRegistered(client: client)
             },
             registerEndpoint: {
                 let response: RegisterResponse = try await client.call(
@@ -46,7 +57,7 @@ struct ConfiguredNotificationEndpointRepository {
 
     func delete() async throws {
         let client = try makeClient()
-        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
+        let registrationID = ConfiguredDeviceSettingsRepository(defaults: defaults).stableRegistrationID()
         let response: DeleteResponse = try await client.call(
             service: "identity.v1.IdentityService",
             method: "DeleteNotificationEndpoint",
