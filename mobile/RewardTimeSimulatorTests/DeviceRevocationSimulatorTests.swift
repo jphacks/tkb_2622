@@ -188,6 +188,15 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         }
 
         XCTAssertEqual(requestCount, 0)
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: false,
+                isAllowed: true,
+                isDenied: false,
+                token: "apns-token"
+            ),
+            .signInRequired
+        )
     }
 
     @MainActor

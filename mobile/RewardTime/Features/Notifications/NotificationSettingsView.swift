@@ -11,11 +11,12 @@ private final class NotificationSettingsViewModel: ObservableObject {
     @Published private(set) var apiStatusMessage = "サーバー登録を確認中です。"
     private let registrationGate = NotificationEndpointRegistrationGate()
 
-    func refresh(forceRegistration: Bool = false) async {
+    func refresh(forceRegistration: Bool = false, isAuthenticated: Bool) async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
         let action = NotificationEndpointSyncPolicy.resolve(
-            isAuthenticated: MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
+            isAuthenticated: isAuthenticated
+                && MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
             isAllowed: isAllowed,
             isDenied: authorizationStatus == .denied,
             token: UserDefaults.standard.string(forKey: "mobile.apns.token")
@@ -24,7 +25,11 @@ private final class NotificationSettingsViewModel: ObservableObject {
         case .signInRequired:
             apiStatusMessage = "通知先をサーバーと同期するにはログインしてください。"
         case .register(let token):
-            await register(token: token, force: forceRegistration)
+            await register(
+                token: token,
+                force: forceRegistration,
+                isAuthenticated: isAuthenticated
+            )
         case .requestAppleRegistration:
             UIApplication.shared.registerForRemoteNotifications()
             apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
@@ -41,15 +46,26 @@ private final class NotificationSettingsViewModel: ObservableObject {
         }
     }
 
-    func requestAuthorization() async {
+    func requestAuthorization(isAuthenticated: Bool) async {
         guard !isRequesting else { return }
         isRequesting = true
         defer { isRequesting = false }
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
-        await refresh(forceRegistration: true)
+        await refresh(forceRegistration: true, isAuthenticated: isAuthenticated)
     }
 
-    func register(token: String, force: Bool = true) async {
+    func register(token: String, force: Bool = true, isAuthenticated: Bool) async {
+        let action = NotificationEndpointSyncPolicy.resolve(
+            isAuthenticated: isAuthenticated
+                && MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
+            isAllowed: true,
+            isDenied: false,
+            token: token
+        )
+        guard case .register = action else {
+            apiStatusMessage = "通知先をサーバーと同期するにはログインしてください。"
+            return
+        }
         #if DEBUG
         let environment = "development"
         #else
@@ -147,6 +163,11 @@ private final class NotificationSettingsViewModel: ObservableObject {
 struct NotificationSettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = NotificationSettingsViewModel()
+    let isAuthenticated: Bool
+
+    init(isAuthenticated: Bool = true) {
+        self.isAuthenticated = isAuthenticated
+    }
 
     var body: some View {
         ScreenContainer {
@@ -170,7 +191,7 @@ struct NotificationSettingsView: View {
 
                 if model.authorizationStatus == .notDetermined {
                     Button {
-                        Task { await model.requestAuthorization() }
+                        Task { await model.requestAuthorization(isAuthenticated: isAuthenticated) }
                     } label: {
                         Label(model.isRequesting ? "確認中…" : "通知を許可", systemImage: "bell.badge")
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -188,7 +209,7 @@ struct NotificationSettingsView: View {
                     .buttonStyle(.bordered)
                 } else if model.isAllowed {
                     Button {
-                        Task { await model.refresh(forceRegistration: true) }
+                        Task { await model.refresh(forceRegistration: true, isAuthenticated: isAuthenticated) }
                     } label: {
                         Label("通知先を再同期", systemImage: "arrow.clockwise")
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -198,19 +219,22 @@ struct NotificationSettingsView: View {
             }
 
         }
-        .task { await model.refresh() }
+        .task { await model.refresh(isAuthenticated: isAuthenticated) }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsTokenReceived)) { notification in
             guard let token = notification.object as? String else { return }
-            Task { await model.register(token: token, force: true) }
+            Task { await model.register(token: token, force: true, isAuthenticated: isAuthenticated) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAPNsRegistrationFailed)) { _ in
             model.apnsRegistrationFailed()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-            Task { await model.refresh(forceRegistration: true) }
+            Task { await model.refresh(forceRegistration: true, isAuthenticated: isAuthenticated) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.refresh() } }
+            if phase == .active { Task { await model.refresh(isAuthenticated: isAuthenticated) } }
+        }
+        .onChange(of: isAuthenticated) { _, authenticated in
+            Task { await model.refresh(forceRegistration: true, isAuthenticated: authenticated) }
         }
         .navigationTitle("通知")
         .navigationBarTitleDisplayMode(.inline)
@@ -218,10 +242,16 @@ struct NotificationSettingsView: View {
 }
 
 struct NotificationToolbarButton: ToolbarContent {
+    let isAuthenticated: Bool
+
+    init(isAuthenticated: Bool = true) {
+        self.isAuthenticated = isAuthenticated
+    }
+
     var body: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             NavigationLink {
-                NotificationSettingsView()
+                NotificationSettingsView(isAuthenticated: isAuthenticated)
             } label: {
                 Image(systemName: "bell")
             }
@@ -233,6 +263,6 @@ struct NotificationToolbarButton: ToolbarContent {
 
 struct NotificationSettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack { NotificationSettingsView() }
+        NavigationStack { NotificationSettingsView(isAuthenticated: true) }
     }
 }
