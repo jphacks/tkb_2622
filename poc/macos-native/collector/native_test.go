@@ -29,7 +29,7 @@ func TestSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := helperFixture(t, "exec /bin/cat '"+fixture+"'\n")
-	native, err := New(path, time.Second)
+	native, err := New(path, 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,9 +44,9 @@ func TestSnapshot(t *testing.T) {
 func TestInvalidHelperOutput(t *testing.T) {
 	for _, script := range []string{"printf 'not-json'\n", "printf '{\"schema_version\":\"1\",\"source\":\"macos-native\",\"url\":\"private\"}'\n", "printf '{} {}'\n", "exit 2\n"} {
 		t.Run(script, func(t *testing.T) {
-			native, _ := New(helperFixture(t, script), time.Second)
+			native, _ := New(helperFixture(t, script), 5*time.Second)
 			_, err := native.Snapshot(context.Background())
-			if err == nil || strings.Contains(err.Error(), "private") {
+			if err == nil || strings.Contains(err.Error(), "private") || strings.Contains(err.Error(), "timeout_or_cancelled") {
 				t.Fatalf("invalid helper output: %v", err)
 			}
 		})
