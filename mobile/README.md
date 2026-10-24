@@ -44,7 +44,7 @@ HomeRepository（ホーム情報取得の境界）
 | モック | 実装場所・現在の動作 |
 | --- | --- |
 | 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenをアイコン・アプリ名付きで表示。Debugで接続設定がない場合は仮データ表示。小休憩へ進めるのは一時停止中だけ |
-| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビュー。設定画面からFamilyControlsで認可・対象選択を行い、選択したアプリまたは標準アプリ以外をManagedSettingsへ適用・解除できる。ホームと設定に端末側の適用設定を表示する。セッション状態に応じた自動制御は未接続 |
+| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`は画面案の静的プレビュー。実際のShieldはFamilyControlsの選択をManagedSettingsへ適用するとiOSが対象アプリ上に表示する。セッション状態との同期コードも実装済みだが、実機での表示確認は未完了 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |
 | 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。「選んだアプリを制限」を選ぶと直下にアプリ選択ボタンを表示し、「標準以外を制限」ではカテゴリ全体へShieldを適用する。セッション連動・適用状態報告・利用時間計測のコードは実装済み。実機動作は未確認 |
