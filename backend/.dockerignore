@@ -1,0 +1,8 @@
+.git
+.env
+.env.*
+*.db
+*.db-*
+*.sqlite*
+bin/
+README.md

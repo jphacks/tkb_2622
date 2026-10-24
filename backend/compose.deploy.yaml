@@ -1,0 +1,10 @@
+services:
+  api:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to an Artifact Registry image with a fixed tag or digest}
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DB_DRIVER: libsql
+      TURSO_DATABASE_URL: ${TURSO_DATABASE_URL:?Set TURSO_DATABASE_URL}
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN:?Set TURSO_AUTH_TOKEN}
