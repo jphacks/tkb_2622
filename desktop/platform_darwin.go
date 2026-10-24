@@ -38,6 +38,7 @@ type popoverState struct {
 	Status          string            `json:"status"`
 	StatusLabel     string            `json:"statusLabel"`
 	TaskDescription string            `json:"taskDescription"`
+	TaskHint        string            `json:"taskHint"`
 	Elapsed         string            `json:"elapsed"`
 	TimerHint       string            `json:"timerHint"`
 	Balance         string            `json:"balance"`
@@ -136,8 +137,8 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 	if task != nil {
 		view.HasTask = true
 		view.TaskDescription = task.Name
-		if task.PlannedSeconds > 0 {
-			view.TaskDescription += " ・ 予定 " + formatPopoverDuration(task.PlannedSeconds)
+		if task.PlannedSeconds > 0 && task.MinimumSeconds > 0 {
+			view.TaskHint = "予定 " + formatPopoverDuration(task.PlannedSeconds) + " ・ 最小 " + formatPopoverDuration(task.MinimumSeconds)
 		}
 	} else {
 		view.TaskDescription = "タスクがありません。設定から追加してください。"
@@ -171,10 +172,15 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 			view.Elapsed = formatPopoverClock(sessionState.ElapsedSeconds)
 			view.TimerHint = "記録の同期が終わるまで結果は確定しません"
 		}
-		if sessionState.Name != "" {
-			view.TaskDescription = sessionState.Name
-		} else if sessionState.Task.Name != "" {
-			view.TaskDescription = sessionState.Task.Name
+		if view.Status != "idle" {
+			if sessionState.Name != "" {
+				view.TaskDescription = sessionState.Name
+				if sessionState.Task.Name != "" && sessionState.Task.Name != sessionState.Name {
+					view.TaskHint = sessionState.Task.Name
+				}
+			} else if sessionState.Task.Name != "" {
+				view.TaskDescription = sessionState.Task.Name
+			}
 		}
 	}
 
@@ -187,20 +193,10 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 	}
 	if snapshot.Result != nil && sessionState != nil && snapshot.Result.SessionID == sessionState.ID && (sessionState.Status == "FINALIZED" || sessionState.Status == "ABORTED") {
 		view.HasResult = true
-		if sessionState.Status == "ABORTED" {
-			view.StatusLabel = "中止済み"
-		} else {
-			view.StatusLabel = "作業終了"
-		}
-		view.TaskDescription = sessionState.Name
-		if view.TaskDescription == "" {
-			view.TaskDescription = sessionState.Task.Name
-		}
-		view.Detail = "作業結果を確認できます。"
+		view.Detail = "前回の作業結果を確認できます。"
 	}
 
 	switch {
-	case view.HasResult:
 	case snapshot.Failure != nil && snapshot.Failure.Message != "":
 		view.Detail = snapshot.Failure.Message
 	case snapshot.CloudOperationPending:
@@ -215,6 +211,10 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 		view.Detail = "このセッションは記録専用です。iPhoneの利用制限は適用しません。"
 	case sessionState != nil && snapshot.Mode == "local-monitor" && sessionState.ServerVersion == 0:
 		view.Detail = "記録はこのMacに保存されます。報酬の確定とiPhone利用枠は未接続です。"
+	case view.Status == "idle" && !view.Start.Allowed:
+		view.Detail = view.Start.Reason
+	case view.HasResult:
+		view.Detail = "前回の作業結果を確認できます。"
 	}
 	return view
 }
