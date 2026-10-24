@@ -81,6 +81,7 @@ func run(logger *slog.Logger) error {
 		Restriction:   restriction.New(restrictionpersistence.NewStore(db)),
 		EnableDocs:    os.Getenv("API_DOCS_ENABLED") == "true",
 		Notifications: notifications,
+		Logger:        logger,
 	})
 	srv := &http.Server{
 		Addr: net.JoinHostPort("", port), Handler: handler,

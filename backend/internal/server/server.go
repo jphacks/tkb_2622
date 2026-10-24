@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"connectrpc.com/connect"
 	"connectrpc.com/grpchealth"
@@ -41,6 +43,7 @@ type Deps struct {
 	}
 	// EnableDocs adds the Swagger UI at /docs and should stay off outside local development.
 	EnableDocs bool
+	Logger     *slog.Logger
 }
 
 // actor maps the verified principal to the caller's business user and device via identity's public operation.
@@ -115,5 +118,49 @@ func Handler(d Deps) http.Handler {
 	if d.EnableDocs {
 		docs.Register(mux)
 	}
-	return mux
+	logger := d.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return requestLogger(logger, mux)
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusRecorder) WriteHeader(status int) {
+	if w.status != 0 {
+		return
+	}
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusRecorder) Write(body []byte) (int, error) {
+	if w.status == 0 {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+func (w *statusRecorder) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		recorder := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		logger.Info("HTTP request completed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", status,
+			"duration_ms", time.Since(started).Milliseconds(),
+		)
+	})
 }
