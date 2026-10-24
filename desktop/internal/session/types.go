@@ -72,20 +72,23 @@ type Settings struct {
 }
 
 type Result struct {
-	SessionID         string `json:"sessionId"`
-	Name              string `json:"name"`
-	Status            string `json:"status"`
-	ElapsedSeconds    int    `json:"elapsedSeconds"`
-	TaskSeconds       int    `json:"taskSeconds"`
-	RelatedSeconds    int    `json:"relatedSeconds"`
-	WorkSeconds       int    `json:"workSeconds"`
-	DistractedSeconds int    `json:"distractedSeconds"`
-	UncertainSeconds  int    `json:"uncertainSeconds"`
-	InactiveSeconds   int    `json:"inactiveSeconds"`
-	EvaluatorVersion  string `json:"evaluatorVersion,omitempty"`
-	EarnedSeconds     int    `json:"earnedSeconds"`
-	UsedSeconds       int    `json:"usedSeconds"`
-	DiscardedSeconds  int    `json:"discardedSeconds"`
+	SessionID         string   `json:"sessionId"`
+	Name              string   `json:"name"`
+	Status            string   `json:"status"`
+	ElapsedSeconds    int      `json:"elapsedSeconds"`
+	TaskSeconds       int      `json:"taskSeconds"`
+	RelatedSeconds    int      `json:"relatedSeconds"`
+	WorkSeconds       int      `json:"workSeconds"`
+	DistractedSeconds int      `json:"distractedSeconds"`
+	UncertainSeconds  int      `json:"uncertainSeconds"`
+	InactiveSeconds   int      `json:"inactiveSeconds"`
+	EvaluatorVersion  string   `json:"evaluatorVersion,omitempty"`
+	B100              *float64 `json:"b100,omitempty"`
+	Q                 *float64 `json:"q,omitempty"`
+	WorkRate          *float64 `json:"workRate,omitempty"`
+	EarnedSeconds     int      `json:"earnedSeconds"`
+	UsedSeconds       int      `json:"usedSeconds"`
+	DiscardedSeconds  int      `json:"discardedSeconds"`
 }
 
 type Snapshot struct {

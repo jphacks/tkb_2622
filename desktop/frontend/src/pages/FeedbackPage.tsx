@@ -73,6 +73,8 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
   ] : [result?.workSeconds ?? 0, result?.distractedSeconds ?? 0, result?.uncertainSeconds ?? 0];
   const classifiedSeconds = categorySeconds.reduce((total, seconds) => total + Math.max(0, seconds), 0);
   const timeFor = (seconds: number | undefined) => result && seconds !== undefined ? duration(seconds) : '—';
+  const percentage = (value: number | undefined, multiplier = 100) =>
+    value !== undefined && Number.isFinite(value) ? `${(value * multiplier).toFixed(1)}%` : '—';
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
     <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -90,19 +92,30 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
       </div>
     </header>
 
-    <section style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }} aria-label="報酬と集中スコア">
-      <div style={{ flex: '1 1 260px', boxSizing: 'border-box', background: colors.purple, color: '#FFFFFF', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <section style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }} aria-label="報酬と分類指標">
+      <div style={{ flex: '1 1 240px', boxSizing: 'border-box', background: colors.purple, color: '#FFFFFF', borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬（未確定）' : '獲得した報酬'}</div>
         <div style={{ fontWeight: 700, fontSize: 44, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
           {mode === 'local-monitor' ? '—' : result ? `+${duration(result.earnedSeconds)}` : '—'}
         </div>
         <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬換算式・報酬APIは未接続です' : '算定根拠・受取前後の残高：未取得'}</div>
       </div>
-      <div style={{ flex: '1 1 200px', boxSizing: 'border-box', background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 13, color: colors.muted }}>集中スコア</div>
-        <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1.1 }}>—<span style={{ fontSize: 15, fontWeight: 500 }}> / 100</span></div>
-        <div style={{ fontSize: 12, color: colors.muted }}>スコア・判定ルールは未取得</div>
-      </div>
+      {hasLocalEvaluation ? [
+        { label: '既知分類内の作業割合（B100）', value: percentage(result?.b100, 1), detail: '100×(T+R)/(T+R+D)。不明・非活動は分母に含みません。' },
+        { label: '判定カバレッジ（Q）', value: percentage(result?.q), detail: '(T+R+D+I)/E。判定できた時間の割合です。' },
+        { label: '計測時間に対する作業割合', value: percentage(result?.workRate), detail: '(T+R)/E。不明時間も含む計測時間を分母にします。' },
+      ].map(metric => <div key={metric.label} style={{ flex: '1 1 200px', boxSizing: 'border-box', background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 13, color: colors.muted }}>{metric.label}</div>
+        <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1, color: colors.ink, fontVariantNumeric: 'tabular-nums' }}>{metric.value}</div>
+        <div style={{ fontSize: 12, color: colors.muted }}>{metric.detail}</div>
+      </div>) : <div style={{ flex: '1 1 240px', boxSizing: 'border-box', background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 13, color: colors.muted }}>集中度</div>
+        <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, color: colors.ink }}>未評価</div>
+        <div style={{ fontSize: 12, color: colors.muted }}>分類集計の参考値であり、心理的な集中度を直接測定するスコアはありません。</div>
+      </div>}
+      {hasLocalEvaluation && <p style={{ flex: '1 1 100%', margin: 0, fontSize: 12, color: colors.muted }}>
+        これらはアプリ・サイトの分類集計から算出した参考値で、心理的な集中度を直接測定したスコアではありません。
+      </p>}
     </section>
 
     <section style={cardStyle}>
