@@ -44,7 +44,7 @@ infra/
 │   └── cloudflare/api-endpoint/
 │       └── worker/proxy.js     # Cloud Run へ転送する Worker
 └── envs/                       # 適用単位（ルートモジュール）．1ディレクトリ = 1 state
-    ├── backend.hcl             # 共通の GCS backend 設定（bucket）
+    ├── backend.hcl.example     # 共通の GCS backend 設定（bucket）の雛形
     ├── shared/
     │   ├── gcp/                # Artifact Registry，CI 用 SA・Workload Identity 連携
     │   └── cloudflare/         # ゾーン共通設定（SSL/TLS）
@@ -64,7 +64,7 @@ infra/
 | `providers.tf` | provider 設定．認証情報は書かない |
 | `backend.tf` | GCS backend の `prefix`（ディレクトリと一致）．bucket は `envs/backend.hcl` から渡す |
 | `main.tf` / `variables.tf` / `outputs.tf` | リソース・モジュール呼び出し，入力，出力 |
-| `terraform.tfvars` | 秘密を含まない環境固有値．コミットする |
+| `terraform.tfvars` | 環境固有値（プロジェクト ID・ゾーン ID・ホスト名等）．`.gitignore` 済みで，雛形の `terraform.tfvars.example` をコミットする |
 | `.terraform.lock.hcl` | provider のロック（linux_amd64 / darwin_arm64 / darwin_amd64）．コミットする |
 
 ### 構成の考え方
@@ -101,7 +101,13 @@ infra/
 
 ### プレースホルダーの置き換え
 
-コミット済みの `terraform.tfvars` と `envs/backend.hcl` は `your-...`・`example.com` のプレースホルダーになっている．最初の apply 前に次の値を置き換える．
+環境ごとの値を入れる `terraform.tfvars` と `envs/backend.hcl` は `.gitignore` 済みで，リポジトリには雛形（`*.example`）だけがある．まず雛形から作成する（既存のファイルは上書きしない）．
+
+```bash
+make -C infra setup
+```
+
+作成したファイルは `your-...`・`example.com` のプレースホルダーになっている．最初の apply 前に次の値を置き換える．値はチームで共有するが，コミットしない．雛形の項目を増やした場合は，各自 `*.example` との差分を自分のファイルへ反映する．
 
 | 値 | ファイル |
 | --- | --- |
@@ -187,6 +193,6 @@ make -C infra lock       # provider 更新後にロックファイルを再生�
 
 ## 6. 注意
 
-- `.terraform/`，`*.tfstate`，`*.tfstate.*`，`tfplan`，`*.secret.tfvars` は `.gitignore` 済み．
+- `.terraform/`，`*.tfstate`，`*.tfstate.*`，`tfplan`，`terraform.tfvars`，`*.auto.tfvars`，`*.secret.tfvars`，`envs/backend.hcl` は `.gitignore` 済み．
 - `terraform validate` はクラウドに接続しない．`plan` は既存リソースを読み取るだけで作成しない．`apply` は課金が発生しうるため，対象スタックと plan を確認してから実行する．
 - prod の Cloud Run サービス・Job は `deletion_protection = true`．削除する場合は先に `false` へ変更して apply する．
