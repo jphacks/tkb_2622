@@ -23,13 +23,12 @@ curl --fail http://localhost:8080/grpc.health.v1.Health/Check \
 
 HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を返します．両方ともAPIプロセスの生存確認であり，DB接続・スキーマの確認は行いません．APIは起動時にDBへ接続し，接続できない場合は起動しません．
 
-`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．既定ではAPIを `127.0.0.1:8080` にだけ公開します．実機iPhoneから確認する場合はMacのLAN IPv4を指定して起動します．
+`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．ローカル開発用APIは既定で `0.0.0.0:8080` に公開し，同じLANの実機iPhoneから接続できます．アプリのConnect API URLには `http://<MacのLAN IPv4>:8080` を設定します．MacのIPv4は `ipconfig getifaddr en0` で確認します．loopbackだけに限定する場合は `API_BIND_ADDRESS=127.0.0.1 make -C backend up` とします．
 
 ```sh
-API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
+make -C backend up
 ```
 
-アプリのConnect API URLには `http://<MacのLAN IPv4>:8080` を設定します．この設定はローカル開発用APIをLANから到達可能にするためのものです．確認後は `make -C backend down` で停止し，通常時は既定のloopback公開を使います．
 
 | コマンド | 動作 |
 | --- | --- |
