@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Classification, Settings, Task } from '../bridge/types';
+import type { Classification, ClassificationCandidate, Settings, Task } from '../bridge/types';
 import type { PageProps } from './SessionPage';
 import { minimumDuration, plannedDuration } from '../components/format';
 import { taskPurposes } from '../fixtures';
@@ -28,7 +28,7 @@ function validDomain(value: string) {
   );
 }
 
-export function SettingsPage({ state, busy, execute, requestEmailOTP, verifyEmailOTP, signOut, refreshAccount }: PageProps) {
+export function SettingsPage({ state, busy, execute, getClassificationCandidates, requestEmailOTP, verifyEmailOTP, signOut, refreshAccount }: PageProps) {
 	const monitor = state.monitor ?? { state: 'unavailable', appId: '', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
   const account = state.account ?? { status: state.mode === 'demo' ? 'demo' as const : 'signedOut' as const, email: '', deviceRegistered: false, message: '' };
   const [draft, setDraft] = useState<Settings>(() => structuredClone(state.settings));
@@ -40,6 +40,9 @@ export function SettingsPage({ state, busy, execute, requestEmailOTP, verifyEmai
   const [otp, setOtp] = useState('');
   const [addingClassification, setAddingClassification] = useState<Classification['category'] | null>(null);
   const [editingClassificationName, setEditingClassificationName] = useState<string | null>(null);
+  const [classificationCandidates, setClassificationCandidates] = useState<ClassificationCandidate[]>([]);
+  const [candidatePanelOpen, setCandidatePanelOpen] = useState(false);
+  const [candidateLoadState, setCandidateLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const stateSignature = JSON.stringify(state.settings);
   const draftIsValid = draft.tasks.length > 0 && draft.tasks.some(item => item.id === draft.selectedTaskId);
   const hasUnsavedChanges = JSON.stringify(draft) !== stateSignature;
@@ -48,13 +51,53 @@ export function SettingsPage({ state, busy, execute, requestEmailOTP, verifyEmai
   const canSaveDraft = canSaveTasks || tasksUnchanged;
   const classificationAppId = (classification.appId ?? '').trim();
   const classificationDomain = (classification.domain ?? '').trim();
-  const classificationIsBrowser = ['com.google.chrome', 'com.apple.safari'].includes(classificationAppId.toLowerCase());
+  const classificationIsBrowser = Boolean(classificationDomain) || ['com.google.chrome', 'com.apple.safari'].includes(classificationAppId.toLowerCase());
   const classificationFormValid = Boolean(
     classification.name.trim() && classification.name.trim().length <= 200 &&
     ((classification.category === 'uncertain' && !classificationAppId && !classificationDomain) ||
       (classificationAppId && classificationAppId.length <= 256 &&
         (classificationIsBrowser ? validDomain(classificationDomain) : !classificationDomain))),
   );
+  const loadClassificationCandidates = async () => {
+    if (!getClassificationCandidates) return;
+    setCandidateLoadState('loading');
+    setCandidatePanelOpen(true);
+    try {
+      setClassificationCandidates(await getClassificationCandidates());
+      setCandidateLoadState('loaded');
+    } catch {
+      setCandidateLoadState('error');
+    }
+  };
+  const findExistingClassification = (candidate: ClassificationCandidate) => {
+    const matchesTarget = (item: Classification) => item.appId?.toLowerCase() === candidate.appId.toLowerCase() &&
+      (item.domain ?? '').toLowerCase() === candidate.domain.toLowerCase();
+    const existingTarget = draft.classifications.find(matchesTarget);
+    if (existingTarget) return existingTarget;
+
+    const appName = candidate.appName.trim().toLowerCase();
+    const appNameParts = appName.split(/\s+/);
+    const appNameLastPart = appNameParts[appNameParts.length - 1];
+    return draft.classifications.find(item => {
+      if (item.appId || item.domain) return false;
+      const name = item.name.trim().toLowerCase();
+      if (name === candidate.name.toLowerCase()) return true;
+      return !candidate.domain && appNameParts.length === 1 && appNameLastPart &&
+        name.split(/\s+/).at(-1) === appNameLastPart;
+    });
+  };
+  const useClassificationCandidate = (candidate: ClassificationCandidate) => {
+    const existing = findExistingClassification(candidate);
+    const category = existing?.category ?? 'uncertain';
+    setClassification({
+      name: existing?.name ?? candidate.name,
+      appId: candidate.appId,
+      domain: candidate.domain,
+      category,
+    });
+    setEditingClassificationName(existing?.name ?? null);
+    setAddingClassification(category);
+  };
   const monitorStatus = {
     ready: '利用可能',
     running: '計測中',
@@ -132,7 +175,22 @@ export function SettingsPage({ state, busy, execute, requestEmailOTP, verifyEmai
         <label className="settings-checkbox-row"><input type="checkbox" checked disabled readOnly /><span>開始と同時に VS Code と前回のフォルダを開く</span><small>未接続</small></label>
       </section>
       <section className="card settings-section">
-        <h2>アプリ・サイトの分類</h2>
+        <div className="settings-section-heading"><div><h2>アプリ・サイトの分類</h2><small>実測ログから候補を選ぶと、IDとDomainを自動入力します。</small></div><button type="button" className="button" disabled={busy || candidateLoadState === 'loading' || !getClassificationCandidates} onClick={() => void loadClassificationCandidates()}>{candidateLoadState === 'loading' ? '読み込み中…' : candidateLoadState === 'loaded' ? '候補を再読み込み' : '実測から候補を読み込む'}</button></div>
+        {candidatePanelOpen && <div className="classification-candidate-panel" aria-live="polite">
+          {candidateLoadState === 'loading' && <p className="settings-note">直近の実測ログを読み込んでいます…</p>}
+          {candidateLoadState === 'error' && <p className="settings-note" role="alert">候補を読み込めませんでした。実測ログが保存されているか確認してください。</p>}
+          {candidateLoadState === 'loaded' && classificationCandidates.length === 0 && <p className="settings-note">候補がありません。作業を実測してから再読み込みしてください。</p>}
+          {candidateLoadState === 'loaded' && classificationCandidates.map(candidate => {
+            const existing = findExistingClassification(candidate);
+            return <div className="classification-candidate" key={`${candidate.appId}:${candidate.domain}`}>
+              <span className="candidate-kind">{candidate.domain ? 'サイト' : 'アプリ'}</span>
+              <div className="candidate-copy"><strong>{candidate.name}</strong><small>{candidate.domain ? `${candidate.appName || candidate.appId} ・ ${candidate.appId} ・ ${candidate.domain}` : candidate.appId}</small></div>
+              <span className="candidate-count">{candidate.sampleCount}件</span>
+              {existing && <span className="candidate-category">{classificationCategoryLabels[existing.category]}</span>}
+              <button type="button" className="text-button" disabled={busy} onClick={() => useClassificationCandidate(candidate)}>{existing ? '設定を確認' : '設定に使う'}</button>
+            </div>;
+          })}
+        </div>}
         {classificationCategories.map(category => {
           const items = draft.classifications.filter(item => item.category === category);
           return <div className="classification-group" key={category}>
@@ -170,7 +228,7 @@ export function SettingsPage({ state, busy, execute, requestEmailOTP, verifyEmai
             setAddingClassification(null);
           }}>キャンセル</button>
         </div>}
-        <p className="settings-note">照合はアプリIDとDomainの完全一致です。Chrome / SafariはDomainが必要です。ルールは作業開始時に固定します。既存のID未設定項目はU（不明）になります。設定はこのMacに保存されます。</p>
+        <p className="settings-note">照合はアプリIDとDomainの完全一致です。ブラウザーのサイトはDomainが必要です。ルールは作業開始時に固定します。既存のID未設定項目はU（不明）になります。設定はこのMacに保存されます。</p>
       </section>
       <section className="card settings-section">
         <h2>アカウント</h2>

@@ -1,5 +1,5 @@
 import { defaultClassifications, defaultTask, defaultTasks, scenarios } from '../fixtures';
-import type { Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result, Settings } from './types';
+import type { ClassificationCandidate, Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result, Settings } from './types';
 
 const storageKey = 'focus-link.demo.v2';
 const terminal = (status: string) => status === 'FINALIZED' || status === 'ABORTED';
@@ -59,6 +59,14 @@ export class DemoBridge implements DesktopBridge {
   }
 
   async getStartupState() { return copy(this.state); }
+
+  async getClassificationCandidates(): Promise<ClassificationCandidate[]> {
+    return [
+      { name: 'Code', appId: 'com.microsoft.VSCode', appName: 'Code', domain: '', sampleCount: 24 },
+      { name: 'github.com', appId: 'com.google.Chrome', appName: 'Google Chrome', domain: 'github.com', sampleCount: 12 },
+      { name: 'ChatGPT', appId: 'com.openai.codex', appName: 'ChatGPT', domain: '', sampleCount: 8 },
+    ];
+  }
 
   async requestEmailOTP(email: string) {
     this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };

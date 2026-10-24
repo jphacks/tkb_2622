@@ -60,6 +60,7 @@ function controlledBridge() {
   const callbacks: Array<(snapshot: Snapshot) => void> = [];
   const bridge: DesktopBridge = {
     getStartupState: vi.fn(async () => makeSnapshot(0)),
+    getClassificationCandidates: vi.fn(async () => []),
     execute: vi.fn(async () => makeSnapshot(1)),
     requestEmailOTP: vi.fn(async () => makeSnapshot(1)),
     verifyEmailOTP: vi.fn(async () => makeSnapshot(1)),

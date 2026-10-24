@@ -36,7 +36,7 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
   if (!state) return <div className="startup-message" role="status"><h1>Focus Link</h1><p>{error || '作業スペースを準備しています…'}</p>{error && <button className="button" onClick={() => void store.connect()}>接続を再試行</button>}</div>;
   if (state.platform === 'unsupported') return <div className="startup-message">このOSは対応していません。</div>;
   const Shell = state.platform === 'windows' ? WindowsShell : MacShell;
-  const props = { state, busy, execute: async (command: Parameters<DesktopStore['execute']>[0]) => {
+  const props = { state, busy, getClassificationCandidates: () => store.getClassificationCandidates(), execute: async (command: Parameters<DesktopStore['execute']>[0]) => {
     const session = state.session;
     const isPendingCompletion = command.action === 'retry' && session && ['COMPLETED_LOCAL', 'ABORTED_LOCAL'].includes(session.status);
     const shouldOpenFeedback = command.action === 'finish' || command.action === 'abort' || isPendingCompletion;

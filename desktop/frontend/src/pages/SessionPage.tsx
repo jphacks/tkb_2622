@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { Command, SessionAction, Snapshot } from '../bridge/types';
+import type { ClassificationCandidate, Command, SessionAction, Snapshot } from '../bridge/types';
 import { clock, duration, minimumDuration, plannedDuration } from '../components/format';
 
 export const statusLabels: Record<string, string> = { RUNNING: '作業中', PAUSED: '一時停止中', FINALIZED: '作業終了', ABORTED: '中止済み', COMPLETED_LOCAL: '終了・同期待ち', ABORTED_LOCAL: '中止・同期待ち' };
 export interface PageProps {
   state: Snapshot;
   busy: boolean;
+  getClassificationCandidates?: () => Promise<ClassificationCandidate[]>;
   execute: (command: Command) => Promise<Snapshot | null>;
   requestEmailOTP: (email: string) => Promise<Snapshot | null>;
   verifyEmailOTP: (email: string, code: string) => Promise<Snapshot | null>;

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -64,6 +65,14 @@ type Record struct {
 	RecordedAt  time.Time    `json:"recordedAt"`
 	Observation *Observation `json:"observation,omitempty"`
 	Reason      string       `json:"reason,omitempty"`
+}
+
+type ClassificationCandidate struct {
+	Name        string `json:"name"`
+	AppID       string `json:"appId"`
+	AppName     string `json:"appName"`
+	Domain      string `json:"domain"`
+	SampleCount int    `json:"sampleCount"`
 }
 
 type Recorder struct {
@@ -277,6 +286,77 @@ func (r *Recorder) ReadRecords() ([]Record, error) {
 		return nil, fmt.Errorf("session capture could not be read: %w", err)
 	}
 	return records, nil
+}
+
+func ReadClassificationCandidates(sessionID string) ([]ClassificationCandidate, error) {
+	if !validSessionID(sessionID) {
+		return nil, errors.New("invalid session id")
+	}
+	configDirectory, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("user config directory unavailable: %w", err)
+	}
+	filePath := filepath.Join(configDirectory, "Focus Link", "sessions", sessionID+".jsonl")
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("session capture could not be opened: %w", err)
+	}
+	defer file.Close()
+
+	candidates := map[string]*ClassificationCandidate{}
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 4096), maxOutputLength*2)
+	for scanner.Scan() {
+		var record Record
+		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			return nil, fmt.Errorf("session capture record is invalid: %w", err)
+		}
+		if record.SessionID != sessionID {
+			return nil, errors.New("session capture contains a different session id")
+		}
+		if record.Kind != "sample" || record.Observation == nil {
+			continue
+		}
+		observation := record.Observation
+		appID := stringValue(observation.AppID)
+		domain := stringValue(observation.BrowserDomain)
+		if appID == "" || appID == "com.wails.focus-link" {
+			continue
+		}
+		if domain == "" && (strings.EqualFold(appID, "com.google.Chrome") || strings.EqualFold(appID, "com.apple.Safari")) {
+			continue
+		}
+		appName := stringValue(observation.AppName)
+		name := domain
+		if name == "" {
+			name = appName
+		}
+		if name == "" {
+			name = appID
+		}
+		key := strings.ToLower(appID) + "\x00" + strings.ToLower(domain)
+		candidate := candidates[key]
+		if candidate == nil {
+			candidate = &ClassificationCandidate{Name: name, AppID: appID, AppName: appName, Domain: domain}
+			candidates[key] = candidate
+		}
+		candidate.SampleCount++
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("session capture could not be read: %w", err)
+	}
+
+	result := make([]ClassificationCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		result = append(result, *candidate)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].SampleCount == result[j].SampleCount {
+			return result[i].Name < result[j].Name
+		}
+		return result[i].SampleCount > result[j].SampleCount
+	})
+	return result, nil
 }
 
 func (r *Recorder) capture(ctx context.Context) (Observation, error) {

@@ -1,3 +1,28 @@
+export namespace monitor {
+
+	export class ClassificationCandidate {
+	    name: string;
+	    appId: string;
+	    appName: string;
+	    domain: string;
+	    sampleCount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ClassificationCandidate(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.appId = source["appId"];
+	        this.appName = source["appName"];
+	        this.domain = source["domain"];
+	        this.sampleCount = source["sampleCount"];
+	    }
+	}
+
+}
+
 export namespace session {
 
 	export class AccountState {

@@ -1,4 +1,4 @@
-import type { Command, DesktopBridge, Snapshot } from '../bridge/types';
+import type { ClassificationCandidate, Command, DesktopBridge, Snapshot } from '../bridge/types';
 
 export interface ViewState { snapshot: Snapshot | null; busy: boolean; error: string | null }
 
@@ -25,6 +25,9 @@ export class DesktopStore {
   disconnect() { this.generation++; this.unsubscribe?.(); this.unsubscribe = undefined; }
   async execute(command: Command): Promise<Snapshot | null> {
 		return this.perform(() => this.bridge.execute(command));
+	}
+	async getClassificationCandidates(): Promise<ClassificationCandidate[]> {
+		return this.bridge.getClassificationCandidates();
 	}
 	async requestEmailOTP(email: string): Promise<Snapshot | null> {
 		return this.perform(() => this.bridge.requestEmailOTP(email));

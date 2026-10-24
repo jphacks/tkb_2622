@@ -7,6 +7,7 @@ export interface Failure { code: string; message: string; retryable: boolean }
 export interface AccountState { status: 'unconfigured' | 'storageUnavailable' | 'signedOut' | 'otpPending' | 'signedIn' | 'error' | 'demo'; email: string; deviceRegistered: boolean; message: string }
 export interface MonitorStatus { state: string; appId?: string; appName: string; browserName: string; domain: string; lastSample: string; sampleCount: number; message: string }
 export interface Classification { name: string; appId?: string; domain?: string; category: 'work' | 'related' | 'distraction' | 'uncertain' }
+export interface ClassificationCandidate { name: string; appId: string; appName: string; domain: string; sampleCount: number }
 export interface Settings { tasks: Task[]; selectedTaskId: string; classifications: Classification[] }
 export interface Result { sessionId: string; name: string; status: SessionStatus; elapsedSeconds: number; taskSeconds?: number; relatedSeconds?: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; inactiveSeconds?: number; evaluatorVersion?: string; earnedSeconds: number; usedSeconds: number; discardedSeconds: number }
 export type SessionAction = 'start' | 'pause' | 'resume' | 'finish' | 'abort' | 'retry';
@@ -29,6 +30,7 @@ export type Command =
   | { action: 'saveSettings'; settings: Settings };
 export interface DesktopBridge {
   getStartupState(): Promise<Snapshot>;
+  getClassificationCandidates(): Promise<ClassificationCandidate[]>;
   execute(command: Command): Promise<Snapshot>;
   requestEmailOTP(email: string): Promise<Snapshot>;
   verifyEmailOTP(email: string, code: string): Promise<Snapshot>;

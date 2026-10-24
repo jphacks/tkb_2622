@@ -197,6 +197,16 @@ func (a *App) GetStartupState() session.Snapshot {
 	return a.engine.Snapshot()
 }
 
+func (a *App) GetClassificationCandidates() ([]monitor.ClassificationCandidate, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	state := a.engine.Snapshot()
+	if state.Session == nil {
+		return []monitor.ClassificationCandidate{}, nil
+	}
+	return monitor.ReadClassificationCandidates(state.Session.ID)
+}
+
 func (a *App) Execute(command session.Command) session.Snapshot {
 	if command.Action == "abort" {
 		a.mu.Lock()
