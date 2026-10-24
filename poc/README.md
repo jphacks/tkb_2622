@@ -8,6 +8,10 @@
 
 macOS操作ログの実行方法・検証結果・未検証事項は専用のREADMEを参照してください。macOS操作ログの実測データと開発用ツールはGit管理対象外です。iOS報酬時間管理と報酬状態同期の手順・検証結果は以下に記載します。
 
+## 友だち集中ウィジェットPoC
+
+友だちの集中状態に応じてキャラクターを切り替えるホーム画面ウィジェット／Dynamic Islandの技術検証は [`ios-friend-focus-widget/`](ios-friend-focus-widget/) を参照する。現段階では同じiPhone上のPoCアプリから状態を切り替える。別端末からのリアルタイム同期や通知配信は対象外。
+
 ## iOS報酬時間管理PoC
 
 Swift / SwiftUIで作成したiOS PoCは [`ios-reward-time/`](ios-reward-time/) に置く。本番向けアプリの実装場所とは分け、PoC固有の画面・仮データ・検証コードをここで管理する。
