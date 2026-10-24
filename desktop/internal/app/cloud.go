@@ -329,12 +329,17 @@ func (a *App) currentCloudAuthLocked(ctx context.Context) (cloud.AuthSession, er
 	if a.credentials == nil {
 		return cloud.AuthSession{}, errors.New("OSの資格情報ストアを利用できません")
 	}
-	current, found, err := a.credentials.Load()
-	if err != nil {
-		return cloud.AuthSession{}, errors.New("保存済みのログイン情報を読み取れません")
-	}
-	if !found {
-		return cloud.AuthSession{}, errors.New("ログイン情報がありません。設定からログインしてください")
+	current := a.authSession
+	if current.AccessToken == "" {
+		var found bool
+		var err error
+		current, found, err = a.credentials.Load()
+		if err != nil {
+			return cloud.AuthSession{}, errors.New("保存済みのログイン情報を読み取れません")
+		}
+		if !found {
+			return cloud.AuthSession{}, errors.New("ログイン情報がありません。設定からログインしてください")
+		}
 	}
 	updated, err := a.refreshSessionIfNeeded(ctx, current)
 	if err != nil {

@@ -6,13 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"runtime"
 
 	"github.com/99designs/keyring"
 	"github.com/jphacks/tkb_2622/desktop/internal/cloud"
 )
 
-const credentialKey = "supabase-session-v1"
+const (
+	credentialKey       = "supabase-session-v2"
+	legacyCredentialKey = "supabase-session-v1"
+)
 
 type credentialStore struct{ ring keyring.Keyring }
 
@@ -29,6 +33,7 @@ func newCredentialStore() (*credentialStore, error) {
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName:                    "com.jphacks.focus-link",
 		AllowedBackends:                allowed,
+		KeychainTrustApplication:       runtime.GOOS == "darwin",
 		KeychainAccessibleWhenUnlocked: true,
 	})
 	if err != nil {
@@ -39,6 +44,11 @@ func newCredentialStore() (*credentialStore, error) {
 
 func (s *credentialStore) Load() (cloud.AuthSession, bool, error) {
 	item, err := s.ring.Get(credentialKey)
+	legacy := false
+	if errors.Is(err, keyring.ErrKeyNotFound) {
+		item, err = s.ring.Get(legacyCredentialKey)
+		legacy = err == nil
+	}
 	if errors.Is(err, keyring.ErrKeyNotFound) {
 		return cloud.AuthSession{}, false, nil
 	}
@@ -51,6 +61,14 @@ func (s *credentialStore) Load() (cloud.AuthSession, bool, error) {
 	}
 	if session.AccessToken == "" || session.RefreshToken == "" || session.Email == "" {
 		return cloud.AuthSession{}, false, errors.New("saved authentication session is incomplete")
+	}
+	if legacy {
+		if err := s.Save(session); err != nil {
+			return cloud.AuthSession{}, false, fmt.Errorf("saved authentication session migration failed: %w", err)
+		}
+		if err := s.ring.Remove(legacyCredentialKey); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+			log.Printf("legacy authentication session could not be removed: %v", err)
+		}
 	}
 	return session, true, nil
 }
@@ -69,11 +87,12 @@ func (s *credentialStore) Save(session cloud.AuthSession) error {
 }
 
 func (s *credentialStore) Delete() error {
-	if err := s.ring.Remove(credentialKey); errors.Is(err, keyring.ErrKeyNotFound) {
-		return nil
-	} else {
-		return err
+	for _, key := range []string{legacyCredentialKey, credentialKey} {
+		if err := s.ring.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+			return err
+		}
 	}
+	return nil
 }
 
 func newUUID() (string, error) {
