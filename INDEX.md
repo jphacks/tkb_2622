@@ -7,7 +7,7 @@
 | ディレクトリ | 用途・現状 |
 | --- | --- |
 | [backend/](backend/) | バックエンド用。README は未記入 |
-| [desktop/](desktop/) | 作業・集中度合を検知するデスクトップアプリ用 |
+| [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
 | [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
 | [infra/](infra/) | インフラ構成の管理用 |
 | [poc/](poc/) | 必要な機能の PoC 用 |
