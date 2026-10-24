@@ -8,7 +8,7 @@ struct BackendHealthCheckView: View {
         case failed(String)
     }
 
-    @State private var baseURLText = ProcessInfo.processInfo.environment["TKB_API_BASE_URL"] ?? "http://127.0.0.1:8080"
+    @State private var baseURLText = MobileAppConfiguration.connectAPIBaseURL ?? ""
     @State private var checkState: CheckState = .idle
 
     var body: some View {
@@ -29,6 +29,18 @@ struct BackendHealthCheckView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("apiBaseURL")
 
+#if !targetEnvironment(simulator)
+                if usesLoopbackAddress {
+                    Label(
+                        "127.0.0.1はこのiPhone自身を指します。Mac上のbackendにはMacのLAN IPを指定してください。",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+#endif
+
                 Button {
                     Task { await checkHealth() }
                 } label: {
@@ -48,6 +60,11 @@ struct BackendHealthCheckView: View {
 
     private var buttonTitle: String {
         isChecking ? "確認中…" : "接続を確認"
+    }
+
+    private var usesLoopbackAddress: Bool {
+        guard let host = URL(string: baseURLText)?.host?.lowercased() else { return false }
+        return ["localhost", "127.0.0.1", "::1"].contains(host)
     }
 
     private var isChecking: Bool {

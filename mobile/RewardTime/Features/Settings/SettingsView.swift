@@ -218,6 +218,7 @@ struct SettingsView: View {
             if phase == .active {
                 screenTime.refreshAuthorizationStatus()
                 refreshOpenUsageGrant()
+                Task { await syncDeviceSettings() }
             }
         }
         .familyActivityPicker(

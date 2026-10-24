@@ -51,7 +51,7 @@ struct AuthenticationSettingsSection: View {
             .textFieldStyle(.roundedBorder)
             .font(.footnote)
 
-            Text("公開用キーだけを入力してください。service_role / secret keyは入力しないでください。実機ではAPI URLにMacのLAN IPを指定します。")
+            Text("公開用キーだけを入力してください。service_role / secret keyは入力しないでください。実機でMac上のbackendを使う場合、API URLにはMacのLAN IPを指定します（127.0.0.1はiPhone自身です）。")
                 .font(.caption2)
                 .foregroundStyle(AppTheme.secondaryInk)
 #else
