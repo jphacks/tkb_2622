@@ -36,6 +36,17 @@ services:
       SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
       AUTH_ALLOW_LOCAL_HTTP: ${AUTH_ALLOW_LOCAL_HTTP:-false}
       API_DOCS_ENABLED: "true"
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_AUTH_KEY_PATH: ${APNS_AUTH_KEY_FILE:+/run/secrets/apns_auth_key}
+    volumes:
+      - type: bind
+        source: ${APNS_AUTH_KEY_FILE:-/dev/null}
+        target: /run/secrets/apns_auth_key
+        read_only: true
+        bind:
+          create_host_path: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
