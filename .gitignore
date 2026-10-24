@@ -1,0 +1,8 @@
+# Local secrets and generated backend artifacts
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/*.db
+backend/*.db-*
+backend/*.sqlite*
+backend/bin/
