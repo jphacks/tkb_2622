@@ -12,6 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
+const activeIPhone = `-- name: ActiveIPhone :one
+SELECT id, user_id, registration_id, auth_session_id, platform, name, status, version, created_at FROM app.devices WHERE user_id = $1 AND platform = 'IOS' AND status = 'ACTIVE'
+`
+
+func (q *Queries) ActiveIPhone(ctx context.Context, userID uuid.UUID) (AppDevice, error) {
+	row := q.db.QueryRowContext(ctx, activeIPhone, userID)
+	var i AppDevice
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.RegistrationID,
+		&i.AuthSessionID,
+		&i.Platform,
+		&i.Name,
+		&i.Status,
+		&i.Version,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const activeIPhoneCount = `-- name: ActiveIPhoneCount :one
 SELECT count(*) FROM app.devices WHERE user_id = $1 AND platform = 'IOS' AND status = 'ACTIVE'
 `

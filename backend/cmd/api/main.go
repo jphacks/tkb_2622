@@ -13,10 +13,18 @@ import (
 	"time"
 
 	"github.com/jphacks/tkb_2622/backend/internal/database"
+	focuspersistence "github.com/jphacks/tkb_2622/backend/internal/focus/adapter/persistence"
+	focus "github.com/jphacks/tkb_2622/backend/internal/focus/application"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/auth"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/persistence"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/application"
+	restrictionpersistence "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/persistence"
+	restriction "github.com/jphacks/tkb_2622/backend/internal/restriction/application"
+	rewardpersistence "github.com/jphacks/tkb_2622/backend/internal/reward/adapter/persistence"
+	reward "github.com/jphacks/tkb_2622/backend/internal/reward/application"
 	"github.com/jphacks/tkb_2622/backend/internal/server"
+	workflowadapter "github.com/jphacks/tkb_2622/backend/internal/workflow/adapter"
+	workflow "github.com/jphacks/tkb_2622/backend/internal/workflow/application"
 )
 
 func main() {
@@ -51,9 +59,18 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer db.Close()
-	service := application.New(persistence.New(db))
+	identityService := application.New(persistence.New(db))
+	handler := server.Handler(server.Deps{
+		Identity:    identityService,
+		Verifier:    verifier,
+		Focus:       focus.New(focuspersistence.NewStore(db)),
+		Sessions:    workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
+		Wallets:     reward.New(rewardpersistence.New(db)),
+		Restriction: restriction.New(restrictionpersistence.NewStore(db)),
+		EnableDocs:  os.Getenv("API_DOCS_ENABLED") == "true",
+	})
 	srv := &http.Server{
-		Addr: net.JoinHostPort("", port), Handler: server.Handler(service, verifier, os.Getenv("API_DOCS_ENABLED") == "true"),
+		Addr: net.JoinHostPort("", port), Handler: handler,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
 	done := make(chan error, 1)

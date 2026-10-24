@@ -26,6 +26,10 @@ type RevokeInput struct {
 	OperationID, DeviceID string
 	ExpectedVersion       int64
 }
+
+// Actor is the business user behind a principal and the device registered for its auth session.
+// DeviceID is empty when the auth session has no registered device.
+type Actor struct{ UserID, DeviceID, DevicePlatform string }
 type DevicePage struct {
 	Devices []domain.Device
 	Next    string
@@ -37,6 +41,8 @@ type Repository interface {
 	RegisterDevice(context.Context, Principal, RegisterInput) (domain.Device, error)
 	ListDevices(context.Context, Principal, string, int) (DevicePage, error)
 	RevokeDevice(context.Context, Principal, RevokeInput) (domain.Device, error)
+	Actor(context.Context, Principal) (Actor, error)
+	ActiveIPhone(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct{ repo Repository }
@@ -94,4 +100,21 @@ func (s *Service) RevokeDevice(ctx context.Context, p Principal, in RevokeInput)
 		return domain.Device{}, ErrInvalid
 	}
 	return s.repo.RevokeDevice(ctx, p, in)
+}
+
+// ResolveActor is the public operation other modules use to identify the caller.
+// It fails with ErrNotFound before EnsureUser and ErrForbidden for disabled users or revoked devices.
+func (s *Service) ResolveActor(ctx context.Context, p Principal) (Actor, error) {
+	if !validPrincipal(p) {
+		return Actor{}, ErrUnauthenticated
+	}
+	return s.repo.Actor(ctx, p)
+}
+
+// ActiveIPhone returns the ID of the user's single active iPhone, or ErrNotFound.
+func (s *Service) ActiveIPhone(ctx context.Context, userID string) (string, error) {
+	if !ValidID(userID) {
+		return "", ErrInvalid
+	}
+	return s.repo.ActiveIPhone(ctx, userID)
 }
