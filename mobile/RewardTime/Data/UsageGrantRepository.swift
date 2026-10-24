@@ -268,7 +268,11 @@ struct ConfiguredUsageGrantRepository {
             || (grant.status == "GRANT_STATUS_REVOKED" && grant.isSettled) {
             DeviceActivityUsageMonitor().stop()
         }
-        return UsageGrantSyncResult(grant: grant, measuredSeconds: measuredSeconds)
+        let serverReportedSeconds = Int(min(grant.reportedSeconds, grant.reservedSeconds))
+        return UsageGrantSyncResult(
+            grant: grant,
+            measuredSeconds: max(measuredSeconds, serverReportedSeconds)
+        )
     }
 
     func synchronizeStoredActiveGrantIfPresent() async {
