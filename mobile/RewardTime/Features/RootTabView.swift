@@ -3,7 +3,7 @@ import SwiftUI
 struct RootTabView: View {
   @Environment(\.scenePhase) private var scenePhase
   @StateObject private var screenTime = MobileScreenTimeController()
-  @StateObject private var usageGrantSync = UsageGrantSyncCoordinator()
+  @StateObject private var apiSync = MobileAPISyncCoordinator()
   @AppStorage("mobile.auth.loginDeferred") private var loginDeferred = false
   @State private var selectedTab = 0
   @State private var pendingInvitationToken: String?
@@ -83,8 +83,8 @@ struct RootTabView: View {
           isAuthenticated: isAuthenticated,
           isVisible: selectedTab == 0,
           requestSignIn: showWelcome,
-          usageSyncError: usageGrantSync.errorMessage,
-          retryUsageSync: { await synchronizeUsageGrant() }
+          apiSyncError: apiSync.errorMessage,
+          retryAPISync: { await synchronizeUsageGrant() }
         )
           .toolbar { NotificationToolbarButton(isAuthenticated: isAuthenticated) }
       }
@@ -227,13 +227,15 @@ struct RootTabView: View {
 
   @MainActor
   private func synchronizeUsageGrant() async {
-    await usageGrantSync.synchronize {
-      let repository = try ConfiguredUsageGrantRepository()
-      try await repository.synchronizeStoredActiveGrantIfPresent()
-    }
-    guard let snapshot = try? await ConfiguredHomeRepository().fetchCurrentSnapshot() else {
-      return
-    }
-    await screenTime.reconcileServerRestriction(snapshot)
+    await apiSync.synchronize(
+      usage: {
+        let repository = try ConfiguredUsageGrantRepository()
+        try await repository.synchronizeStoredActiveGrantIfPresent()
+      },
+      refreshHome: {
+        let snapshot = try await ConfiguredHomeRepository().fetchCurrentSnapshot()
+        await screenTime.reconcileServerRestriction(snapshot)
+      }
+    )
   }
 }

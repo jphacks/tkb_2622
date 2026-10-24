@@ -10,8 +10,8 @@ struct HomeView: View {
   private let isAuthenticated: Bool
   private let isVisible: Bool
   private let requestSignIn: () -> Void
-  private let usageSyncError: String?
-  private let retryUsageSync: () async -> Void
+  private let apiSyncError: String?
+  private let retryAPISync: () async -> Void
 
   init(
     repository: any HomeRepository = ConfiguredHomeRepository(),
@@ -19,23 +19,23 @@ struct HomeView: View {
     isAuthenticated: Bool = true,
     isVisible: Bool = true,
     requestSignIn: @escaping () -> Void = {},
-    usageSyncError: String? = nil,
-    retryUsageSync: @escaping () async -> Void = {}
+    apiSyncError: String? = nil,
+    retryAPISync: @escaping () async -> Void = {}
   ) {
     _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
     _screenTime = ObservedObject(wrappedValue: screenTime)
     self.isAuthenticated = isAuthenticated
     self.isVisible = isVisible
     self.requestSignIn = requestSignIn
-    self.usageSyncError = usageSyncError
-    self.retryUsageSync = retryUsageSync
+    self.apiSyncError = apiSyncError
+    self.retryAPISync = retryAPISync
   }
 
   var body: some View {
     ScreenContainer {
       if isAuthenticated {
-        if let usageSyncError {
-          usageSyncWarning(usageSyncError)
+        if let apiSyncError {
+          apiSyncWarning(apiSyncError)
         }
         switch viewModel.state {
         case .loading:
@@ -174,19 +174,19 @@ struct HomeView: View {
     }
   }
 
-  private func usageSyncWarning(_ message: String) -> some View {
+  private func apiSyncWarning(_ message: String) -> some View {
     SurfaceCard {
-      Label("利用状況をサーバーへ同期できませんでした", systemImage: "exclamationmark.triangle.fill")
+      Label("サーバー同期に失敗しました", systemImage: "exclamationmark.triangle.fill")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.red)
-      Text("この端末の計測記録を消さずに再試行できます。")
+      Text("詳細を確認し、通信が戻ったら再試行してください。")
         .font(.footnote)
         .foregroundStyle(AppTheme.secondaryInk)
       Text(message)
         .font(.caption)
         .foregroundStyle(AppTheme.secondaryInk)
-      Button("利用状況を再同期") {
-        Task { await retryUsageSync() }
+      Button("同期を再試行") {
+        Task { await retryAPISync() }
       }
       .buttonStyle(.bordered)
     }
