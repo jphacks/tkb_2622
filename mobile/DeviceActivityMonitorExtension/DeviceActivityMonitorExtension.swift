@@ -54,15 +54,19 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
         guard let data = defaults.data(forKey: selectionKey),
               let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data),
-              !selection.applicationTokens.isEmpty else {
+              !selection.applicationTokens.subtracting(
+                  Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey)
+              ).isEmpty else {
             store.shield.applications = nil
-            store.shield.applicationCategories = .all()
+            store.shield.applicationCategories = .all(except: Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey))
             defaults.set("missing_selection", forKey: "mobile.usage.monitorError")
             defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
             return
         }
         store.shield.applicationCategories = nil
-        store.shield.applications = selection.applicationTokens
+        store.shield.applications = selection.applicationTokens.subtracting(
+            Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey)
+        )
         defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
     }
 

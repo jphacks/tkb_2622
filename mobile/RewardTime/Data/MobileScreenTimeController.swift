@@ -87,7 +87,7 @@ final class MobileScreenTimeController: ObservableObject {
         let configured: Bool
         switch restrictionMode {
         case .selectedApplications:
-            configured = isAuthorized && selectedApplicationCount > 0 && !hasUnsupportedTargets
+            configured = isAuthorized && restrictedApplicationCount > 0 && !hasUnsupportedTargets
         case .entireDevice:
             configured = isAuthorized && !alwaysAllowedSelection.applicationTokens.isEmpty
         }
@@ -106,6 +106,10 @@ final class MobileScreenTimeController: ObservableObject {
     }
 
     var selectedApplicationCount: Int { selection.applicationTokens.count }
+    var restrictedApplicationTokens: Set<ApplicationToken> {
+        selection.applicationTokens.subtracting(alwaysAllowedSelection.applicationTokens)
+    }
+    var restrictedApplicationCount: Int { restrictedApplicationTokens.count }
 
     var hasUnsupportedTargets: Bool {
         !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
@@ -120,8 +124,8 @@ final class MobileScreenTimeController: ObservableObject {
         if restrictionMode == .selectedApplications && hasUnsupportedTargets {
             return "カテゴリやWebサイトはまだ適用できません。選択内容をアプリだけにしてください。"
         }
-        if restrictionMode == .selectedApplications && selectedApplicationCount == 0 {
-            return "先に制限するアプリを1つ以上選んでください。"
+        if restrictionMode == .selectedApplications && restrictedApplicationCount == 0 {
+            return "制限するアプリを1つ以上選んでください。常時許可に選んだアプリは対象外です。"
         }
         if restrictionMode == .entireDevice && alwaysAllowedSelection.applicationTokens.isEmpty {
             return "常時許可する標準アプリを選んでください。Safariは選ばないでください。"
@@ -179,7 +183,7 @@ final class MobileScreenTimeController: ObservableObject {
         switch restrictionMode {
         case .selectedApplications:
             settingsStore.shield.applicationCategories = nil
-            settingsStore.shield.applications = selection.applicationTokens
+            settingsStore.shield.applications = restrictedApplicationTokens
         case .entireDevice:
             settingsStore.shield.applications = nil
             settingsStore.shield.applicationCategories = .all(except: alwaysAllowedSelection.applicationTokens)

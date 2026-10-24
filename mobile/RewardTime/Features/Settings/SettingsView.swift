@@ -106,10 +106,10 @@ struct SettingsView: View {
                     Divider()
                     sectionTitle("制限するアプリ", icon: "square.grid.2x2")
                     HStack {
-                        Text("選択中のアプリ")
+                        Text("制限対象のアプリ")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text("\(screenTime.selectedApplicationCount)個")
+                        Text("\(screenTime.restrictedApplicationCount)個")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(AppTheme.primary)
                     }
@@ -122,9 +122,9 @@ struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
 
-                    if !screenTime.selection.applicationTokens.isEmpty {
+                    if !screenTime.restrictedApplicationTokens.isEmpty {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
-                            ForEach(Array(screenTime.selection.applicationTokens), id: \.self) { token in
+                            ForEach(Array(screenTime.restrictedApplicationTokens), id: \.self) { token in
                                 Label(token)
                                     .font(.caption.weight(.medium))
                                     .lineLimit(1)
@@ -139,29 +139,29 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(AppTheme.secondaryInk)
                     }
-                } else {
-                    Divider()
-                    sectionTitle("常時許可するアプリ", icon: "checkmark.shield")
-                    Text("標準アプリを常時許可するには、ここで選択してください。Safariは選ばないでください。")
-                        .font(.footnote)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                    HStack {
-                        Text("選択中のアプリ")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text("\(screenTime.alwaysAllowedSelection.applicationTokens.count)個")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.primary)
-                    }
-                    Button {
-                        isPickingAlwaysAllowedApps = true
-                        isFamilyActivityPickerPresented = true
-                    } label: {
-                        Label("常時許可するアプリを選ぶ", systemImage: "checkmark.app")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
                 }
+
+                Divider()
+                sectionTitle("常時許可するアプリ", icon: "checkmark.shield")
+                Text("選んだアプリはどちらの制限モードでも対象外です。iPhone標準アプリを選び、Safariは選ばないでください。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                HStack {
+                    Text("選択中のアプリ")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(screenTime.alwaysAllowedSelection.applicationTokens.count)個")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.primary)
+                }
+                Button {
+                    isPickingAlwaysAllowedApps = true
+                    isFamilyActivityPickerPresented = true
+                } label: {
+                    Label("常時許可するアプリを選ぶ", systemImage: "checkmark.app")
+                }
+                .buttonStyle(.bordered)
+                .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
                 modeButton(.entireDevice)
 
                 Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "lock.fill")

@@ -16,11 +16,17 @@ struct DeviceActivityUsageMonitor {
         return center.activities.contains(DeviceActivityName(rawName))
     }
 
-    func start(operationID: String, reservedSeconds: Int, selection: FamilyActivitySelection) throws {
+    func start(
+        operationID: String,
+        reservedSeconds: Int,
+        selection: FamilyActivitySelection,
+        alwaysAllowedSelection: FamilyActivitySelection
+    ) throws {
         guard reservedSeconds > 0, reservedSeconds.isMultiple(of: 60) else {
             throw DeviceActivityUsageMonitorError.invalidDuration
         }
-        guard !selection.applicationTokens.isEmpty else {
+        let applications = selection.applicationTokens.subtracting(alwaysAllowedSelection.applicationTokens)
+        guard !applications.isEmpty else {
             throw DeviceActivityUsageMonitorError.noSelectedApplications
         }
         if defaults.string(forKey: "mobile.usage.activeGrantID") != nil,
@@ -49,7 +55,7 @@ struct DeviceActivityUsageMonitor {
             let threshold = DateComponents(minute: seconds / 60)
             if #available(iOS 17.4, *) {
                 events[eventName] = DeviceActivityEvent(
-                    applications: selection.applicationTokens,
+                    applications: applications,
                     categories: [],
                     webDomains: [],
                     threshold: threshold,
@@ -57,7 +63,7 @@ struct DeviceActivityUsageMonitor {
                 )
             } else {
                 events[eventName] = DeviceActivityEvent(
-                    applications: selection.applicationTokens,
+                    applications: applications,
                     categories: [],
                     webDomains: [],
                     threshold: threshold

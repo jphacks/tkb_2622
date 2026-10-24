@@ -258,9 +258,14 @@ struct ConfiguredHomeRepository: HomeRepository {
 
         let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
         let selectionData = defaults.data(forKey: "mobile.screenTime.selection")
-        let selectedApplicationCount = selectionData
+        let selectedApplications = selectionData
             .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
-            .map { $0.applicationTokens.count } ?? 0
+            .map(\.applicationTokens) ?? []
+        let alwaysAllowedData = defaults.data(forKey: "mobile.screenTime.alwaysAllowedSelection")
+        let alwaysAllowedApplications = alwaysAllowedData
+            .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
+            .map(\.applicationTokens) ?? []
+        let selectedApplicationCount = selectedApplications.subtracting(alwaysAllowedApplications).count
 
         return try await APIHomeRepository(
             baseURL: apiBaseURL,

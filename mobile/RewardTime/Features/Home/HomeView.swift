@@ -184,9 +184,9 @@ struct HomeView: View {
     private func restrictedAppsCard(_ snapshot: MobileHomeSnapshot) -> some View {
         let isSelectingApps = screenTime.restrictionMode == .selectedApplications
         let hasLocalSelection = isSelectingApps && (screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData)
-        let selectedTokens = Array(screenTime.selection.applicationTokens)
+        let selectedTokens = Array(screenTime.restrictedApplicationTokens)
         let count = hasLocalSelection
-            ? screenTime.selectedApplicationCount
+            ? screenTime.restrictedApplicationCount
             : (snapshot.restrictedApplicationCount ?? snapshot.restrictedApps.count)
 
         return SurfaceCard {
@@ -203,7 +203,7 @@ struct HomeView: View {
             }
 
             if !isSelectingApps {
-                Text("標準アプリ以外のアプリにShieldを設定します。")
+                Text("常時許可に選んだアプリを除くすべてのアプリにShieldを設定します。")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
             } else if hasLocalSelection && !selectedTokens.isEmpty {
@@ -240,7 +240,7 @@ struct HomeView: View {
                      ? "スクリーンタイムを許可すると、設定から対象アプリを選べます。"
                      : (screenTime.restrictionMode == .selectedApplications
                         ? "設定から制限するアプリを選べます。"
-                        : "設定から全体制限の除外アプリを選べます。"))
+                        : "設定から常時許可するアプリを選べます。"))
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
             }

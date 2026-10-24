@@ -50,7 +50,7 @@ final class UsageReservationViewModel: ObservableObject {
         !isReserving && selectedMinutes > 0 && selectedMinutes <= balanceMinutes
             && !sessionID.isEmpty && screenTime.isAuthorized
             && screenTime.restrictionMode == .selectedApplications
-            && screenTime.selectedApplicationCount > 0
+            && screenTime.restrictedApplicationCount > 0
             && !screenTime.hasUnsupportedTargets
             && ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID") == nil
     }
@@ -61,7 +61,7 @@ final class UsageReservationViewModel: ObservableObject {
         if screenTime.restrictionMode != .selectedApplications {
             return "利用時間を正確に計測するため、「選んだアプリを制限」にしてください。"
         }
-        if screenTime.selectedApplicationCount == 0 {
+        if screenTime.restrictedApplicationCount == 0 {
             return "利用時間を計測するアプリを設定から選んでください。"
         }
         if screenTime.hasUnsupportedTargets {
@@ -94,7 +94,8 @@ final class UsageReservationViewModel: ObservableObject {
             try DeviceActivityUsageMonitor().start(
                 operationID: operationID,
                 reservedSeconds: requestedSeconds,
-                selection: screenTime.selection
+                selection: screenTime.selection,
+                alwaysAllowedSelection: screenTime.alwaysAllowedSelection
             )
             let repository = try ConfiguredUsageGrantRepository()
             let result = try await repository.reserve(
