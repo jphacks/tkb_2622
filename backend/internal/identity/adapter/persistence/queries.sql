@@ -27,3 +27,5 @@ SELECT * FROM app.identity_operations WHERE user_id = $1 AND kind = $2 AND opera
 -- name: SaveOperation :exec
 INSERT INTO app.identity_operations (user_id, kind, operation_id, request_hash, response)
 VALUES ($1, $2, $3, $4, $5);
+-- name: ActiveIPhone :one
+SELECT * FROM app.devices WHERE user_id = $1 AND platform = 'IOS' AND status = 'ACTIVE';
