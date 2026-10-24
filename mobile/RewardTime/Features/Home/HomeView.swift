@@ -69,6 +69,12 @@ struct HomeView: View {
                 Label("09 制限画面のプレビュー", systemImage: "lock.iphone")
                     .font(.footnote.weight(.medium))
             }
+            NavigationLink {
+                BackendHealthCheckView()
+            } label: {
+                Label("backendヘルスチェック", systemImage: "network")
+                    .font(.footnote.weight(.medium))
+            }
         }
     }
 #endif
