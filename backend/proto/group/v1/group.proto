@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 
 service GroupService {
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
 }
 
 message GroupMember {
@@ -22,3 +23,8 @@ message Group {
 
 message ListGroupsRequest {}
 message ListGroupsResponse { repeated Group groups = 1; }
+message CreateGroupRequest {
+  string operation_id = 1;
+  string name = 2;
+}
+message CreateGroupResponse { Group group = 1; }

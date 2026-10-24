@@ -7,6 +7,7 @@ import (
 	v1 "github.com/jphacks/tkb_2622/backend/gen/group/v1"
 	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/group/application"
+	"github.com/jphacks/tkb_2622/backend/internal/group/domain"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -32,19 +33,35 @@ func (h *Handler) ListGroups(ctx context.Context, _ *connect.Request[v1.ListGrou
 	}
 	response := &v1.ListGroupsResponse{Groups: make([]*v1.Group, 0, len(groups))}
 	for _, group := range groups {
-		out := &v1.Group{
-			Id:        group.ID,
-			Name:      group.Name,
-			CreatedAt: timestamppb.New(group.CreatedAt),
-			Members:   make([]*v1.GroupMember, 0, len(group.Members)),
-		}
-		for _, member := range group.Members {
-			out.Members = append(out.Members, &v1.GroupMember{
-				IsCurrentUser: member.IsCurrentUser,
-				JoinedAt:      timestamppb.New(member.JoinedAt),
-			})
-		}
-		response.Groups = append(response.Groups, out)
+		response.Groups = append(response.Groups, groupMessage(group))
 	}
 	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) CreateGroup(ctx context.Context, req *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
+	userID, err := h.resolve(ctx)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	group, err := h.service.CreateGroup(ctx, userID, req.Msg.OperationId, req.Msg.Name)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	return connect.NewResponse(&v1.CreateGroupResponse{Group: groupMessage(group)}), nil
+}
+
+func groupMessage(group domain.Group) *v1.Group {
+	out := &v1.Group{
+		Id:        group.ID,
+		Name:      group.Name,
+		CreatedAt: timestamppb.New(group.CreatedAt),
+		Members:   make([]*v1.GroupMember, 0, len(group.Members)),
+	}
+	for _, member := range group.Members {
+		out.Members = append(out.Members, &v1.GroupMember{
+			IsCurrentUser: member.IsCurrentUser,
+			JoinedAt:      timestamppb.New(member.JoinedAt),
+		})
+	}
+	return out
 }

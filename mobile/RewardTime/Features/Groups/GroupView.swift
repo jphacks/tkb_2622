@@ -3,6 +3,11 @@ import SwiftUI
 struct GroupView: View {
     @StateObject private var model = GroupViewModel(repository: ConfiguredGroupRepository())
     @State private var selectedGroupID: String?
+    @State private var isShowingCreateGroup = false
+    @State private var newGroupName = ""
+    @State private var createOperationID: String?
+    @State private var createError: String?
+    @State private var isCreatingGroup = false
 
     var body: some View {
         ScreenContainer {
@@ -29,9 +34,14 @@ struct GroupView: View {
                 SurfaceCard {
                     Label("所属グループはありません", systemImage: "person.2")
                         .font(.headline)
-                    Text("グループへの参加後、ここに一覧が表示されます。")
+                    Text("グループを作成するとここに表示されます。招待からの参加は未対応です。")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.secondaryInk)
+                    Button("グループを作成") {
+                        isShowingCreateGroup = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.primary)
                 }
             case .loaded(let groups):
                 groupPicker(groups)
@@ -54,6 +64,94 @@ struct GroupView: View {
         .task { await model.load() }
         .navigationTitle("グループ")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    isShowingCreateGroup = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("グループを作成")
+            }
+        }
+        .sheet(isPresented: $isShowingCreateGroup, onDismiss: resetCreateGroupForm) {
+            createGroupSheet
+                .presentationDetents([.medium])
+        }
+    }
+
+    private var createGroupSheet: some View {
+        NavigationStack {
+            Form {
+                Section("グループ名") {
+                    TextField("例：研究室", text: $newGroupName)
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: newGroupName) { _, _ in
+                            createOperationID = nil
+                            createError = nil
+                        }
+                    Text("前後の空白を除いて1〜100文字")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+
+                if let createError {
+                    Section {
+                        Text(createError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("グループを作成")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") { isShowingCreateGroup = false }
+                        .disabled(isCreatingGroup)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await submitCreateGroup() }
+                    } label: {
+                        if isCreatingGroup {
+                            ProgressView()
+                        } else {
+                            Text("作成")
+                        }
+                    }
+                    .disabled(newGroupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreatingGroup)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func submitCreateGroup() async {
+        let operationID = createOperationID ?? UUID().uuidString.lowercased()
+        createOperationID = operationID
+        isCreatingGroup = true
+        defer { isCreatingGroup = false }
+
+        do {
+            let group = try await model.createGroup(name: newGroupName, operationID: operationID)
+            selectedGroupID = group.id
+            isShowingCreateGroup = false
+        } catch {
+            if let clientError = error as? ConnectJSONClient.ClientError,
+               case .connect(code: "invalid_argument") = clientError {
+                createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。"
+            } else {
+                createError = (error as? LocalizedError)?.errorDescription
+                    ?? "グループを作成できませんでした。接続状態を確認して再試行してください。"
+            }
+        }
+    }
+
+    private func resetCreateGroupForm() {
+        newGroupName = ""
+        createOperationID = nil
+        createError = nil
     }
 
     @ViewBuilder

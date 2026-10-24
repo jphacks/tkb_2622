@@ -35,11 +35,15 @@ const (
 const (
 	// GroupServiceListGroupsProcedure is the fully-qualified name of the GroupService's ListGroups RPC.
 	GroupServiceListGroupsProcedure = "/group.v1.GroupService/ListGroups"
+	// GroupServiceCreateGroupProcedure is the fully-qualified name of the GroupService's CreateGroup
+	// RPC.
+	GroupServiceCreateGroupProcedure = "/group.v1.GroupService/CreateGroup"
 )
 
 // GroupServiceClient is a client for the group.v1.GroupService service.
 type GroupServiceClient interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
+	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 }
 
 // NewGroupServiceClient constructs a client for the group.v1.GroupService service. By default, it
@@ -57,12 +61,18 @@ func NewGroupServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			baseURL+GroupServiceListGroupsProcedure,
 			opts...,
 		),
+		createGroup: connect.NewClient[v1.CreateGroupRequest, v1.CreateGroupResponse](
+			httpClient,
+			baseURL+GroupServiceCreateGroupProcedure,
+			opts...,
+		),
 	}
 }
 
 // groupServiceClient implements GroupServiceClient.
 type groupServiceClient struct {
-	listGroups *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	listGroups  *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	createGroup *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
 }
 
 // ListGroups calls group.v1.GroupService.ListGroups.
@@ -70,9 +80,15 @@ func (c *groupServiceClient) ListGroups(ctx context.Context, req *connect.Reques
 	return c.listGroups.CallUnary(ctx, req)
 }
 
+// CreateGroup calls group.v1.GroupService.CreateGroup.
+func (c *groupServiceClient) CreateGroup(ctx context.Context, req *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
+	return c.createGroup.CallUnary(ctx, req)
+}
+
 // GroupServiceHandler is an implementation of the group.v1.GroupService service.
 type GroupServiceHandler interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
+	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 }
 
 // NewGroupServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -86,10 +102,17 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 		svc.ListGroups,
 		opts...,
 	)
+	groupServiceCreateGroupHandler := connect.NewUnaryHandler(
+		GroupServiceCreateGroupProcedure,
+		svc.CreateGroup,
+		opts...,
+	)
 	return "/group.v1.GroupService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GroupServiceListGroupsProcedure:
 			groupServiceListGroupsHandler.ServeHTTP(w, r)
+		case GroupServiceCreateGroupProcedure:
+			groupServiceCreateGroupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -101,4 +124,8 @@ type UnimplementedGroupServiceHandler struct{}
 
 func (UnimplementedGroupServiceHandler) ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.ListGroups is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.CreateGroup is not implemented"))
 }

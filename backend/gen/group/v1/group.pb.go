@@ -222,6 +222,102 @@ func (x *ListGroupsResponse) GetGroups() []*Group {
 	return nil
 }
 
+type CreateGroupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateGroupRequest) Reset() {
+	*x = CreateGroupRequest{}
+	mi := &file_group_v1_group_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateGroupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateGroupRequest) ProtoMessage() {}
+
+func (x *CreateGroupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_group_v1_group_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateGroupRequest.ProtoReflect.Descriptor instead.
+func (*CreateGroupRequest) Descriptor() ([]byte, []int) {
+	return file_group_v1_group_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateGroupRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *CreateGroupRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateGroupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Group         *Group                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateGroupResponse) Reset() {
+	*x = CreateGroupResponse{}
+	mi := &file_group_v1_group_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateGroupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateGroupResponse) ProtoMessage() {}
+
+func (x *CreateGroupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_group_v1_group_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateGroupResponse.ProtoReflect.Descriptor instead.
+func (*CreateGroupResponse) Descriptor() ([]byte, []int) {
+	return file_group_v1_group_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateGroupResponse) GetGroup() *Group {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
 var File_group_v1_group_proto protoreflect.FileDescriptor
 
 const file_group_v1_group_proto_rawDesc = "" +
@@ -238,10 +334,16 @@ const file_group_v1_group_proto_rawDesc = "" +
 	"\amembers\x18\x04 \x03(\v2\x15.group.v1.GroupMemberR\amembers\"\x13\n" +
 	"\x11ListGroupsRequest\"=\n" +
 	"\x12ListGroupsResponse\x12'\n" +
-	"\x06groups\x18\x01 \x03(\v2\x0f.group.v1.GroupR\x06groups2W\n" +
+	"\x06groups\x18\x01 \x03(\v2\x0f.group.v1.GroupR\x06groups\"K\n" +
+	"\x12CreateGroupRequest\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"<\n" +
+	"\x13CreateGroupResponse\x12%\n" +
+	"\x05group\x18\x01 \x01(\v2\x0f.group.v1.GroupR\x05group2\xa3\x01\n" +
 	"\fGroupService\x12G\n" +
 	"\n" +
-	"ListGroups\x12\x1b.group.v1.ListGroupsRequest\x1a\x1c.group.v1.ListGroupsResponseB:Z8github.com/jphacks/tkb_2622/backend/gen/group/v1;groupv1b\x06proto3"
+	"ListGroups\x12\x1b.group.v1.ListGroupsRequest\x1a\x1c.group.v1.ListGroupsResponse\x12J\n" +
+	"\vCreateGroup\x12\x1c.group.v1.CreateGroupRequest\x1a\x1d.group.v1.CreateGroupResponseB:Z8github.com/jphacks/tkb_2622/backend/gen/group/v1;groupv1b\x06proto3"
 
 var (
 	file_group_v1_group_proto_rawDescOnce sync.Once
@@ -255,26 +357,31 @@ func file_group_v1_group_proto_rawDescGZIP() []byte {
 	return file_group_v1_group_proto_rawDescData
 }
 
-var file_group_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_group_v1_group_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_group_v1_group_proto_goTypes = []any{
 	(*GroupMember)(nil),           // 0: group.v1.GroupMember
 	(*Group)(nil),                 // 1: group.v1.Group
 	(*ListGroupsRequest)(nil),     // 2: group.v1.ListGroupsRequest
 	(*ListGroupsResponse)(nil),    // 3: group.v1.ListGroupsResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*CreateGroupRequest)(nil),    // 4: group.v1.CreateGroupRequest
+	(*CreateGroupResponse)(nil),   // 5: group.v1.CreateGroupResponse
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
 }
 var file_group_v1_group_proto_depIdxs = []int32{
-	4, // 0: group.v1.GroupMember.joined_at:type_name -> google.protobuf.Timestamp
-	4, // 1: group.v1.Group.created_at:type_name -> google.protobuf.Timestamp
+	6, // 0: group.v1.GroupMember.joined_at:type_name -> google.protobuf.Timestamp
+	6, // 1: group.v1.Group.created_at:type_name -> google.protobuf.Timestamp
 	0, // 2: group.v1.Group.members:type_name -> group.v1.GroupMember
 	1, // 3: group.v1.ListGroupsResponse.groups:type_name -> group.v1.Group
-	2, // 4: group.v1.GroupService.ListGroups:input_type -> group.v1.ListGroupsRequest
-	3, // 5: group.v1.GroupService.ListGroups:output_type -> group.v1.ListGroupsResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1, // 4: group.v1.CreateGroupResponse.group:type_name -> group.v1.Group
+	2, // 5: group.v1.GroupService.ListGroups:input_type -> group.v1.ListGroupsRequest
+	4, // 6: group.v1.GroupService.CreateGroup:input_type -> group.v1.CreateGroupRequest
+	3, // 7: group.v1.GroupService.ListGroups:output_type -> group.v1.ListGroupsResponse
+	5, // 8: group.v1.GroupService.CreateGroup:output_type -> group.v1.CreateGroupResponse
+	7, // [7:9] is the sub-list for method output_type
+	5, // [5:7] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_group_v1_group_proto_init() }
@@ -288,7 +395,7 @@ func file_group_v1_group_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_group_v1_group_proto_rawDesc), len(file_group_v1_group_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

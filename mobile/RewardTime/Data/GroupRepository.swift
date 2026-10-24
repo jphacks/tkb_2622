@@ -54,10 +54,20 @@ struct GroupProtoTimestamp: Decodable {
 
 protocol GroupRepository {
     func fetchGroups() async throws -> [MobileGroup]
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup
 }
 
 struct APIGroupRepository: GroupRepository {
     private struct EmptyRequest: Encodable {}
+    private struct CreateGroupRequest: Encodable {
+        let operationId: String
+        let name: String
+    }
+
+    private struct CreateGroupResponse: Decodable {
+        let group: MobileGroup
+    }
+
     private struct ListGroupsResponse: Decodable {
         let groups: [MobileGroup]
 
@@ -84,10 +94,28 @@ struct APIGroupRepository: GroupRepository {
         )
         return response.groups
     }
+
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup {
+        let response: CreateGroupResponse = try await client.call(
+            service: "group.v1.GroupService",
+            method: "CreateGroup",
+            requestBody: CreateGroupRequest(operationId: operationID, name: name),
+            responseType: CreateGroupResponse.self
+        )
+        return response.group
+    }
 }
 
 struct ConfiguredGroupRepository: GroupRepository {
     func fetchGroups() async throws -> [MobileGroup] {
+        try await repository().fetchGroups()
+    }
+
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup {
+        try await repository().createGroup(name: name, operationID: operationID)
+    }
+
+    private func repository() throws -> APIGroupRepository {
         let defaults = UserDefaults.standard
         let projectURLText = defaults.string(forKey: "mobile.supabase.projectURL") ?? ""
         let publishableKey = defaults.string(forKey: "mobile.supabase.publishableKey") ?? ""
@@ -104,7 +132,7 @@ struct ConfiguredGroupRepository: GroupRepository {
         }
 
         let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
-        return try await APIGroupRepository(baseURL: apiBaseURL, auth: auth).fetchGroups()
+        return APIGroupRepository(baseURL: apiBaseURL, auth: auth)
     }
 
     private static func validatedURL(_ text: String) -> URL? {
@@ -115,7 +143,16 @@ struct ConfiguredGroupRepository: GroupRepository {
     }
 }
 
-enum GroupRepositoryError: Error {
+enum GroupRepositoryError: LocalizedError {
     case missingConfiguration
     case invalidConfiguration
+
+    var errorDescription: String? {
+        switch self {
+        case .missingConfiguration:
+            "設定タブでSupabase接続情報を設定し、ログインしてください。"
+        case .invalidConfiguration:
+            "Supabase接続情報とbackend API URLを確認してください。"
+        }
+    }
 }

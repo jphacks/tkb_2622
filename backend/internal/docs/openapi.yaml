@@ -799,6 +799,26 @@ components:
         - "2024-12-25T12:00:00Z"
       format: date-time
       description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
+    group.v1.CreateGroupRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        name:
+          type: string
+          title: name
+      title: CreateGroupRequest
+      additionalProperties: false
+    group.v1.CreateGroupResponse:
+      type: object
+      properties:
+        group:
+          allOf:
+            - $ref: '#/components/schemas/group.v1.Group'
+          title: group
+      title: CreateGroupResponse
+      additionalProperties: false
     group.v1.Group:
       type: object
       properties:
@@ -2113,6 +2133,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.UploadActivityBatchResponse'
+  /group.v1.GroupService/CreateGroup:
+    post:
+      tags:
+        - GroupService
+      summary: CreateGroup
+      operationId: group.v1.GroupService.CreateGroup
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.CreateGroupRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.CreateGroupResponse'
   /group.v1.GroupService/ListGroups:
     post:
       tags:

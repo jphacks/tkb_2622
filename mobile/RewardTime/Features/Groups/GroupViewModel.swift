@@ -25,6 +25,16 @@ final class GroupViewModel: ObservableObject {
         }
     }
 
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup {
+        let group = try await repository.createGroup(name: name, operationID: operationID)
+        if case .loaded(let groups) = state {
+            state = .loaded(groups.filter { $0.id != group.id } + [group])
+        } else {
+            state = .loaded([group])
+        }
+        return group
+    }
+
     private static func failureMessage(for error: Error) -> String {
         switch error {
         case GroupRepositoryError.missingConfiguration:

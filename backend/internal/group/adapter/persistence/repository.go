@@ -2,9 +2,14 @@ package persistence
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/group/domain"
 )
 
@@ -50,4 +55,90 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Gr
 		return nil, err
 	}
 	return groups, nil
+}
+
+func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name string) (out domain.Group, err error) {
+	userIDValue := uuid.MustParse(userID)
+	operationIDValue := uuid.MustParse(operationID)
+	requestBytes, err := json.Marshal(struct{ Name string }{Name: name})
+	if err != nil {
+		return domain.Group{}, err
+	}
+	requestHashBytes := sha256.Sum256(requestBytes)
+	requestHash := hex.EncodeToString(requestHashBytes[:])
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return domain.Group{}, err
+	}
+	defer tx.Rollback()
+
+	var status string
+	err = tx.QueryRowContext(ctx, `SELECT status FROM app.users WHERE id = $1 FOR UPDATE`, userIDValue).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Group{}, apperr.ErrNotFound
+	}
+	if err != nil {
+		return domain.Group{}, err
+	}
+	if status != "ACTIVE" {
+		return domain.Group{}, apperr.ErrForbidden
+	}
+
+	var savedHash string
+	var savedResponse []byte
+	err = tx.QueryRowContext(ctx, `
+		SELECT request_hash, response
+		FROM app.group_operations
+		WHERE user_id = $1 AND operation_id = $2`, userIDValue, operationIDValue).Scan(&savedHash, &savedResponse)
+	if err == nil {
+		if savedHash != requestHash {
+			return domain.Group{}, apperr.ErrConflict
+		}
+		if err = json.Unmarshal(savedResponse, &out); err != nil {
+			return domain.Group{}, err
+		}
+		if err = tx.Commit(); err != nil {
+			return domain.Group{}, err
+		}
+		return out, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return domain.Group{}, err
+	}
+
+	groupID := uuid.New()
+	var joinedAt sql.NullTime
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO app.groups (id, name, created_by)
+		VALUES ($1, $2, $3)
+		RETURNING created_at`, groupID, name, userIDValue).Scan(&out.CreatedAt)
+	if err != nil {
+		return domain.Group{}, err
+	}
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO app.group_memberships (id, group_id, user_id, status, joined_at)
+		VALUES ($1, $2, $3, 'ACTIVE', now())
+		RETURNING joined_at`, uuid.New(), groupID, userIDValue).Scan(&joinedAt)
+	if err != nil {
+		return domain.Group{}, err
+	}
+	out.ID = groupID.String()
+	out.Name = name
+	out.CreatedAt = out.CreatedAt.UTC()
+	out.Members = []domain.Member{{IsCurrentUser: true, JoinedAt: joinedAt.Time.UTC()}}
+	response, err := json.Marshal(out)
+	if err != nil {
+		return domain.Group{}, err
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO app.group_operations (user_id, operation_id, request_hash, response)
+		VALUES ($1, $2, $3, $4)`, userIDValue, operationIDValue, requestHash, response)
+	if err != nil {
+		return domain.Group{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return domain.Group{}, err
+	}
+	return out, nil
 }
