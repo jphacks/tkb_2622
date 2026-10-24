@@ -13,13 +13,9 @@ struct SupabaseAuthService: AccessTokenProviding {
     }
 
     func verifyEmailOTP(email: String, code: String) async throws {
-        do {
-            // A first-time user with email confirmation enabled receives a signup OTP.
-            _ = try await client.auth.verifyOTP(email: email, token: code, type: .signup)
-        } catch {
-            // Existing passwordless users receive the regular email OTP type.
-            _ = try await client.auth.verifyOTP(email: email, token: code, type: .email)
-        }
+        // `.email` matches both the signup confirmation code (first login) and the
+        // magic-link code (existing user), so a single request covers both cases.
+        _ = try await client.auth.verifyOTP(email: email, token: code, type: .email)
     }
 
     func accessToken() async throws -> String? {
@@ -28,6 +24,39 @@ struct SupabaseAuthService: AccessTokenProviding {
 
     func signOutFromThisDevice() async throws {
         try await client.auth.signOut(scope: .local)
+    }
+}
+
+enum EmailOTPInput {
+    static func normalizedEmail(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    /// Keeps ASCII digits only, so pasted or autofilled codes with spaces or
+    /// full-width digits still match the code Supabase sent.
+    static func normalizedCode(_ raw: String) -> String {
+        let halfWidth = raw.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? raw
+        return String(halfWidth.filter { $0.isASCII && $0.isNumber })
+    }
+
+    static func isPlausibleCode(_ code: String) -> Bool {
+        (6...10).contains(code.count)
+    }
+}
+
+enum AuthenticationErrorMessage {
+    static func describe(_ error: Error) -> String {
+        guard let authError = error as? AuthError else {
+            return error.localizedDescription
+        }
+        switch authError.errorCode {
+        case .otpExpired:
+            return "確認コードが無効か期限切れです。最後に届いたメールのコードを入力するか、コードを再送してください。(otp_expired)"
+        case .overEmailSendRateLimit, .overRequestRateLimit:
+            return "送信・認証の回数制限に達しました。しばらく待ってから再試行してください。(\(authError.errorCode.rawValue))"
+        default:
+            return "\(authError.message) (\(authError.errorCode.rawValue))"
+        }
     }
 }
 
