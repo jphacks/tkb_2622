@@ -239,7 +239,7 @@ private enum APIHomeRepositoryError: LocalizedError {
 
 struct ConfiguredHomeRepository: HomeRepository {
     func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
-        let defaults = UserDefaults.standard
+        let defaults = ScreenTimeSharedStorage.defaults
         let projectURLText = MobileAppConfiguration.supabaseProjectURL ?? ""
         let publishableKey = MobileAppConfiguration.supabasePublishableKey ?? ""
         let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL ?? ""
