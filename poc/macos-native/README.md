@@ -60,6 +60,32 @@ bin/focuslog replay --input testdata/sample.json --out data/replay-new
 
 サンプルは12秒の人工データです。アプリ切替、GitHub／YouTube、ブラウザ権限拒否、Collectorの失敗を含み、推定4秒・Unknown 8秒になります。実機結果や集中時間を示すものではありません。サンプル内のfixture_collector_timeoutは意図した欠損です。
 
-Reportのapplications/domainsは有効な観測点で見つかった一覧です。単発観測のアプリ時間は0秒で、時間を集計するのは前面情報が整合した隣接観測間だけです。イベントは観測点なのでstart_at=end_at、区間の品質はsample_based_estimateまたはunknownです。読書・思考・集中・報酬の判定は行いません。
+Reportのapplications/domainsは有効な観測点で見つかった一覧です。単発観測のアプリ時間は0秒で、時間を集計するのは前面情報が整合した隣接観測間だけです。イベントは観測点なのでstart_at=end_at、区間の品質はsample_based_estimateまたはunknownです。この分析だけでは作業関連性を判定しません。`--session` を指定した場合は、以下の5分類評価を追加します。心理的な集中や報酬付与を保証するものではありません。
 
 Sanitizeは取得元/schemaの不一致をネイティブ由来に書き換えません。不正な観測は理由付きでUnknownにします。replayはこの形式で自分が管理する保存データを入力してください。アプリ表示名や理由欄に手動で機密情報を混入させたJSONまで匿名化する機能ではありません。
+
+## 5分類と評価のPoC
+
+[Notionの評価仕様](https://app.notion.com/p/40237d51ff7b80eda18fee8928c36de4)を正本とし、セッションごとに本人が指定したルールで分類します。`--session` の設定は取得開始前に読み込み、`evaluation.json` に固定して保存します。同じCaptureと設定から終了時の評価を再現できます。
+
+- TASK（T）：主作業。RELATED_TRANSITION（R）：同じ目的の関連作業。両方を同じ重みで関連作業秒に加算します。
+- DISTRACTION（D）：無関係と登録した同一app/domainが連続10秒以上。確定時に開始へ遡って計上します。10秒未満はUNKNOWNです。欠測・pause・別の文脈をまたいで持続秒を足しません。
+- UNKNOWN（U）：未登録、必要な観測の欠損、短い移動、無操作猶予の超過・入力継続性が確認できない区間。
+- IDLE（I）：明確なロックまたはスリープの根拠がある区間。現行native helperはその根拠を取得しないため、実ログの通常評価ではIになりません。エンジンの明示的な確定休止根拠入力と人工データで計算経路を検証します。
+
+モード別の無操作猶予は NORMAL=60秒、READING=180秒、VIDEO=300秒です。各閾値に達した時点以降はUとします（60/180/300秒を包含）。猶予内でも、前面文脈と入力経過の根拠が必要です。入力があった隣接観測の間を復元できなければ、保守的にUが増える場合があります。動画・音声の再生だけでは作業と判定しません。
+
+pauseは評価対象から除きます。評価対象秒E=T+R+D+U+I、判定済みアクティブ秒K=T+R+D、関連作業秒=T+Rです。基本点B=100×(T+R)/K、充足率Q=(T+R+D+I)/E、作業時間率W_rate=(T+R)/Eを区別します。K=0のB、E=0のQとW_rateはnullで評価保留です。スコアと設定版・エンジン版・観測schema版は別々に保持します。
+
+```sh
+bin/focuslog replay --input testdata/sample.json --session testdata/session.json --out data/evaluated-replay
+bin/focuslog record --duration 30s --poll 1s --session testdata/session.json --out data/evaluated-live
+```
+
+サンプルのapp/domainルールは架空の検証タスク用です。実際の作業ではコピーし、目的に合わせて明示設定してください。Chrome自体を作業とするルールは使わず、Chromeと完全一致domainの組で登録します。domainルールは対応中のChrome/Safariに限ります。app_idはログのbundle IDと同じ大文字・小文字の表記で指定します。`github.com` と `www.github.com` は別登録です。raw URL・path・ワイルドカードはルールに指定しません。設定不正は取得前に拒否します。
+
+`--session` はrecord/replayだけで使えます。通常のcapture/events/analysisに加えevaluation.jsonを0600で保存し、標準出力にも評価結果を出します。--outを省略すると評価だけを標準出力に出します。pauseは設定のUTC半開区間で明示するreplay評価用です。recordではpause設定を拒否します。対話的pause/resumeや永続セッション管理はまだありません。報酬、iPhone連携、追加ペナルティP、復帰遅延等の説明指標は対象外です。
+
+評価JSONの`session_seconds`はセッション幅、`paused_seconds`はその範囲に切り詰めて重複を除いたpause秒、`elapsed_seconds`はE（前2値の差）、`known_seconds`はKです。`totals`のT/R/D/U/Iと`segments`はpauseを含みません。SegmentのclassはT/R/D/U/Iの略記、app_id/browser_domainとreasonsを併記します。`b`は0〜100、`q`と`work_rate`は0〜1です。confidenceは校正していないため出力しません。人工サンプルはT=2秒、R=1秒、D=0秒、U=9秒、I=0秒、B=100、Q=0.25、W_rate=0.25になります。短いYouTube区間をDへ確定しないため、観測品質のsampled秒とは一致しません。
+
+エンジンの`Evaluate`は、このPoCのNormalizer（analysis.Analyze）が作ったAnalysisを入力契約とします。保存形式の版・区間範囲・重複は検証しますが、手動編集されたログや設定の真実性を保証するものではありません。`EvaluateWithEvidence`は信頼するAdapterが確定したLOCK/SLEEPの半開区間とsourceを渡すAPIです。現CLIではこの追加入力は使いません。人工試験はevaluation/evaluation_test.goにあります。根拠は監査のため元入力をinput_evidenceに保持し、evidenceにはセッション内へ切り詰めた範囲を出します。重複した根拠の時間は重複計上しません。pauseと休止が重なる時間はpauseを優先します。

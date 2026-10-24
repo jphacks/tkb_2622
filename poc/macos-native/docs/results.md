@@ -50,7 +50,7 @@
 
 スクリーンショットやログを証跡に添付する場合も、raw URL、ページタイトル、ユーザー名、その他の個人情報は伏せ、必要最小限の domain と status / reason だけを記録してください。
 
-## 最終検証
+## 操作ログ取得の検証
 
 - 自動テスト：`go test -race -count=1 -json ./...` 35件成功、失敗0件。analysis、cmd/focuslog、collectorの3パッケージ。modelは型定義のみです。
 - 静的・ビルド：`go vet ./...`、Go CLIビルド、`native/build.sh`が成功しました。補助プログラムのプロセス初回起動がrace実行時に1秒を超えたため、テスト側の正常起動待機を5秒とし、形式不正テストがtimeoutで見かけ上通らないことも確認しました。
@@ -64,3 +64,29 @@
 GitHubからYouTubeへのURL設定を送った試行で、直後の4秒間はgithub.comが観測されました。その試行中のブラウザ実URLは別途照合していないため、ナビゲーション待ち・window選択・取得遅延のどれが原因かは未確定です。その後、専用のYouTube文書を作った試行では、直接AppleScriptで読んだURLのhostとhelperのbrowser_domainがwww.youtube.comで一致しました。Safariのドメイン取得は確認できていますが、同じwindow内のタブ・URL切替の精度は未検証です。
 
 全試行でテスト専用windowのみを閉じ、元の前面アプリへ戻しました。常駐Collector、自動起動設定、ActivityWatchサーバーは使っていません。実機の長時間idle境界、権限拒否、ロック・スリープ、裏タブ音声は未検証です。音声・ロック・スリープを必要とする製品判断はこのPoCだけでは行えません。
+
+
+## 5分類評価の検証
+
+明示した検証用TaskSnapshotとルールを使い、取得→正規化→評価→保存までを確認しました。以下の分類値は本人の実際の作業目的を評価した値ではありません。検証用タスクへの登録をテスト条件としています。
+
+| 項目 | 確認結果 | 限界・残る確認 |
+|---|---|---|
+| 人工データ5分類 | 30分のT1200/R300/D180/U60/I60、B約89.286、Q約96.667%、Work1500秒を自動テスト | Iの根拠は人工LOCK。実ロック取得の証明ではない |
+| 長い確定休止の式 | T300/I1500でB100、Q100%、W_rate約16.667%を自動テスト | 実スリープ取得は未実装 |
+| pause / 欠測 / 重複 | pauseをEと全分類から除外、全面pauseの率はnull、重複LOCK/SLEEPは二重計上しない。欠測・短い脱線・全Unknownを自動テスト | 対話pause/resume、永続的なセッション復元は未実装 |
+| Chromeの3文脈 | 38秒、観測38件、取得エラー0。github.comをT、example.comをD、developer.apple.comをRとして明示設定 | 人工のテスト目的。切替時刻の誤差評価ではない |
+| 実ログ分類タイムライン | T8.017/R12.020/D15.018/U2.945/I0秒。Work20.037秒、B57.159、Q92.25%、W_rate52.729%。合計38秒 | サンプリング推定であり注視・理解の証明ではない |
+| 実ログの無操作 | 310秒、観測310件、取得エラー0。無操作最大110.432秒、60秒以降の閾値true区間を確認。入力再開によるカウンタ減少も含む | 入力が再開されたため180/300秒の実境界は未到達。正確な手動入力時刻との誤差は未測定 |
+| モード切替の再評価 | 同じ310秒ログをNORMAL/READING/VIDEOで再生し、すべて分類秒数の合計=310秒。READING/VIDEOは60秒超過だけでUnknownにしない | モード別閾値は自動テストも実施。実機180/300秒到達の確認とは区別する |
+| 取得失敗と復帰 | 検証用wrapperで2回失敗後にnative helperへ復帰。8秒で実観測6件・失敗2件。障害を跨ぐ分析区間をUnknownにし、終了まで保存成功 | 全8秒の分類はU（検証設定の未登録等を含む）。実アプリ強制終了やsleep復帰の試験ではない |
+| 安全な保存 | evaluationも0600。capture/events/analysis/evaluationにURL・title等のキーがなくdomainにpath/queryがないことを検品 | 設定に本人が入力したタスク名等は保存される |
+
+実機証跡はGit除外のdata/five-class-browser/（captureとevaluation、切替命令時刻markers.json）、data/five-class-idle-observation/、data/five-class-mode-{normal,reading,video}/、data/five-class-recovery/に保存しました。専用Chromeウィンドウを閉じ、開始前の前面アプリへ戻しました。ブラウザの既存ウィンドウや設定は変更していません。
+
+ロックは公開された画面スリープ／セッション切替通知と同義として扱いません。システムスリープには[NSWorkspace.willSleepNotification](https://developer.apple.com/documentation/appkit/nsworkspace/willsleepnotification)と[didWakeNotification](https://developer.apple.com/documentation/appkit/nsworkspace/didwakenotification)が利用候補ですが、現行のサンプルごとに起動するhelperでは継続した通知監視ができません。記録中の継続監視Adapterを別途実装し、実際のsleep/wakeと欠損の照合が必要です。
+
+Notion仕様全体を満たしたという判定ではありません。実ロック・スリープ、180/300秒の実境界、配布署名での権限拒否と復旧、長時間・強制終了時の耐久性を確認する必要があります。復帰時間・脱線エピソード・最長関連作業区間などの説明指標、永続WorkSession管理、報酬・iPhone側のPoCも別途残ります。
+
+
+評価追加後の自動確認は、競合検出付き `go test -race -count=1 -json ./...`、`go vet ./...`、CLIビルドが成功しています。テストログはGit除外のdata/five-class-tests.jsonに保持し、実ログ検証とは区別します。
