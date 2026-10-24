@@ -1,4 +1,12 @@
-# 今回のアプリで必要な機能のPoCをこのディレクトリで作成
+# 機能検証PoC
+
+| PoC | 目的 |
+|---|---|
+| [macOS操作ログ](macos-native/README.md) | ActivityWatch・ブラウザ拡張なしで、前面アプリ・無操作時間・Chrome／Safariの選択中タブのドメインを取得する |
+| [iOS報酬時間管理](ios-reward-time/) | iPhoneで報酬時間の管理とScreen Timeによる制限を検証する |
+| [報酬状態同期API](reward-sync-api/server.py) | Mac → API → iPhoneアプリの報酬状態の通信を検証する |
+
+macOS操作ログの実行方法・検証結果・未検証事項は専用のREADMEを参照してください。macOS操作ログの実測データと開発用ツールはGit管理対象外です。iOS報酬時間管理と報酬状態同期の手順・検証結果は以下に記載します。
 
 ## iOS報酬時間管理PoC
 

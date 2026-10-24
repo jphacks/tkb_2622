@@ -1,0 +1,35 @@
+{
+  "id": "fixture-programming-session",
+  "task_snapshot": {
+    "id": "fixture-programming",
+    "name": "人工ログで評価経路を検証する",
+    "mode": "NORMAL",
+    "rules_version": "fixture-rules-v1",
+    "rules": [
+      {
+        "app_id": "com.microsoft.VSCode",
+        "class": "TASK"
+      },
+      {
+        "app_id": "com.apple.Terminal",
+        "class": "RELATED_TRANSITION"
+      },
+      {
+        "app_id": "com.google.Chrome",
+        "domain": "github.com",
+        "class": "RELATED_TRANSITION"
+      },
+      {
+        "app_id": "com.google.Chrome",
+        "domain": "youtube.com",
+        "class": "DISTRACTION"
+      },
+      {
+        "app_id": "com.google.Chrome",
+        "domain": "www.youtube.com",
+        "class": "DISTRACTION"
+      }
+    ]
+  },
+  "pauses": []
+}
