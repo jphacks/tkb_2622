@@ -6,8 +6,7 @@ final class NotificationEndpointRegistrationFlowTests: XCTestCase {
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(
                 isAuthenticated: false,
-                isAllowed: true,
-                isDenied: false,
+                permission: .allowed,
                 token: "apns-token"
             ),
             .signInRequired
@@ -15,8 +14,7 @@ final class NotificationEndpointRegistrationFlowTests: XCTestCase {
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(
                 isAuthenticated: false,
-                isAllowed: false,
-                isDenied: true,
+                permission: .denied,
                 token: nil
             ),
             .signInRequired
@@ -27,8 +25,7 @@ final class NotificationEndpointRegistrationFlowTests: XCTestCase {
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(
                 isAuthenticated: true,
-                isAllowed: true,
-                isDenied: false,
+                permission: .allowed,
                 token: "apns-token"
             ),
             .register(token: "apns-token")
@@ -36,11 +33,21 @@ final class NotificationEndpointRegistrationFlowTests: XCTestCase {
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(
                 isAuthenticated: true,
-                isAllowed: false,
-                isDenied: true,
+                permission: .denied,
                 token: nil
             ),
             .remove
+        )
+    }
+
+    func testUnresolvedPermissionDoesNotRegisterAnAvailableToken() {
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: true,
+                permission: .notAllowed,
+                token: "apns-token"
+            ),
+            .permissionRequired
         )
     }
 

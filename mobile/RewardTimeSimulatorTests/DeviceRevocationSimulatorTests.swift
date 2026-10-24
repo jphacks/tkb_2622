@@ -294,11 +294,29 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertEqual(
             NotificationEndpointSyncPolicy.resolve(
                 isAuthenticated: false,
-                isAllowed: true,
-                isDenied: false,
+                permission: .allowed,
                 token: "apns-token"
             ),
             .signInRequired
+        )
+    }
+
+    func testNotificationTokenCallbackHonorsDeniedSystemPermission() {
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: true,
+                permission: .denied,
+                token: "apns-token"
+            ),
+            .remove
+        )
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: true,
+                permission: .allowed,
+                token: "apns-token"
+            ),
+            .register(token: "apns-token")
         )
     }
 

@@ -17,8 +17,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
         let action = NotificationEndpointSyncPolicy.resolve(
             isAuthenticated: isAuthenticated
                 && MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
-            isAllowed: isAllowed,
-            isDenied: authorizationStatus == .denied,
+            permission: syncPermission,
             token: UserDefaults.standard.string(forKey: "mobile.apns.token")
         )
         switch action {
@@ -34,13 +33,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
             UIApplication.shared.registerForRemoteNotifications()
             apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
         case .remove:
-            do {
-                try await ConfiguredNotificationEndpointRepository().delete()
-                invalidateRegistrationCache()
-                apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
-            } catch {
-                apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
-            }
+            await removeRegisteredEndpoint()
         case .permissionRequired:
             apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
         }
@@ -55,15 +48,28 @@ private final class NotificationSettingsViewModel: ObservableObject {
     }
 
     func register(token: String, force: Bool = false, isAuthenticated: Bool) async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        authorizationStatus = settings.authorizationStatus
         let action = NotificationEndpointSyncPolicy.resolve(
             isAuthenticated: isAuthenticated
                 && MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
-            isAllowed: true,
-            isDenied: false,
+            permission: syncPermission,
             token: token
         )
-        guard case .register = action else {
-            apiStatusMessage = "通知先をサーバーと同期するにはログインしてください。"
+        guard case .register(let authorizedToken) = action else {
+            switch action {
+            case .signInRequired:
+                apiStatusMessage = "通知先をサーバーと同期するにはログインしてください。"
+            case .remove:
+                await removeRegisteredEndpoint()
+            case .permissionRequired:
+                apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
+            case .requestAppleRegistration:
+                UIApplication.shared.registerForRemoteNotifications()
+                apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
+            case .register:
+                break
+            }
             return
         }
         #if DEBUG
@@ -71,6 +77,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
         #else
         let environment = "production"
         #endif
+        let token = authorizedToken
         let fingerprint = registrationFingerprint(token: token, environment: environment)
         let decision = fingerprint.map {
             registrationGate.beginRegistration(for: $0, force: force)
@@ -121,6 +128,29 @@ private final class NotificationSettingsViewModel: ObservableObject {
             return
         }
         registrationGate.invalidateRegistration(for: fingerprint)
+    }
+
+    private func removeRegisteredEndpoint() async {
+        do {
+            try await ConfiguredNotificationEndpointRepository().delete()
+            invalidateRegistrationCache()
+            apiStatusMessage = "通知許可がないため、サーバーの通知先登録を解除しました。"
+        } catch {
+            apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    private var syncPermission: NotificationEndpointSyncPolicy.Permission {
+        switch authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return .allowed
+        case .denied:
+            return .denied
+        case .notDetermined:
+            return .notAllowed
+        @unknown default:
+            return .notAllowed
+        }
     }
 
     func apnsRegistrationFailed() {

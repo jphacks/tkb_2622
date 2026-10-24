@@ -9,6 +9,12 @@ enum NotificationEndpointRegistrationFlow {
 }
 
 enum NotificationEndpointSyncPolicy {
+    enum Permission: Equatable {
+        case allowed
+        case denied
+        case notAllowed
+    }
+
     enum Action: Equatable {
         case signInRequired
         case register(token: String)
@@ -19,15 +25,18 @@ enum NotificationEndpointSyncPolicy {
 
     static func resolve(
         isAuthenticated: Bool,
-        isAllowed: Bool,
-        isDenied: Bool,
+        permission: Permission,
         token: String?
     ) -> Action {
         guard isAuthenticated else { return .signInRequired }
-        if isAllowed {
+        switch permission {
+        case .allowed:
             guard let token, !token.isEmpty else { return .requestAppleRegistration }
             return .register(token: token)
+        case .denied:
+            return .remove
+        case .notAllowed:
+            return .permissionRequired
         }
-        return isDenied ? .remove : .permissionRequired
     }
 }
