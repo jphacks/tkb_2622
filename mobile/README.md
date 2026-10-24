@@ -62,6 +62,12 @@ backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Co
 
 Debugビルドのホームから「backendヘルスチェック」を開くと、指定URLの`GET /healthz`を確認できる。SimulatorからMac上のローカルbackendを確認する場合は既定値`http://127.0.0.1:8080`を使用する。iPhone実機からは、backend READMEの手順でComposeの公開先をMacのLAN IPv4に設定し、アプリのConnect API URLへ`http://<MacのLAN IPv4>:8080`を入力する。Debug構成だけローカルネットワーク接続を許可し、Release構成のATS設定は変更していない。ヘルスチェックは認証や業務データの読み書きを行わず、実API疎通を完了したことにはならない。
 
+### DesktopとiPhoneの作業状態を確認する
+
+両アプリで同じSupabase project・メールアカウントを使い、同じbackend databaseへ接続する。Simulatorは`127.0.0.1`、実機iPhoneはMacのLAN IPv4をAPI URLに使うが、どちらも同じMac上のbackendへ到達させる。Mobileをログイン済みのままホーム表示にしておくと、Desktopで作業を開始した状態をforeground中に最大30秒程度で再取得する。iPhoneをbackgroundへ移すと定期取得は止まり、foreground復帰時にすぐ再取得する。メール表示が一致してもSupabase projectが異なると別Auth subjectになり、サーバー上の作業状態は共有されない。
+
+受け入れ確認は、DesktopとiPhoneの両方で同じメールOTPアカウントへログインし、Desktopで作業を開始して、iPhoneのホームに作業中状態が反映されることを確認する。30秒経過しても反映されない場合は、両アプリのログイン状態、Supabase projectの一致、同じMac backendへの接続、backendログの`GetCurrentSession` statusを照合する。`/healthz`成功だけでは認証・同一User・作業同期の証明にならない。認証subjectやtokenは画面・ログへ出さない。実Supabaseを使う2アプリのE2Eは未確認。
+
 API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorでは`RewardTimeSimulatorTests` schemeを使い、端末失効API、Group API error分類、認証入口状態resolver、EnsureUser／GetMe同期とUpdateDisplayName／UpdateAvatarのRepository要求・応答契約、利用枠再試行エラー分類、Reserve／GetGrant／ReportUsage／予約operation照合のRepository契約を確認する。
 
 ```sh

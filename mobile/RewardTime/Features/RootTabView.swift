@@ -117,9 +117,16 @@ struct RootTabView: View {
       .tag(3)
     }
     .tint(AppTheme.primary)
-    .task { if isAuthenticated { await synchronizeUsageGrant() } }
-    .onChange(of: scenePhase) { _, phase in
-      if phase == .active && isAuthenticated { Task { await synchronizeUsageGrant() } }
+    .task(id: scenePhase) {
+      guard isAuthenticated, scenePhase == .active else { return }
+      while !Task.isCancelled {
+        await synchronizeUsageGrant()
+        do {
+          try await Task.sleep(for: .seconds(30))
+        } catch {
+          return
+        }
+      }
     }
   }
 
