@@ -38,12 +38,23 @@ const (
 	// GroupServiceCreateGroupProcedure is the fully-qualified name of the GroupService's CreateGroup
 	// RPC.
 	GroupServiceCreateGroupProcedure = "/group.v1.GroupService/CreateGroup"
+	// GroupServiceCreateInvitationProcedure is the fully-qualified name of the GroupService's
+	// CreateInvitation RPC.
+	GroupServiceCreateInvitationProcedure = "/group.v1.GroupService/CreateInvitation"
+	// GroupServiceAcceptInvitationProcedure is the fully-qualified name of the GroupService's
+	// AcceptInvitation RPC.
+	GroupServiceAcceptInvitationProcedure = "/group.v1.GroupService/AcceptInvitation"
+	// GroupServiceLeaveGroupProcedure is the fully-qualified name of the GroupService's LeaveGroup RPC.
+	GroupServiceLeaveGroupProcedure = "/group.v1.GroupService/LeaveGroup"
 )
 
 // GroupServiceClient is a client for the group.v1.GroupService service.
 type GroupServiceClient interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
+	CreateInvitation(context.Context, *connect.Request[v1.CreateInvitationRequest]) (*connect.Response[v1.CreateInvitationResponse], error)
+	AcceptInvitation(context.Context, *connect.Request[v1.AcceptInvitationRequest]) (*connect.Response[v1.AcceptInvitationResponse], error)
+	LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error)
 }
 
 // NewGroupServiceClient constructs a client for the group.v1.GroupService service. By default, it
@@ -66,13 +77,31 @@ func NewGroupServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			baseURL+GroupServiceCreateGroupProcedure,
 			opts...,
 		),
+		createInvitation: connect.NewClient[v1.CreateInvitationRequest, v1.CreateInvitationResponse](
+			httpClient,
+			baseURL+GroupServiceCreateInvitationProcedure,
+			opts...,
+		),
+		acceptInvitation: connect.NewClient[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse](
+			httpClient,
+			baseURL+GroupServiceAcceptInvitationProcedure,
+			opts...,
+		),
+		leaveGroup: connect.NewClient[v1.LeaveGroupRequest, v1.LeaveGroupResponse](
+			httpClient,
+			baseURL+GroupServiceLeaveGroupProcedure,
+			opts...,
+		),
 	}
 }
 
 // groupServiceClient implements GroupServiceClient.
 type groupServiceClient struct {
-	listGroups  *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
-	createGroup *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	listGroups       *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	createGroup      *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	createInvitation *connect.Client[v1.CreateInvitationRequest, v1.CreateInvitationResponse]
+	acceptInvitation *connect.Client[v1.AcceptInvitationRequest, v1.AcceptInvitationResponse]
+	leaveGroup       *connect.Client[v1.LeaveGroupRequest, v1.LeaveGroupResponse]
 }
 
 // ListGroups calls group.v1.GroupService.ListGroups.
@@ -85,10 +114,28 @@ func (c *groupServiceClient) CreateGroup(ctx context.Context, req *connect.Reque
 	return c.createGroup.CallUnary(ctx, req)
 }
 
+// CreateInvitation calls group.v1.GroupService.CreateInvitation.
+func (c *groupServiceClient) CreateInvitation(ctx context.Context, req *connect.Request[v1.CreateInvitationRequest]) (*connect.Response[v1.CreateInvitationResponse], error) {
+	return c.createInvitation.CallUnary(ctx, req)
+}
+
+// AcceptInvitation calls group.v1.GroupService.AcceptInvitation.
+func (c *groupServiceClient) AcceptInvitation(ctx context.Context, req *connect.Request[v1.AcceptInvitationRequest]) (*connect.Response[v1.AcceptInvitationResponse], error) {
+	return c.acceptInvitation.CallUnary(ctx, req)
+}
+
+// LeaveGroup calls group.v1.GroupService.LeaveGroup.
+func (c *groupServiceClient) LeaveGroup(ctx context.Context, req *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error) {
+	return c.leaveGroup.CallUnary(ctx, req)
+}
+
 // GroupServiceHandler is an implementation of the group.v1.GroupService service.
 type GroupServiceHandler interface {
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
+	CreateInvitation(context.Context, *connect.Request[v1.CreateInvitationRequest]) (*connect.Response[v1.CreateInvitationResponse], error)
+	AcceptInvitation(context.Context, *connect.Request[v1.AcceptInvitationRequest]) (*connect.Response[v1.AcceptInvitationResponse], error)
+	LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error)
 }
 
 // NewGroupServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -107,12 +154,33 @@ func NewGroupServiceHandler(svc GroupServiceHandler, opts ...connect.HandlerOpti
 		svc.CreateGroup,
 		opts...,
 	)
+	groupServiceCreateInvitationHandler := connect.NewUnaryHandler(
+		GroupServiceCreateInvitationProcedure,
+		svc.CreateInvitation,
+		opts...,
+	)
+	groupServiceAcceptInvitationHandler := connect.NewUnaryHandler(
+		GroupServiceAcceptInvitationProcedure,
+		svc.AcceptInvitation,
+		opts...,
+	)
+	groupServiceLeaveGroupHandler := connect.NewUnaryHandler(
+		GroupServiceLeaveGroupProcedure,
+		svc.LeaveGroup,
+		opts...,
+	)
 	return "/group.v1.GroupService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GroupServiceListGroupsProcedure:
 			groupServiceListGroupsHandler.ServeHTTP(w, r)
 		case GroupServiceCreateGroupProcedure:
 			groupServiceCreateGroupHandler.ServeHTTP(w, r)
+		case GroupServiceCreateInvitationProcedure:
+			groupServiceCreateInvitationHandler.ServeHTTP(w, r)
+		case GroupServiceAcceptInvitationProcedure:
+			groupServiceAcceptInvitationHandler.ServeHTTP(w, r)
+		case GroupServiceLeaveGroupProcedure:
+			groupServiceLeaveGroupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -128,4 +196,16 @@ func (UnimplementedGroupServiceHandler) ListGroups(context.Context, *connect.Req
 
 func (UnimplementedGroupServiceHandler) CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.CreateGroup is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) CreateInvitation(context.Context, *connect.Request[v1.CreateInvitationRequest]) (*connect.Response[v1.CreateInvitationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.CreateInvitation is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) AcceptInvitation(context.Context, *connect.Request[v1.AcceptInvitationRequest]) (*connect.Response[v1.AcceptInvitationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.AcceptInvitation is not implemented"))
+}
+
+func (UnimplementedGroupServiceHandler) LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("group.v1.GroupService.LeaveGroup is not implemented"))
 }

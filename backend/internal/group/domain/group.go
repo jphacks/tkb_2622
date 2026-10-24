@@ -13,3 +13,13 @@ type Group struct {
 	CreatedAt time.Time
 	Members   []Member
 }
+
+type Invitation struct {
+	ID        string
+	Token     string
+	ExpiresAt time.Time
+}
+
+type LeaveResult struct {
+	GroupDeleted bool
+}

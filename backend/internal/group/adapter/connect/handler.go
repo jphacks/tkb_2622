@@ -50,6 +50,46 @@ func (h *Handler) CreateGroup(ctx context.Context, req *connect.Request[v1.Creat
 	return connect.NewResponse(&v1.CreateGroupResponse{Group: groupMessage(group)}), nil
 }
 
+func (h *Handler) CreateInvitation(ctx context.Context, req *connect.Request[v1.CreateInvitationRequest]) (*connect.Response[v1.CreateInvitationResponse], error) {
+	userID, err := h.resolve(ctx)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	invitation, err := h.service.CreateInvitation(ctx, userID, req.Msg.OperationId, req.Msg.GroupId)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	return connect.NewResponse(&v1.CreateInvitationResponse{
+		InvitationId: invitation.ID,
+		Token:        invitation.Token,
+		ExpiresAt:    timestamppb.New(invitation.ExpiresAt),
+	}), nil
+}
+
+func (h *Handler) AcceptInvitation(ctx context.Context, req *connect.Request[v1.AcceptInvitationRequest]) (*connect.Response[v1.AcceptInvitationResponse], error) {
+	userID, err := h.resolve(ctx)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	group, err := h.service.AcceptInvitation(ctx, userID, req.Msg.OperationId, req.Msg.Token)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	return connect.NewResponse(&v1.AcceptInvitationResponse{Group: groupMessage(group)}), nil
+}
+
+func (h *Handler) LeaveGroup(ctx context.Context, req *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error) {
+	userID, err := h.resolve(ctx)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	result, err := h.service.LeaveGroup(ctx, userID, req.Msg.OperationId, req.Msg.GroupId)
+	if err != nil {
+		return nil, apperr.Connect(err)
+	}
+	return connect.NewResponse(&v1.LeaveGroupResponse{GroupDeleted: result.GroupDeleted}), nil
+}
+
 func groupMessage(group domain.Group) *v1.Group {
 	out := &v1.Group{
 		Id:        group.ID,

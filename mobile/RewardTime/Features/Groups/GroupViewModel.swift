@@ -35,6 +35,28 @@ final class GroupViewModel: ObservableObject {
         return group
     }
 
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
+        try await repository.createInvitation(groupID: groupID, operationID: operationID)
+    }
+
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup {
+        let group = try await repository.acceptInvitation(token: token, operationID: operationID)
+        if case .loaded(let groups) = state {
+            state = .loaded(groups.filter { $0.id != group.id } + [group])
+        } else {
+            state = .loaded([group])
+        }
+        return group
+    }
+
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool {
+        let groupDeleted = try await repository.leaveGroup(groupID: groupID, operationID: operationID)
+        if case .loaded(let groups) = state {
+            state = .loaded(groups.filter { $0.id != groupID })
+        }
+        return groupDeleted
+    }
+
     private static func failureMessage(for error: Error) -> String {
         switch error {
         case GroupRepositoryError.missingConfiguration:

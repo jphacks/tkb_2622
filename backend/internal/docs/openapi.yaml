@@ -799,6 +799,26 @@ components:
         - "2024-12-25T12:00:00Z"
       format: date-time
       description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
+    group.v1.AcceptInvitationRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        token:
+          type: string
+          title: token
+      title: AcceptInvitationRequest
+      additionalProperties: false
+    group.v1.AcceptInvitationResponse:
+      type: object
+      properties:
+        group:
+          allOf:
+            - $ref: '#/components/schemas/group.v1.Group'
+          title: group
+      title: AcceptInvitationResponse
+      additionalProperties: false
     group.v1.CreateGroupRequest:
       type: object
       properties:
@@ -818,6 +838,32 @@ components:
             - $ref: '#/components/schemas/group.v1.Group'
           title: group
       title: CreateGroupResponse
+      additionalProperties: false
+    group.v1.CreateInvitationRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        groupId:
+          type: string
+          title: group_id
+      title: CreateInvitationRequest
+      additionalProperties: false
+    group.v1.CreateInvitationResponse:
+      type: object
+      properties:
+        invitationId:
+          type: string
+          title: invitation_id
+        token:
+          type: string
+          title: token
+        expiresAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: expires_at
+      title: CreateInvitationResponse
       additionalProperties: false
     group.v1.Group:
       type: object
@@ -850,6 +896,25 @@ components:
             - $ref: '#/components/schemas/google.protobuf.Timestamp'
           title: joined_at
       title: GroupMember
+      additionalProperties: false
+    group.v1.LeaveGroupRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        groupId:
+          type: string
+          title: group_id
+      title: LeaveGroupRequest
+      additionalProperties: false
+    group.v1.LeaveGroupResponse:
+      type: object
+      properties:
+        groupDeleted:
+          type: boolean
+          title: group_deleted
+      title: LeaveGroupResponse
       additionalProperties: false
     group.v1.ListGroupsRequest:
       type: object
@@ -2133,6 +2198,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.UploadActivityBatchResponse'
+  /group.v1.GroupService/AcceptInvitation:
+    post:
+      tags:
+        - GroupService
+      summary: AcceptInvitation
+      operationId: group.v1.GroupService.AcceptInvitation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.AcceptInvitationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.AcceptInvitationResponse'
   /group.v1.GroupService/CreateGroup:
     post:
       tags:
@@ -2171,6 +2274,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/group.v1.CreateGroupResponse'
+  /group.v1.GroupService/CreateInvitation:
+    post:
+      tags:
+        - GroupService
+      summary: CreateInvitation
+      operationId: group.v1.GroupService.CreateInvitation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.CreateInvitationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.CreateInvitationResponse'
+  /group.v1.GroupService/LeaveGroup:
+    post:
+      tags:
+        - GroupService
+      summary: LeaveGroup
+      operationId: group.v1.GroupService.LeaveGroup
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.LeaveGroupRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.LeaveGroupResponse'
   /group.v1.GroupService/ListGroups:
     post:
       tags:

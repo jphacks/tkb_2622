@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 	"unicode/utf8"
 
@@ -13,11 +14,17 @@ import (
 var (
 	ErrUnauthenticated = apperr.ErrUnauthenticated
 	ErrInvalid         = apperr.ErrInvalid
+	ErrNotFound        = apperr.ErrNotFound
+	ErrConflict        = apperr.ErrConflict
+	ErrPrecondition    = apperr.ErrPrecondition
 )
 
 type Repository interface {
 	ListGroups(context.Context, string) ([]domain.Group, error)
 	CreateGroup(context.Context, string, string, string) (domain.Group, error)
+	CreateInvitation(context.Context, string, string, string) (domain.Invitation, error)
+	AcceptInvitation(context.Context, string, string, string) (domain.Group, error)
+	LeaveGroup(context.Context, string, string, string) (domain.LeaveResult, error)
 }
 
 type Service struct{ repo Repository }
@@ -46,4 +53,49 @@ func (s *Service) CreateGroup(ctx context.Context, userID, operationID, name str
 		return domain.Group{}, ErrInvalid
 	}
 	return s.repo.CreateGroup(ctx, userID, operationID, name)
+}
+
+func (s *Service) CreateInvitation(ctx context.Context, userID, operationID, groupID string) (domain.Invitation, error) {
+	if !validUserID(userID) {
+		return domain.Invitation{}, ErrUnauthenticated
+	}
+	if !validUUID(operationID) || !validUUID(groupID) {
+		return domain.Invitation{}, ErrInvalid
+	}
+	return s.repo.CreateInvitation(ctx, userID, operationID, groupID)
+}
+
+func (s *Service) AcceptInvitation(ctx context.Context, userID, operationID, token string) (domain.Group, error) {
+	if !validUserID(userID) {
+		return domain.Group{}, ErrUnauthenticated
+	}
+	if !validUUID(operationID) || !validInvitationToken(token) {
+		return domain.Group{}, ErrInvalid
+	}
+	return s.repo.AcceptInvitation(ctx, userID, operationID, token)
+}
+
+func (s *Service) LeaveGroup(ctx context.Context, userID, operationID, groupID string) (domain.LeaveResult, error) {
+	if !validUserID(userID) {
+		return domain.LeaveResult{}, ErrUnauthenticated
+	}
+	if !validUUID(operationID) || !validUUID(groupID) {
+		return domain.LeaveResult{}, ErrInvalid
+	}
+	return s.repo.LeaveGroup(ctx, userID, operationID, groupID)
+}
+
+func validUserID(value string) bool {
+	id, err := uuid.Parse(value)
+	return err == nil && id != uuid.Nil && id.String() == value
+}
+
+func validUUID(value string) bool {
+	id, err := uuid.Parse(value)
+	return err == nil && id != uuid.Nil && id.String() == value
+}
+
+func validInvitationToken(value string) bool {
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	return err == nil && len(decoded) == 32
 }

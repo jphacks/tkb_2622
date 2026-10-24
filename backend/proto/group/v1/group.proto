@@ -7,6 +7,9 @@ import "google/protobuf/timestamp.proto";
 service GroupService {
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
   rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse);
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
 }
 
 message GroupMember {
@@ -28,3 +31,22 @@ message CreateGroupRequest {
   string name = 2;
 }
 message CreateGroupResponse { Group group = 1; }
+message CreateInvitationRequest {
+  string operation_id = 1;
+  string group_id = 2;
+}
+message CreateInvitationResponse {
+  string invitation_id = 1;
+  string token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message AcceptInvitationRequest {
+  string operation_id = 1;
+  string token = 2;
+}
+message AcceptInvitationResponse { Group group = 1; }
+message LeaveGroupRequest {
+  string operation_id = 1;
+  string group_id = 2;
+}
+message LeaveGroupResponse { bool group_deleted = 1; }

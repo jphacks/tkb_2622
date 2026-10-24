@@ -2,12 +2,33 @@ import SwiftUI
 
 struct GroupView: View {
     @StateObject private var model = GroupViewModel(repository: ConfiguredGroupRepository())
+    @Binding private var invitationToken: String?
     @State private var selectedGroupID: String?
     @State private var isShowingCreateGroup = false
     @State private var newGroupName = ""
     @State private var createOperationID: String?
     @State private var createError: String?
     @State private var isCreatingGroup = false
+    @State private var invitationLink: URL?
+    @State private var invitationExpiresAt: Date?
+    @State private var invitationGroupID: String?
+    @State private var invitationOperationID: String?
+    @State private var invitationError: String?
+    @State private var isCreatingInvitation = false
+    @State private var isShowingAcceptInvitation = false
+    @State private var acceptError: String?
+    @State private var acceptOperationID: String?
+    @State private var isAcceptingInvitation = false
+    @State private var groupToLeave: MobileGroup?
+    @State private var leaveOperationID: String?
+    @State private var leaveError: String?
+    @State private var groupNotice: String?
+    @State private var isLeavingGroup = false
+    @State private var isShowingLeaveConfirmation = false
+
+    init(invitationToken: Binding<String?> = .constant(nil)) {
+        _invitationToken = invitationToken
+    }
 
     var body: some View {
         ScreenContainer {
@@ -34,7 +55,7 @@ struct GroupView: View {
                 SurfaceCard {
                     Label("所属グループはありません", systemImage: "person.2")
                         .font(.headline)
-                    Text("グループを作成するとここに表示されます。招待からの参加は未対応です。")
+                    Text("グループを作成するか、メンバーから届いた招待リンクで参加できます。")
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.secondaryInk)
                     Button("グループを作成") {
@@ -53,7 +74,7 @@ struct GroupView: View {
                 SurfaceCard {
                     Label("未対応のグループ機能", systemImage: "info.circle")
                         .font(.subheadline.weight(.bold))
-                    Text("作業開始フィード、メンバーの表示名、招待、退出はbackend APIが未対応です。")
+                    Text("作業開始フィードとメンバーの表示名はbackend APIが未対応です。")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
@@ -77,6 +98,46 @@ struct GroupView: View {
         .sheet(isPresented: $isShowingCreateGroup, onDismiss: resetCreateGroupForm) {
             createGroupSheet
                 .presentationDetents([.medium])
+        }
+        .onAppear { showAcceptInvitationIfNeeded() }
+        .onChange(of: invitationToken) { _, _ in showAcceptInvitationIfNeeded() }
+        .confirmationDialog(
+            "グループの招待リンク",
+            isPresented: $isShowingAcceptInvitation,
+            titleVisibility: .visible
+        ) {
+            Button(isAcceptingInvitation ? "参加中…" : "グループに参加") {
+                Task { await acceptInvitation() }
+            }
+            .disabled(isAcceptingInvitation)
+            Button("キャンセル", role: .cancel) { clearInvitationToken() }
+        } message: {
+            if let acceptError {
+                Text(acceptError)
+            } else {
+                Text("この招待リンクを使ってグループに参加します。招待リンクは1回だけ使用できます。")
+            }
+        }
+        .confirmationDialog(
+            "グループから退出しますか？",
+            isPresented: $isShowingLeaveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("退出する", role: .destructive) {
+                Task { await leaveGroup() }
+            }
+            .disabled(isLeavingGroup)
+            Button("キャンセル", role: .cancel) { groupToLeave = nil }
+        } message: {
+            Text("最後のメンバーが退出するとグループと招待リンクが削除されます。")
+        }
+        .alert(groupNotice == nil ? "グループ操作に失敗しました" : "退出しました", isPresented: Binding(
+            get: { invitationError != nil || leaveError != nil || groupNotice != nil },
+            set: { if !$0 { invitationError = nil; leaveError = nil; groupNotice = nil } }
+        )) {
+            Button("閉じる", role: .cancel) { invitationError = nil; leaveError = nil; groupNotice = nil }
+        } message: {
+            Text(groupNotice ?? invitationError ?? leaveError ?? "もう一度お試しください。")
         }
     }
 
@@ -152,6 +213,93 @@ struct GroupView: View {
         newGroupName = ""
         createOperationID = nil
         createError = nil
+    }
+
+    private func showAcceptInvitationIfNeeded() {
+        guard invitationToken != nil else { return }
+        isShowingAcceptInvitation = true
+    }
+
+    @MainActor
+    private func acceptInvitation() async {
+        guard let token = invitationToken else { return }
+        let operationID = acceptOperationID ?? UUID().uuidString.lowercased()
+        acceptOperationID = operationID
+        acceptError = nil
+        isAcceptingInvitation = true
+        defer { isAcceptingInvitation = false }
+        do {
+            let group = try await model.acceptInvitation(token: token, operationID: operationID)
+            selectedGroupID = group.id
+            clearInvitationToken()
+        } catch {
+            acceptError = invitationFailureMessage(error)
+            isShowingAcceptInvitation = true
+        }
+    }
+
+    @MainActor
+    private func createInvitation(for groupID: String) async {
+        invitationError = nil
+        isCreatingInvitation = true
+        defer { isCreatingInvitation = false }
+        let operationID = invitationOperationID ?? UUID().uuidString.lowercased()
+        invitationOperationID = operationID
+        do {
+            let invitation = try await model.createInvitation(groupID: groupID, operationID: operationID)
+            guard let url = GroupInvitationLink.make(token: invitation.token) else {
+                invitationError = "招待リンクを作成できませんでした。"
+                return
+            }
+            invitationLink = url
+            invitationExpiresAt = invitation.expiresAt.date
+            invitationGroupID = groupID
+            invitationOperationID = nil
+        } catch {
+            invitationError = invitationFailureMessage(error)
+        }
+    }
+
+    @MainActor
+    private func leaveGroup() async {
+        guard let group = groupToLeave else { return }
+        isLeavingGroup = true
+        leaveError = nil
+        defer { isLeavingGroup = false }
+        let operationID = leaveOperationID ?? UUID().uuidString.lowercased()
+        leaveOperationID = operationID
+        do {
+            let deleted = try await model.leaveGroup(groupID: group.id, operationID: operationID)
+            selectedGroupID = nil
+            invitationLink = nil
+            invitationExpiresAt = nil
+            invitationGroupID = nil
+            invitationOperationID = nil
+            leaveOperationID = nil
+            groupToLeave = nil
+            if deleted {
+                groupNotice = "最後のメンバーが退出したため、グループと招待リンクも削除しました。"
+            } else {
+                groupNotice = "グループから退出しました。"
+            }
+        } catch {
+            leaveError = invitationFailureMessage(error)
+        }
+    }
+
+    private func clearInvitationToken() {
+        invitationToken = nil
+        acceptOperationID = nil
+        acceptError = nil
+        isShowingAcceptInvitation = false
+    }
+
+    private func invitationFailureMessage(_ error: Error) -> String {
+        if let clientError = error as? ConnectJSONClient.ClientError,
+           case .connect(code: "failed_precondition") = clientError {
+            return "招待リンクは期限切れか、すでに使用されています。新しいリンクを発行してもらってください。"
+        }
+        return (error as? LocalizedError)?.errorDescription ?? "もう一度お試しください。"
     }
 
     @ViewBuilder
@@ -232,6 +380,57 @@ struct GroupView: View {
                     }
                 }
             }
+
+            Divider()
+
+            Button {
+                Task { await createInvitation(for: group.id) }
+            } label: {
+                Label(isCreatingInvitation ? "招待リンクを作成中…" : "招待リンクを作成して共有", systemImage: "person.crop.circle.badge.plus")
+                    .frame(maxWidth: .infinity, minHeight: 42)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isCreatingInvitation || isLeavingGroup)
+
+            if let invitationLink, invitationGroupID == group.id {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("7日間有効・1回限り")
+                        .font(.caption.weight(.semibold))
+                    if let invitationExpiresAt {
+                        Text("有効期限 \(invitationExpiresAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
+                    ShareLink(item: invitationLink) {
+                        Label("招待リンクを共有", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.primary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 14))
+            }
+
+            if let invitationError {
+                Text(invitationError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if let leaveError {
+                Text(leaveError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button("このグループから退出", role: .destructive) {
+                groupToLeave = group
+                isShowingLeaveConfirmation = true
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .disabled(isCreatingInvitation || isLeavingGroup)
         }
     }
 }

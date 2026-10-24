@@ -55,6 +55,34 @@ struct GroupProtoTimestamp: Decodable {
 protocol GroupRepository {
     func fetchGroups() async throws -> [MobileGroup]
     func createGroup(name: String, operationID: String) async throws -> MobileGroup
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool
+}
+
+struct MobileGroupInvitation {
+    let id: String
+    let token: String
+    let expiresAt: GroupProtoTimestamp
+}
+
+enum GroupInvitationLink {
+    static let scheme = "rewardtime"
+    static let host = "invite"
+
+    static func make(token: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = host
+        components.queryItems = [URLQueryItem(name: "token", value: token)]
+        return components.url
+    }
+
+    static func token(from url: URL) -> String? {
+        guard url.scheme == scheme, url.host == host else { return nil }
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "token" })?.value
+    }
 }
 
 struct APIGroupRepository: GroupRepository {
@@ -66,6 +94,35 @@ struct APIGroupRepository: GroupRepository {
 
     private struct CreateGroupResponse: Decodable {
         let group: MobileGroup
+    }
+
+    private struct CreateInvitationRequest: Encodable {
+        let operationId: String
+        let groupId: String
+    }
+
+    private struct CreateInvitationResponse: Decodable {
+        let invitationId: String
+        let token: String
+        let expiresAt: GroupProtoTimestamp
+    }
+
+    private struct AcceptInvitationRequest: Encodable {
+        let operationId: String
+        let token: String
+    }
+
+    private struct AcceptInvitationResponse: Decodable {
+        let group: MobileGroup
+    }
+
+    private struct LeaveGroupRequest: Encodable {
+        let operationId: String
+        let groupId: String
+    }
+
+    private struct LeaveGroupResponse: Decodable {
+        let groupDeleted: Bool
     }
 
     private struct ListGroupsResponse: Decodable {
@@ -104,6 +161,36 @@ struct APIGroupRepository: GroupRepository {
         )
         return response.group
     }
+
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
+        let response: CreateInvitationResponse = try await client.call(
+            service: "group.v1.GroupService",
+            method: "CreateInvitation",
+            requestBody: CreateInvitationRequest(operationId: operationID, groupId: groupID),
+            responseType: CreateInvitationResponse.self
+        )
+        return MobileGroupInvitation(id: response.invitationId, token: response.token, expiresAt: response.expiresAt)
+    }
+
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup {
+        let response: AcceptInvitationResponse = try await client.call(
+            service: "group.v1.GroupService",
+            method: "AcceptInvitation",
+            requestBody: AcceptInvitationRequest(operationId: operationID, token: token),
+            responseType: AcceptInvitationResponse.self
+        )
+        return response.group
+    }
+
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool {
+        let response: LeaveGroupResponse = try await client.call(
+            service: "group.v1.GroupService",
+            method: "LeaveGroup",
+            requestBody: LeaveGroupRequest(operationId: operationID, groupId: groupID),
+            responseType: LeaveGroupResponse.self
+        )
+        return response.groupDeleted
+    }
 }
 
 struct ConfiguredGroupRepository: GroupRepository {
@@ -113,6 +200,18 @@ struct ConfiguredGroupRepository: GroupRepository {
 
     func createGroup(name: String, operationID: String) async throws -> MobileGroup {
         try await repository().createGroup(name: name, operationID: operationID)
+    }
+
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
+        try await repository().createInvitation(groupID: groupID, operationID: operationID)
+    }
+
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup {
+        try await repository().acceptInvitation(token: token, operationID: operationID)
+    }
+
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool {
+        try await repository().leaveGroup(groupID: groupID, operationID: operationID)
     }
 
     private func repository() throws -> APIGroupRepository {
