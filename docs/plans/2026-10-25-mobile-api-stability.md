@@ -82,7 +82,7 @@
 
 ```sh
 docker compose --project-directory backend -f backend/compose.local.yaml logs --since=10m --no-log-prefix api \
-  | jq -Rc 'try (fromjson | {time,level,msg,operation,error_type,sql_state,constraint,table,code}) catch empty'
+  | jq -Rc 'try (fromjson | {time,level,msg,method,path,status,duration_ms,operation,error_type,sql_state,constraint,table,code}) catch empty'
 ```
 
 ## 優先順位
