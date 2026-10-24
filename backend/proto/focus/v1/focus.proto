@@ -1,0 +1,252 @@
+syntax = "proto3";
+package focus.v1;
+option go_package = "github.com/jphacks/tkb_2622/backend/gen/focus/v1;focusv1";
+
+import "google/protobuf/timestamp.proto";
+import "restriction/v1/restriction.proto";
+import "reward/v1/reward.proto";
+
+service FocusService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  // The measuring device is the PC device registered for the caller's auth session.
+  // Requires an active iPhone with an enabled restriction policy.
+  rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
+  rpc UploadActivityBatch(UploadActivityBatchRequest) returns (UploadActivityBatchResponse);
+  rpc PauseSession(PauseSessionRequest) returns (PauseSessionResponse);
+  rpc ResumeSession(ResumeSessionRequest) returns (ResumeSessionResponse);
+  rpc FinishSession(FinishSessionRequest) returns (FinishSessionResponse);
+  rpc AbortSession(AbortSessionRequest) returns (AbortSessionResponse);
+  rpc GetCurrentSession(GetCurrentSessionRequest) returns (GetCurrentSessionResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc GetSessionOperation(GetSessionOperationRequest) returns (GetSessionOperationResponse);
+}
+
+enum TaskCategory {
+  TASK_CATEGORY_UNSPECIFIED = 0;
+  TASK_CATEGORY_PROGRAMMING = 1;
+  TASK_CATEGORY_DOCUMENT_WRITING = 2;
+  TASK_CATEGORY_READING = 3;
+  TASK_CATEGORY_DESIGN = 4;
+  TASK_CATEGORY_STUDY = 5;
+  TASK_CATEGORY_OTHER = 6;
+}
+enum FocusMode {
+  FOCUS_MODE_UNSPECIFIED = 0;
+  FOCUS_MODE_NORMAL = 1;
+  FOCUS_MODE_READING = 2;
+  FOCUS_MODE_VIDEO = 3;
+}
+message TaskSettings {
+  string name = 1;
+  TaskCategory category = 2;
+  FocusMode mode = 3;
+  int64 planned_seconds = 4;
+  int64 minimum_seconds = 5;
+}
+message Task {
+  string id = 1;
+  TaskSettings settings = 2;
+  int64 version = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+message CreateTaskRequest {
+  string operation_id = 1;
+  TaskSettings settings = 2;
+}
+message CreateTaskResponse { Task task = 1; }
+message UpdateTaskRequest {
+  string operation_id = 1;
+  string task_id = 2;
+  int64 expected_version = 3;
+  TaskSettings settings = 4;
+}
+message UpdateTaskResponse { Task task = 1; }
+message GetTaskRequest { string task_id = 1; }
+message GetTaskResponse { Task task = 1; }
+message ListTasksRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  string next_page_token = 2;
+}
+
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SESSION_STATUS_RUNNING = 1;
+  SESSION_STATUS_PAUSED = 2;
+  SESSION_STATUS_FINALIZED = 3;
+  SESSION_STATUS_ABORTED = 4;
+}
+enum ActivityClass {
+  ACTIVITY_CLASS_UNSPECIFIED = 0;
+  ACTIVITY_CLASS_TASK = 1;
+  ACTIVITY_CLASS_RELATED_TRANSITION = 2;
+  ACTIVITY_CLASS_DISTRACTION = 3;
+  ACTIVITY_CLASS_UNKNOWN = 4;
+  ACTIVITY_CLASS_IDLE = 5;
+}
+// Half-open interval [start_time, end_time) classified on the PC.
+message ActivitySegment {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+  ActivityClass classification = 3;
+  repeated string reasons = 4;
+}
+// Milliseconds per class. active = T + R + D + U + I (paused time excluded), work = T + R.
+message Durations {
+  int64 task_millis = 1;
+  int64 related_transition_millis = 2;
+  int64 distraction_millis = 3;
+  int64 unknown_millis = 4;
+  int64 idle_millis = 5;
+  int64 active_millis = 6;
+  int64 work_millis = 7;
+}
+message Session {
+  string id = 1;
+  string device_id = 2;
+  string task_id = 3;
+  // Task settings fixed at start.
+  TaskSettings task_snapshot = 4;
+  SessionStatus status = 5;
+  int64 version = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp paused_at = 8;
+  google.protobuf.Timestamp ended_at = 9;
+  Durations durations = 10;
+  int64 accepted_through_seq = 11;
+  bool minimum_reached = 12;
+  // B100 = 100 * (T + R) / (T + R + D). Unset when the denominator is 0.
+  optional double focus_score = 13;
+  // Q = (T + R + D + I) / E. Unset when E is 0.
+  optional double quality = 14;
+  // Wrate = (T + R) / E. Unset when E is 0.
+  optional double work_rate = 15;
+}
+message StartSessionRequest {
+  string operation_id = 1;
+  string task_id = 2;
+  int64 task_version = 3;
+}
+message StartSessionResponse {
+  Session session = 1;
+  reward.v1.RewardBalance balance = 2;
+  restriction.v1.RestrictionState restriction = 3;
+}
+enum BatchStatus {
+  BATCH_STATUS_UNSPECIFIED = 0;
+  // Validated, counted and evaluated for interim rewards.
+  BATCH_STATUS_ACCEPTED = 1;
+  // Stored but waiting for earlier seqs; not evaluated yet.
+  BATCH_STATUS_PENDING = 2;
+  // Late batch after the session ended; kept as history only, never rewarded.
+  BATCH_STATUS_HISTORY = 3;
+}
+message UploadActivityBatchRequest {
+  string session_id = 1;
+  string batch_id = 2;
+  // Starts at 1 and increases by 1 per batch within the session.
+  int64 seq = 3;
+  string evaluator_version = 4;
+  string rules_version = 5;
+  repeated ActivitySegment segments = 6;
+}
+message ActivityReceipt {
+  string batch_id = 1;
+  int64 seq = 2;
+  BatchStatus status = 3;
+  int64 accepted_through_seq = 4;
+  repeated int64 missing_seqs = 5;
+  int64 earned_seconds = 6;
+}
+message UploadActivityBatchResponse {
+  ActivityReceipt receipt = 1;
+  reward.v1.RewardBalance balance = 2;
+}
+message PauseSessionRequest {
+  string operation_id = 1;
+  string session_id = 2;
+  int64 expected_version = 3;
+  google.protobuf.Timestamp paused_at = 4;
+  // Last batch seq sent before pausing (0 if none).
+  int64 last_seq = 5;
+}
+message PauseSessionResponse {
+  Session session = 1;
+  reward.v1.RewardBalance balance = 2;
+}
+message ResumeSessionRequest {
+  string operation_id = 1;
+  string session_id = 2;
+  int64 expected_version = 3;
+}
+message ResumeSessionResponse {
+  Session session = 1;
+  reward.v1.RewardBalance balance = 2;
+  restriction.v1.RestrictionState restriction = 3;
+}
+message FinishSessionRequest {
+  string operation_id = 1;
+  string session_id = 2;
+  int64 expected_version = 3;
+  google.protobuf.Timestamp ended_at = 4;
+  int64 last_seq = 5;
+  // Unsent segments; stored for history and never rewarded.
+  repeated ActivitySegment remaining_segments = 6;
+}
+message FinishSessionResponse {
+  Session session = 1;
+  int64 discarded_seconds = 2;
+  reward.v1.RewardBalance balance = 3;
+  restriction.v1.RestrictionState restriction = 4;
+}
+message AbortSessionRequest {
+  string operation_id = 1;
+  string session_id = 2;
+  int64 expected_version = 3;
+  google.protobuf.Timestamp ended_at = 4;
+  int64 last_seq = 5;
+  repeated ActivitySegment remaining_segments = 6;
+}
+message AbortSessionResponse {
+  Session session = 1;
+  int64 discarded_seconds = 2;
+  reward.v1.RewardBalance balance = 3;
+  restriction.v1.RestrictionState restriction = 4;
+}
+message GetCurrentSessionRequest {}
+// session is unset when there is no unfinished session.
+message GetCurrentSessionResponse { Session session = 1; }
+message GetSessionRequest { string session_id = 1; }
+message GetSessionResponse {
+  Session session = 1;
+  reward.v1.RewardSummary reward = 2;
+}
+enum OperationKind {
+  OPERATION_KIND_UNSPECIFIED = 0;
+  OPERATION_KIND_START = 1;
+  OPERATION_KIND_PAUSE = 2;
+  OPERATION_KIND_RESUME = 3;
+  OPERATION_KIND_FINISH = 4;
+  OPERATION_KIND_ABORT = 5;
+}
+enum OperationStatus {
+  OPERATION_STATUS_UNSPECIFIED = 0;
+  // No committed result. This does not guarantee the operation never ran; retry with the same ID.
+  OPERATION_STATUS_NOT_FOUND = 1;
+  OPERATION_STATUS_SUCCEEDED = 2;
+}
+message GetSessionOperationRequest {
+  OperationKind kind = 1;
+  string operation_id = 2;
+}
+message GetSessionOperationResponse {
+  OperationStatus status = 1;
+  string session_id = 2;
+}

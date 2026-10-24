@@ -5,11 +5,24 @@
 package identitysql
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type AppActivityBatch struct {
+	SessionID        uuid.UUID
+	Seq              int64
+	BatchID          uuid.UUID
+	RequestHash      string
+	Status           string
+	EvaluatorVersion string
+	RulesVersion     string
+	Segments         json.RawMessage
+	ReceivedAt       time.Time
+}
 
 type AppDevice struct {
 	ID             uuid.UUID
@@ -23,6 +36,15 @@ type AppDevice struct {
 	CreatedAt      time.Time
 }
 
+type AppFocusOperation struct {
+	UserID      uuid.UUID
+	Kind        string
+	OperationID uuid.UUID
+	RequestHash string
+	ResourceID  uuid.UUID
+	Response    json.RawMessage
+}
+
 type AppIdentityOperation struct {
 	UserID      uuid.UUID
 	Kind        string
@@ -31,10 +53,142 @@ type AppIdentityOperation struct {
 	Response    json.RawMessage
 }
 
+type AppRestrictionOperation struct {
+	UserID      uuid.UUID
+	Kind        string
+	OperationID uuid.UUID
+	RequestHash string
+	ResourceID  uuid.UUID
+	Response    json.RawMessage
+}
+
+type AppRestrictionPolicy struct {
+	DeviceID            uuid.UUID
+	UserID              uuid.UUID
+	Enabled             bool
+	TargetMode          string
+	UsageTimeMode       string
+	AllowedAppsPolicy   string
+	DeviceConfigVersion int64
+	Configured          bool
+	Version             int64
+	UpdatedAt           time.Time
+}
+
+type AppRestrictionState struct {
+	UserID           uuid.UUID
+	DeviceID         uuid.NullUUID
+	SessionID        uuid.NullUUID
+	ControlRevision  int64
+	DesiredMode      string
+	ActiveGrantID    uuid.NullUUID
+	AppliedRevision  int64
+	ShieldStatus     string
+	PermissionStatus string
+	LastAppliedAt    sql.NullTime
+	LastReportedAt   sql.NullTime
+	FailureReason    string
+	Version          int64
+}
+
+type AppRewardGrant struct {
+	ID            uuid.UUID
+	SessionID     uuid.UUID
+	UserID        uuid.UUID
+	PolicyVersion int32
+	SourceFromSeq int64
+	SourceToSeq   int64
+	EarnedSeconds int64
+	TransactionID uuid.UUID
+	GrantedAt     time.Time
+}
+
+type AppRewardTransaction struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	SessionID     uuid.UUID
+	Type          string
+	AmountSeconds int64
+	SourceID      string
+	BalanceAfter  int64
+	OccurredAt    time.Time
+}
+
+type AppRewardWallet struct {
+	UserID         uuid.UUID
+	SessionID      uuid.NullUUID
+	BalanceSeconds int64
+	EvaluatedSeq   int64
+	Version        int64
+	UpdatedAt      time.Time
+}
+
+type AppTask struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	Name           string
+	Category       string
+	Mode           string
+	PlannedSeconds int64
+	MinimumSeconds int64
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type AppUsageGrant struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	DeviceID           uuid.UUID
+	SessionID          uuid.UUID
+	RequestedSeconds   int64
+	ReservedSeconds    int64
+	Status             string
+	ControlRevision    int64
+	IssuedAt           time.Time
+	ActivatedAt        sql.NullTime
+	ReportSeq          int64
+	ReportedSeconds    int64
+	LastObservedAt     sql.NullTime
+	ConsumedSeconds    sql.NullInt64
+	DiscardedSeconds   sql.NullInt64
+	EndReason          sql.NullString
+	EndedByOperationID string
+	CompletedAt        sql.NullTime
+	Version            int64
+}
+
 type AppUser struct {
 	ID           uuid.UUID
 	AuthProvider string
 	AuthSubject  uuid.UUID
 	CreatedAt    time.Time
 	Status       string
+}
+
+type AppWorkSession struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	DeviceID           uuid.UUID
+	TaskID             uuid.UUID
+	TaskName           string
+	Category           string
+	Mode               string
+	PlannedSeconds     int64
+	MinimumSeconds     int64
+	Status             string
+	Version            int64
+	StartedAt          time.Time
+	RunningSince       sql.NullTime
+	ServerActiveMillis int64
+	PausedAt           sql.NullTime
+	EndedAt            sql.NullTime
+	AcceptedSeq        int64
+	LastSegmentEnd     sql.NullTime
+	TaskMillis         int64
+	RelatedMillis      int64
+	DistractionMillis  int64
+	UnknownMillis      int64
+	IdleMillis         int64
+	FinalSegments      json.RawMessage
 }

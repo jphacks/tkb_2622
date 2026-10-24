@@ -1,0 +1,23 @@
+syntax = "proto3";
+package reward.v1;
+option go_package = "github.com/jphacks/tkb_2622/backend/gen/reward/v1;rewardv1";
+
+service RewardService {
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+}
+// Unused reward seconds of the current (unfinished) work session. Zero with no session_id when idle.
+message RewardBalance {
+  string session_id = 1;
+  int64 balance_seconds = 2;
+  int64 version = 3;
+  // Highest contiguous activity batch seq that has been evaluated for interim rewards.
+  int64 evaluated_through_seq = 4;
+}
+// Earned, spent and discarded seconds of one session. Spending arrives with the Restriction API.
+message RewardSummary {
+  int64 earned_seconds = 1;
+  int64 spent_seconds = 2;
+  int64 discarded_seconds = 3;
+}
+message GetBalanceRequest {}
+message GetBalanceResponse { RewardBalance balance = 1; }

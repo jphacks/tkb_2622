@@ -1,0 +1,202 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B20000000000000000000014 /* SharedFocusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* SharedFocusSnapshot.swift */; };
+		B20000000000000000000015 /* SharedFocusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* SharedFocusSnapshot.swift */; };
+		B20000000000000000000016 /* FriendFocusWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* FriendFocusWidgetExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B20000000000000000000012 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B20000000000000000000011 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B20000000000000000000010;
+			remoteInfo = FriendFocusWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B2000000000000000000000B /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B20000000000000000000016 /* FriendFocusWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		B20000000000000000000001 /* FriendFocusWidgetPoC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FriendFocusWidgetPoC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000002 /* FriendFocusWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = FriendFocusWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000005 /* SharedFocusSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFocusSnapshot.swift; sourceTree = "<group>"; };
+		B20000000000000000000032 /* FriendFocusActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000033 /* FriendFocusActivityAttributes.swift */; };
+		B20000000000000000000034 /* FriendFocusActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000033 /* FriendFocusActivityAttributes.swift */; };
+		B20000000000000000000033 /* FriendFocusActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendFocusActivityAttributes.swift; sourceTree = "<group>"; };
+		B20000000000000000000030 /* WidgetExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = WidgetExtension-Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B20000000000000000000003 /* HostApp */ = {isa = PBXFileSystemSynchronizedRootGroup; path = HostApp; sourceTree = "<group>"; };
+		B20000000000000000000004 /* WidgetExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; path = WidgetExtension; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B20000000000000000000008 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B2000000000000000000000D /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B20000000000000000000007 = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000003 /* HostApp */,
+				B20000000000000000000004 /* WidgetExtension */,
+				B20000000000000000000026 /* Shared */,
+				B20000000000000000000031 /* Configuration */,
+				B20000000000000000000006 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B20000000000000000000026 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000005 /* SharedFocusSnapshot.swift */,
+				B20000000000000000000033 /* FriendFocusActivityAttributes.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		B20000000000000000000031 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000030 /* WidgetExtension-Info.plist */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		B20000000000000000000006 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* FriendFocusWidgetPoC.app */,
+				B20000000000000000000002 /* FriendFocusWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B20000000000000000000009 /* FriendFocusWidgetPoC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000021 /* Build configuration list for PBXNativeTarget "FriendFocusWidgetPoC" */;
+			buildPhases = (
+				B2000000000000000000000A /* Sources */,
+				B20000000000000000000008 /* Frameworks */,
+				B2000000000000000000000C /* Resources */,
+				B2000000000000000000000B /* Embed App Extensions */,
+			);
+			buildRules = ();
+			dependencies = (
+				B20000000000000000000013 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B20000000000000000000003 /* HostApp */,
+			);
+			name = FriendFocusWidgetPoC;
+			packageProductDependencies = ();
+			productName = FriendFocusWidgetPoC;
+			productReference = B20000000000000000000001 /* FriendFocusWidgetPoC.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B20000000000000000000010 /* FriendFocusWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000022 /* Build configuration list for PBXNativeTarget "FriendFocusWidgetExtension" */;
+			buildPhases = (
+				B2000000000000000000000E /* Sources */,
+				B2000000000000000000000D /* Frameworks */,
+				B2000000000000000000000F /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (
+				B20000000000000000000004 /* WidgetExtension */,
+			);
+			name = FriendFocusWidgetExtension;
+			packageProductDependencies = ();
+			productName = FriendFocusWidgetExtension;
+			productReference = B20000000000000000000002 /* FriendFocusWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B20000000000000000000011 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					B20000000000000000000009 = {CreatedOnToolsVersion = 27.0; SystemCapabilities = {com.apple.ApplicationGroups.iOS = {enabled = 1;};};};
+					B20000000000000000000010 = {CreatedOnToolsVersion = 27.0; SystemCapabilities = {com.apple.ApplicationGroups.iOS = {enabled = 1;};};};
+				};
+			};
+			buildConfigurationList = B20000000000000000000020 /* Build configuration list for PBXProject "FriendFocusWidgetPoC" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = ja;
+			hasScannedForEncodings = 0;
+			knownRegions = (ja, Base,);
+			mainGroup = B20000000000000000000007;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B20000000000000000000006 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B20000000000000000000009 /* FriendFocusWidgetPoC */,
+				B20000000000000000000010 /* FriendFocusWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B2000000000000000000000C /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B2000000000000000000000F /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B2000000000000000000000A /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000014 /* SharedFocusSnapshot.swift in Sources */, B20000000000000000000032 /* FriendFocusActivityAttributes.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
+		B2000000000000000000000E /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000015 /* SharedFocusSnapshot.swift in Sources */, B20000000000000000000034 /* FriendFocusActivityAttributes.swift in Sources */,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B20000000000000000000013 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = B20000000000000000000010 /* FriendFocusWidgetExtension */; targetProxy = B20000000000000000000012 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B2000000000000000000001A /* Debug project */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; }; name = Debug; };
+		B2000000000000000000001B /* Release project */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; }; name = Release; };
+		B2000000000000000000001C /* Debug app */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = HostApp/FriendFocusHost.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "友だちFocus PoC"; INFOPLIST_KEY_NSSupportsLiveActivities = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1; PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.friendfocuspoc; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		B2000000000000000000001D /* Release app */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = HostApp/FriendFocusHost.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "友だちFocus PoC"; INFOPLIST_KEY_NSSupportsLiveActivities = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UILaunchScreen_Generation = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1; PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.friendfocuspoc; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		B2000000000000000000001E /* Debug widget */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = WidgetExtension/FriendFocusWidgetExtension.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = Configuration/WidgetExtension-Info.plist; INFOPLIST_KEY_CFBundleDisplayName = FriendFocusWidget; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1; PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.friendfocuspoc.widget; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		B2000000000000000000001F /* Release widget */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = WidgetExtension/FriendFocusWidgetExtension.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = Configuration/WidgetExtension-Info.plist; INFOPLIST_KEY_CFBundleDisplayName = FriendFocusWidget; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1; PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.friendfocuspoc.widget; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B20000000000000000000020 /* Build configuration list for PBXProject "FriendFocusWidgetPoC" */ = {isa = XCConfigurationList; buildConfigurations = (B2000000000000000000001A /* Debug */, B2000000000000000000001B /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000021 /* Build configuration list for PBXNativeTarget "FriendFocusWidgetPoC" */ = {isa = XCConfigurationList; buildConfigurations = (B2000000000000000000001C /* Debug */, B2000000000000000000001D /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000022 /* Build configuration list for PBXNativeTarget "FriendFocusWidgetExtension" */ = {isa = XCConfigurationList; buildConfigurations = (B2000000000000000000001E /* Debug */, B2000000000000000000001F /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = B20000000000000000000011 /* Project object */;
+}
