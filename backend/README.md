@@ -39,7 +39,18 @@ API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
 | `make -C backend build` | イメージをビルド |
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
+| `SEED_AUTH_SUBJECT=<UUID> make -C backend seed` | 登録済みiOS開発ユーザー用のモックデータをローカルDBへ投入 |
 | `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
+
+### 開発用モックデータ
+
+アプリでSupabase Authへログインし，業務UserとiOS端末を登録した後に実行します。`SEED_AUTH_SUBJECT`にはログインしたSupabaseユーザーのUUIDを指定してください。投入先は`compose.local.yaml`で起動するローカルPostgreSQLに固定されています。
+
+```sh
+SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed
+```
+
+作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，グループを投入します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
 
 ローカルのPostgreSQL（`postgres:17.7-bookworm`）は名前付きボリューム`tkb-backend-local_postgres-data`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
 
