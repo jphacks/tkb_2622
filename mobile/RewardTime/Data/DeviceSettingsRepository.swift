@@ -105,6 +105,14 @@ struct ConfiguredDeviceSettingsRepository {
         let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
         let client = ConnectJSONClient(baseURL: apiBaseURL, tokenProvider: auth)
         let deviceName = await UIDevice.current.name
+        return try await sync(settings: settings, client: client, deviceName: deviceName)
+    }
+
+    func sync(
+        settings: DeviceRestrictionSettings,
+        client: ConnectJSONClient,
+        deviceName: String
+    ) async throws -> SyncedDevicePolicy {
         let deviceID = try await ensureDeviceRegistered(client: client, deviceName: deviceName)
 
         for attempt in 0..<3 {
