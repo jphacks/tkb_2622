@@ -62,7 +62,7 @@ backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Co
 
 Debugビルドのホームから「backendヘルスチェック」を開くと、指定URLの`GET /healthz`を確認できる。SimulatorからMac上のローカルbackendを確認する場合は既定値`http://127.0.0.1:8080`を使用する。iPhone実機からは、backend READMEの手順でComposeの公開先をMacのLAN IPv4に設定し、アプリのConnect API URLへ`http://<MacのLAN IPv4>:8080`を入力する。Debug構成だけローカルネットワーク接続を許可し、Release構成のATS設定は変更していない。ヘルスチェックは認証や業務データの読み書きを行わず、実API疎通を完了したことにはならない。
 
-API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorで端末失効APIとログアウト順序を確認する場合は、`RewardTimeSimulatorTests` schemeを使う。
+API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorでは`RewardTimeSimulatorTests` schemeを使い、端末失効API、Group API error分類、認証入口状態resolverを確認する。
 
 ```sh
 xcodebuild test \
@@ -72,7 +72,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行を検証する。
+Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API error案内、初回未認証・同期失敗・認証済み・ローカル利用の入口状態を検証する。認証状態テストはresolverの分岐であり、SwiftUIログイン画面の表示確認や実Supabase OTP試験ではない。
 
 ## ソース構成
 

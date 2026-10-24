@@ -140,6 +140,44 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "unimplemented")).contains("グループAPIがありません"))
         XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "not_found")).contains("not_found"))
         XCTAssertTrue(GroupAPIErrorMessage.describe(.connect(code: "unauthenticated")).contains("再ログイン"))
+
+        let actionError: Error = ConnectJSONClient.ClientError.connect(code: "unauthenticated")
+        XCTAssertTrue(GroupAPIErrorMessage.describe(actionError).contains("再ログイン"))
+    }
+
+    func testAuthenticationEntryRequiresIdentitySyncAndShowsFirstLaunchWelcome() {
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: false
+            ),
+            .welcome
+        )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: true,
+                businessUserReady: false,
+                loginDeferred: false
+            ),
+            .identitySyncRequired
+        )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: true,
+                businessUserReady: true,
+                loginDeferred: false
+            ),
+            .authenticated
+        )
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: true
+            ),
+            .localOnly
+        )
     }
 
     private func repository() -> ConfiguredDeviceRevocationRepository {

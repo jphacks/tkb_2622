@@ -251,9 +251,7 @@ struct GroupView: View {
       {
         createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。"
       } else {
-        createError =
-          (error as? LocalizedError)?.errorDescription
-          ?? "グループを作成できませんでした。接続状態を確認して再試行してください。"
+        createError = GroupAPIErrorMessage.describe(error)
       }
     }
   }
@@ -350,7 +348,7 @@ struct GroupView: View {
     {
       return "招待リンクは期限切れか、すでに使用されています。新しいリンクを発行してもらってください。"
     }
-    return (error as? LocalizedError)?.errorDescription ?? "もう一度お試しください。"
+    return GroupAPIErrorMessage.describe(error)
   }
 
   @ViewBuilder

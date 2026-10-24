@@ -32,4 +32,10 @@ final class GroupAPIErrorMessageTests: XCTestCase {
             GroupAPIErrorMessage.describe(.httpStatus(404)).contains("グループAPIがありません")
         )
     }
+
+    func testGroupActionErrorWrapperKeepsConnectGuidance() {
+        let error: Error = ConnectJSONClient.ClientError.connect(code: "unauthenticated")
+
+        XCTAssertTrue(GroupAPIErrorMessage.describe(error).contains("再ログイン"))
+    }
 }

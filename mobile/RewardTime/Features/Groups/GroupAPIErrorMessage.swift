@@ -1,4 +1,14 @@
+import Foundation
+
 enum GroupAPIErrorMessage {
+    static func describe(_ error: Error) -> String {
+        if let clientError = error as? ConnectJSONClient.ClientError {
+            return describe(clientError)
+        }
+        return (error as? LocalizedError)?.errorDescription
+            ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+    }
+
     static func describe(_ error: ConnectJSONClient.ClientError) -> String {
         switch error {
         case .httpStatus(404), .connect(code: "unimplemented"):
