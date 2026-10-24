@@ -1,6 +1,6 @@
 # バックエンド
 
-Go / `net/http`でHTTPとConnect互換のヘルスチェックを提供する最小構成です．Userテーブルをgooseで管理します．UserのCRUD・認証・業務RPC・テストコードは未実装です．
+Go / `net/http`でHTTPとConnect互換のヘルスチェックを提供する最小構成です．Userテーブルをgooseで管理し，`RewardWallet`の基本的なドメイン操作を実装しています．UserのCRUD・認証・業務RPC・業務データの永続化・テストコードは未実装です．
 
 今後の業務実装は，6つの業務モジュールと横断処理のworkflowからなるモジュラーモノリスとし，各モジュール内でクリーンアーキテクチャの依存方向を守ります．目標のディレクトリ構成・責務・トランザクション境界は[バックエンド構成](../docs/spec/1.バックエンド構成.md)を参照してください．以下は現在実装済みの構成と起動手順です．
 
@@ -38,6 +38,7 @@ SQLiteは名前付きボリューム`tkb-backend-local_sqlite-data`の`/data/app
 - `cmd/migrate`：`up`／`down`／`status`コマンド．SQLはバイナリに埋め込みます．
 - `internal/server`：HTTPと公式`connectrpc.com/grpchealth`のハンドラー．
 - `internal/database`：ローカルSQLite（modernc）とリモートTurso/libSQL（libsql-client-go）の接続．
+- `internal/reward/domain`：セッション内ウォレットの残高加算・利用枠確保・終了時破棄．報酬計算，重複付与判定，DB更新は含まない．
 - `migrations`：UserのDDLとgooseの適用履歴．
 
 | 環境変数 | 用途・既定値 |

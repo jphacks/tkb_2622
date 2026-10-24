@@ -8,7 +8,7 @@
 | --- | --- |
 | [backend/](backend/) | Go APIの最小実装。Userテーブル，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-| [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
+| [mobile/](mobile/) | SwiftUI本番アプリ用。現時点では実装未着手。[開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | インフラ構成の管理用 |
 | [poc/](poc/) | 必要な機能の PoC 用。[iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
@@ -31,6 +31,16 @@
 | [API仕様書](docs/spec/3.API仕様書.md) | ヘルスチェックを実装済み．小休憩モデルの業務動作，基本APIの契約案，全機能の対応表，未決事項を記載 |
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | 途中報酬・小休憩，終了時の全未使用報酬破棄・制限解除，グループ・通知のモデルを記載 |
 | [インフラ構成](docs/spec/2.インフラ構成.md) | 未記入（空ファイル） |
+
+## UIモック
+
+画面遷移と表示項目の参照用HTMLです。モックの状態と仕様との対応・実装時の扱いは[UIモック案内](docs/UI/README.md)，業務ルールは仕様資料を正とします。
+
+| 画面群 | モック |
+| --- | --- |
+| Macの作業結果・履歴・設定・セッション操作 | [作業後フィードバック](docs/UI/01_Mac_作業後フィードバック.html)，[これまでの記録](docs/UI/02_Mac_これまでの記録.html)，[設定](docs/UI/03_Mac_設定.html)，[メニューバー開始前](<docs/UI/04_Mac_メニューバー(開始前).html>)，[作業中](<docs/UI/05_Mac_メニューバー(作業中).html>)，[一時停止中](<docs/UI/06_Mac_メニューバー(一時停止中).html>)，[起動時ポップアップ](docs/UI/07_Mac_アプリ起動時ポップアップ.html) |
+| iPhoneの作業状態・制限・残高利用 | [作業中ホーム](docs/UI/08_iPhone_作業中ホーム.html)，[制限画面](<docs/UI/09_iPhone_制限画面(Shield).html>)，[残高を使う](docs/UI/10_iPhone_残高を使う.html)，[利用中](docs/UI/11_iPhone_利用中.html) |
+| iPhoneの設定・グループ・通知 | [設定](docs/UI/12_iPhone_設定.html)，[グループ](docs/UI/13_iPhone_グループ.html)，[通知の例](docs/UI/14_iPhone_Mac_通知の例.html) |
 
 資料が空の場合は仕様未定として扱います。実装に必要な仕様を決めたら該当資料に記載し、資料の追加・移動や記入状況の変更に合わせてこの索引を更新します。
 
