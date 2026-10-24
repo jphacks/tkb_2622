@@ -5,7 +5,13 @@ struct SupabaseAuthService: AccessTokenProviding {
     let client: SupabaseClient
 
     init(projectURL: URL, publishableKey: String) {
-        client = SupabaseClient(supabaseURL: projectURL, supabaseKey: publishableKey)
+        client = SupabaseClient(
+            supabaseURL: projectURL,
+            supabaseKey: publishableKey,
+            options: SupabaseClientOptions(
+                auth: .init(emitLocalSessionAsInitialSession: true)
+            )
+        )
     }
 
     func sendEmailOTP(to email: String) async throws {

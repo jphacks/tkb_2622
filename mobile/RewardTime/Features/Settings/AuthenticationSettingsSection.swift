@@ -237,7 +237,7 @@ struct AuthenticationSettingsSection: View {
         let session = try await service.client.auth.session
         let operationKey = "mobile.identity.ensureUser.operation.\(session.user.id.uuidString)"
         let defaults = UserDefaults.standard
-        let operationID = defaults.string(forKey: operationKey) ?? UUID().uuidString
+        let operationID = (defaults.string(forKey: operationKey) ?? UUID().uuidString).lowercased()
         defaults.set(operationID, forKey: operationKey)
 
         let repository = IdentityAPIRepository(baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"), auth: service)
