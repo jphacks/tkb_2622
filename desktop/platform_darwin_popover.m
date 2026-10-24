@@ -205,8 +205,9 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 }
 
 - (void)updateWithState:(NSDictionary *)state {
+    NSDictionary *nextState = [state copy];
     [_lastState release];
-    _lastState = [state copy];
+    _lastState = nextState;
 
     NSString *status = state[@"status"] ?: @"idle";
     NSString *detail = state[@"detail"] ?: @"";
