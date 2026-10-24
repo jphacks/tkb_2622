@@ -49,6 +49,17 @@ npm run dev -- --host 127.0.0.1
 
 ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．Wailsで起動する場合は`cd desktop`の後に`wails dev`を実行する．リリース向けビルドは同じ場所で`wails build`を実行する．
 
+#### Windowsでの起動
+
+Windowsのアプリとして起動するには，**Windows側（例：`C:\dev\tkb_2622`）にcloneしたリポジトリ**をPowerShellで操作する．WSLで`wails dev`を実行するとLinux版としてビルドされ，WSL上のパス（`\\wsl.localhost\...`）ではnpmが動かない．`make`がなければ`winget install ezwinports.make`で入れる．
+
+```powershell
+make -C desktop setup-win   # 初回・依存更新時
+make -C desktop up-win      # wails devで起動（終了はCtrl+C）
+```
+
+`setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加するため，初回後は新しいターミナルを開く．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．処理は`scripts/windows/*.ps1`にあり，`make`がない場合は`powershell -ExecutionPolicy Bypass -File desktop\scripts\windows\setup.ps1`（起動は`up.ps1`）でも実行できる．
+
 ```sh
 cd desktop/frontend
 npm run typecheck
