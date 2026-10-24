@@ -196,10 +196,9 @@ struct APIHomeRepository: HomeRepository {
         balanceSessionID: String,
         restrictionSessionID: String
     ) throws {
-        let ids = [currentSessionID, balanceSessionID, restrictionSessionID]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-        guard Set(ids).count <= 1 else {
+        let expectedSessionID = currentSessionID ?? ""
+        guard balanceSessionID == expectedSessionID,
+              restrictionSessionID == expectedSessionID else {
             throw APIHomeRepositoryError.inconsistentSessionIDs
         }
     }
@@ -224,9 +223,18 @@ private struct ProtoJSONInt64: Decodable {
     }
 }
 
-private enum APIHomeRepositoryError: Error {
+private enum APIHomeRepositoryError: LocalizedError {
     case inconsistentSessionIDs
     case unexpectedSessionStatus
+
+    var errorDescription: String? {
+        switch self {
+        case .inconsistentSessionIDs:
+            "作業・残高・制限状態のセッションが一致しません。少し待ってから再読み込みしてください。"
+        case .unexpectedSessionStatus:
+            "作業状態を読み取れませんでした。アプリを再読み込みしてください。"
+        }
+    }
 }
 
 struct ConfiguredHomeRepository: HomeRepository {
