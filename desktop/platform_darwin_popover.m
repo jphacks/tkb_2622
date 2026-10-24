@@ -389,6 +389,10 @@ void FocusLinkConfigurePopover(NSPopover *popover) {
     focusLinkPopover = popover;
     focusLinkPopoverViewController = [[FocusLinkPopoverViewController alloc] init];
     popover.contentViewController = focusLinkPopoverViewController;
+    // アプリを前面化せずにメニューバーのパネルを見やすく保つ。
+    if (@available(macOS 10.14, *)) {
+        popover.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+    }
     popover.behavior = NSPopoverBehaviorTransient;
     popover.animates = YES;
     popover.contentSize = NSMakeSize(360, 250);
