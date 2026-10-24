@@ -167,6 +167,7 @@ func (h *Handler) RevokeDevice(ctx context.Context, req *connect.Request[v1.Revo
 }
 
 func (h *Handler) RegisterNotificationEndpoint(ctx context.Context, req *connect.Request[v1.RegisterNotificationEndpointRequest]) (*connect.Response[v1.RegisterNotificationEndpointResponse], error) {
+	slog.Info("notification endpoint API request received", "operation", "register")
 	environment := map[v1.APNsEnvironment]string{
 		v1.APNsEnvironment_AP_NS_ENVIRONMENT_DEVELOPMENT: "development",
 		v1.APNsEnvironment_AP_NS_ENVIRONMENT_PRODUCTION:  "production",
@@ -182,6 +183,7 @@ func (h *Handler) RegisterNotificationEndpoint(ctx context.Context, req *connect
 }
 
 func (h *Handler) DeleteNotificationEndpoint(ctx context.Context, req *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
+	slog.Info("notification endpoint API request received", "operation", "delete")
 	if err := h.service.DeleteNotificationEndpoint(ctx, principal(ctx), req.Msg.RegistrationId); err != nil {
 		logInternalNotificationError("delete", err)
 		return nil, rpcError(err)
