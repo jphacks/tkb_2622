@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	v1 "github.com/jphacks/tkb_2622/backend/gen/focus/v1"
+	restrictionv1 "github.com/jphacks/tkb_2622/backend/gen/restriction/v1"
 	rewardv1 "github.com/jphacks/tkb_2622/backend/gen/reward/v1"
 	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/focus/application"
@@ -57,7 +58,7 @@ func session(s application.Session) *v1.Session {
 	t := s.Totals
 	out := &v1.Session{
 		Id: s.ID, DeviceId: s.DeviceID, TaskId: s.TaskID, TaskSnapshot: settingsOut(s.Snapshot), Status: statusOut[s.Status], Version: s.Version,
-		StartedAt: timestamppb.New(s.StartedAt), AcceptedThroughSeq: s.AcceptedSeq, MinimumReached: s.MinimumReached(),
+		StartedAt: timestamppb.New(s.StartedAt), AcceptedThroughSeq: s.AcceptedSeq, MinimumReached: s.MinimumReached(), TrackingOnly: s.TrackingOnly,
 		Durations: &v1.Durations{TaskMillis: t.Task, RelatedTransitionMillis: t.Related, DistractionMillis: t.Distraction, UnknownMillis: t.Unknown, IdleMillis: t.Idle, ActiveMillis: t.Active(), WorkMillis: t.Work()},
 	}
 	if s.PausedAt != nil && s.Status == "PAUSED" {
@@ -68,6 +69,12 @@ func session(s application.Session) *v1.Session {
 	}
 	out.FocusScore, out.Quality, out.WorkRate = t.Scores()
 	return out
+}
+func sessionRestriction(result workflow.SessionResult) *restrictionv1.RestrictionState {
+	if result.Session.TrackingOnly {
+		return nil
+	}
+	return restrictionconnect.StateMessage(result.Restriction)
 }
 func balance(w reward.Wallet) *rewardv1.RewardBalance {
 	return &rewardv1.RewardBalance{SessionId: w.SessionID, BalanceSeconds: w.BalanceSeconds, Version: w.Version, EvaluatedThroughSeq: w.EvaluatedSeq}
@@ -153,7 +160,7 @@ func (h *Handler) StartSession(ctx context.Context, req *connect.Request[v1.Star
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.StartSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
+	return connect.NewResponse(&v1.StartSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: sessionRestriction(r)}), nil
 }
 func (h *Handler) UploadActivityBatch(ctx context.Context, req *connect.Request[v1.UploadActivityBatchRequest]) (*connect.Response[v1.UploadActivityBatchResponse], error) {
 	a, err := h.resolve(ctx)
@@ -197,7 +204,7 @@ func (h *Handler) ResumeSession(ctx context.Context, req *connect.Request[v1.Res
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.ResumeSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
+	return connect.NewResponse(&v1.ResumeSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: sessionRestriction(r)}), nil
 }
 func (h *Handler) endInput(msg interface {
 	GetOperationId() string
@@ -229,7 +236,7 @@ func (h *Handler) FinishSession(ctx context.Context, req *connect.Request[v1.Fin
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.FinishSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
+	return connect.NewResponse(&v1.FinishSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: sessionRestriction(r)}), nil
 }
 func (h *Handler) AbortSession(ctx context.Context, req *connect.Request[v1.AbortSessionRequest]) (*connect.Response[v1.AbortSessionResponse], error) {
 	a, err := h.resolve(ctx)
@@ -244,7 +251,7 @@ func (h *Handler) AbortSession(ctx context.Context, req *connect.Request[v1.Abor
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.AbortSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
+	return connect.NewResponse(&v1.AbortSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: sessionRestriction(r)}), nil
 }
 func (h *Handler) GetCurrentSession(ctx context.Context, req *connect.Request[v1.GetCurrentSessionRequest]) (*connect.Response[v1.GetCurrentSessionResponse], error) {
 	a, err := h.resolve(ctx)

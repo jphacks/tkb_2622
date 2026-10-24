@@ -58,7 +58,7 @@ func asTask(t q.AppTask) domain.Task {
 }
 func asSession(s q.AppWorkSession) domain.Session {
 	return domain.Session{
-		ID: s.ID.String(), UserID: s.UserID.String(), DeviceID: s.DeviceID.String(), TaskID: s.TaskID.String(),
+		ID: s.ID.String(), UserID: s.UserID.String(), DeviceID: s.DeviceID.String(), TrackingOnly: s.TrackingOnly, TaskID: s.TaskID.String(),
 		Snapshot: domain.TaskSettings{Name: s.TaskName, Category: s.Category, Mode: s.Mode, PlannedSeconds: s.PlannedSeconds, MinimumSeconds: s.MinimumSeconds},
 		Status:   s.Status, Version: s.Version, StartedAt: s.StartedAt.UTC(), RunningSince: timePtr(s.RunningSince), ServerActiveMillis: s.ServerActiveMillis,
 		PausedAt: timePtr(s.PausedAt), EndedAt: timePtr(s.EndedAt), AcceptedSeq: s.AcceptedSeq, LastSegmentEnd: timePtr(s.LastSegmentEnd),
@@ -103,7 +103,7 @@ func (r *Repository) ListTasks(ctx context.Context, userID, after string, limit 
 
 func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error {
 	err := r.q.CreateSession(ctx, q.CreateSessionParams{
-		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TaskID: uid(s.TaskID),
+		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TrackingOnly: s.TrackingOnly, TaskID: uid(s.TaskID),
 		TaskName: s.Snapshot.Name, Category: s.Snapshot.Category, Mode: s.Snapshot.Mode, PlannedSeconds: s.Snapshot.PlannedSeconds, MinimumSeconds: s.Snapshot.MinimumSeconds,
 		Status: s.Status, Version: s.Version, StartedAt: s.StartedAt, RunningSince: nullTime(s.RunningSince),
 	})

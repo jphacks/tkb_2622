@@ -41,8 +41,8 @@ func (q *Queries) BatchByID(ctx context.Context, arg BatchByIDParams) (AppActivi
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO app.work_sessions (id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO app.work_sessions (id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, tracking_only)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 `
 
 type CreateSessionParams struct {
@@ -59,6 +59,7 @@ type CreateSessionParams struct {
 	Version        int64
 	StartedAt      time.Time
 	RunningSince   sql.NullTime
+	TrackingOnly   bool
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
@@ -76,6 +77,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.Version,
 		arg.StartedAt,
 		arg.RunningSince,
+		arg.TrackingOnly,
 	)
 	return err
 }
@@ -122,7 +124,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (AppTask
 }
 
 const currentSession = `-- name: CurrentSession :one
-SELECT id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, server_active_millis, paused_at, ended_at, accepted_seq, last_segment_end, task_millis, related_millis, distraction_millis, unknown_millis, idle_millis, final_segments FROM app.work_sessions WHERE user_id = $1 AND status IN ('RUNNING', 'PAUSED')
+SELECT id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, server_active_millis, paused_at, ended_at, accepted_seq, last_segment_end, task_millis, related_millis, distraction_millis, unknown_millis, idle_millis, final_segments, tracking_only FROM app.work_sessions WHERE user_id = $1 AND status IN ('RUNNING', 'PAUSED')
 `
 
 func (q *Queries) CurrentSession(ctx context.Context, userID uuid.UUID) (AppWorkSession, error) {
@@ -153,6 +155,7 @@ func (q *Queries) CurrentSession(ctx context.Context, userID uuid.UUID) (AppWork
 		&i.UnknownMillis,
 		&i.IdleMillis,
 		&i.FinalSegments,
+		&i.TrackingOnly,
 	)
 	return i, err
 }
@@ -222,7 +225,7 @@ func (q *Queries) GetOperation(ctx context.Context, arg GetOperationParams) (App
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, server_active_millis, paused_at, ended_at, accepted_seq, last_segment_end, task_millis, related_millis, distraction_millis, unknown_millis, idle_millis, final_segments FROM app.work_sessions WHERE user_id = $1 AND id = $2
+SELECT id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, server_active_millis, paused_at, ended_at, accepted_seq, last_segment_end, task_millis, related_millis, distraction_millis, unknown_millis, idle_millis, final_segments, tracking_only FROM app.work_sessions WHERE user_id = $1 AND id = $2
 `
 
 type GetSessionParams struct {
@@ -258,6 +261,7 @@ func (q *Queries) GetSession(ctx context.Context, arg GetSessionParams) (AppWork
 		&i.UnknownMillis,
 		&i.IdleMillis,
 		&i.FinalSegments,
+		&i.TrackingOnly,
 	)
 	return i, err
 }
