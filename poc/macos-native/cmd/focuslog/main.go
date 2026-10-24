@@ -16,6 +16,7 @@ import (
 
 	"focuspocket/macos-native/analysis"
 	"focuspocket/macos-native/collector"
+	"focuspocket/macos-native/evaluation"
 	"focuspocket/macos-native/model"
 )
 
@@ -40,6 +41,7 @@ func run(args []string) error {
 	poll := flags.Duration("poll", time.Second, "recordの取得間隔")
 	out := flags.String("out", "", "新規保存ディレクトリ。省略すると標準出力へ分析JSON")
 	input := flags.String("input", "testdata/sample.json", "replay入力Capture JSON")
+	sessionPath := flags.String("session", "", "record/replayの評価設定JSON（開始前に固定）")
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -58,6 +60,20 @@ func run(args []string) error {
 		} else if !os.IsNotExist(err) {
 			return err
 		}
+	}
+	var session *evaluation.Session
+	if *sessionPath != "" {
+		if name != "record" && name != "replay" {
+			return errors.New("sessionはrecord/replayで指定してください")
+		}
+		var configured evaluation.Session
+		if err := readSession(*sessionPath, &configured); err != nil {
+			return err
+		}
+		if name == "record" && len(configured.Pauses) != 0 {
+			return errors.New("recordの設定にpauseは指定できません。保存済みCaptureのreplayで明示してください")
+		}
+		session = &configured
 	}
 	var capture model.Capture
 	if name == "replay" {
@@ -115,6 +131,14 @@ func run(args []string) error {
 	}
 	capture = analysis.Sanitize(capture)
 	result := analysis.Analyze(capture)
+	var evaluated *evaluation.Result
+	if session != nil {
+		value, err := evaluation.Evaluate(*session, result)
+		if err != nil {
+			return fmt.Errorf("セッション評価: %w", err)
+		}
+		evaluated = &value
+	}
 	for _, failure := range capture.Errors {
 		fmt.Fprintln(os.Stderr, "取得失敗:", failure.Reason)
 	}
@@ -123,6 +147,9 @@ func run(args []string) error {
 		acquisitionError = errors.New("観測を取得できませんでした。失敗情報は保存します")
 	}
 	if *out == "" {
+		if evaluated != nil {
+			return errors.Join(printJSON(evaluated), acquisitionError)
+		}
 		return errors.Join(printJSON(result), acquisitionError)
 	}
 	if err := os.MkdirAll(filepath.Dir(*out), 0700); err != nil {
@@ -138,6 +165,13 @@ func run(args []string) error {
 		if err := saveJSON(filepath.Join(*out, item.name), item.value); err != nil {
 			return err
 		}
+	}
+	if evaluated != nil {
+		if err := saveJSON(filepath.Join(*out, "evaluation.json"), evaluated); err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stderr, "保存先:", *out, "（ルールに基づく行動推定。心理的集中の測定ではありません）")
+		return errors.Join(printJSON(evaluated), acquisitionError)
 	}
 	fmt.Fprintln(os.Stderr, "保存先:", *out, "（サンプリングによる推定。集中スコアではありません）")
 	return errors.Join(printJSON(result.Report), acquisitionError)
@@ -194,4 +228,29 @@ func record(native *collector.Native, duration, poll time.Duration) model.Captur
 	}
 	// 自前観測は過去の状態を再取得できない。終了後の値を過去へ補完しない。
 	return capture
+}
+
+func readSession(path string, session *evaluation.Session) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 1024*1024+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > 1024*1024 {
+		return errors.New("Sessionは1MiB以下にしてください")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(session); err != nil {
+		return fmt.Errorf("Session JSONを読めません: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("Sessionに余分なJSONがあります")
+	}
+	return evaluation.ValidateSession(*session)
 }

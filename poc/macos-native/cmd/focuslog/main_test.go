@@ -71,3 +71,67 @@ func TestInvalidArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestReplaySessionEvaluation(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "evaluated")
+	if err := run([]string{"replay", "--input", "../../testdata/sample.json", "--session", "../../testdata/session.json", "--out", out}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "evaluation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		WorkSeconds float64            `json:"work_seconds"`
+		Totals      map[string]float64 `json:"totals"`
+		B           *float64           `json:"b"`
+		Q           *float64           `json:"q"`
+		Session     struct {
+			ID string `json:"id"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.WorkSeconds != 3 || result.Totals["T"] != 2 || result.Totals["R"] != 1 || result.Totals["D"] != 0 || result.Totals["U"] != 9 || result.B == nil || *result.B != 100 || result.Q == nil || *result.Q != .25 || result.Session.ID != "fixture-programming-session" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	info, err := os.Stat(filepath.Join(out, "evaluation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatal("evaluation not private")
+	}
+}
+
+func TestInvalidSessionRejectedBeforeCapture(t *testing.T) {
+	root := t.TempDir()
+	config := filepath.Join(root, "session.json")
+	if err := os.WriteFile(config, []byte(`{"id":"invalid"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(root, "result")
+	if err := run([]string{"record", "--helper", "/usr/bin/false", "--session", config, "--out", out}); err == nil {
+		t.Fatal("accepted invalid session")
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatal("capture attempted despite invalid session")
+	}
+}
+
+func TestSessionRejectsUnknownFieldsAndTrailingData(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/session.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []string{string(data) + " {}", `{"url":"https://private.example/path"}`} {
+		config := filepath.Join(t.TempDir(), "session.json")
+		if err := os.WriteFile(config, []byte(invalid), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := run([]string{"replay", "--input", "../../testdata/sample.json", "--session", config}); err == nil {
+			t.Fatal("accepted invalid JSON session")
+		}
+	}
+}
