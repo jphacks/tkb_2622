@@ -182,7 +182,7 @@ struct ConfiguredDeviceSettingsRepository {
         }
     }
 
-    private func stableRegistrationID() -> String {
+    func stableRegistrationID() -> String {
         let key = "mobile.device.registrationID"
         if let stored = defaults.string(forKey: key) {
             let normalized = stored.lowercased()

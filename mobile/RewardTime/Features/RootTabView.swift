@@ -51,7 +51,11 @@ struct RootTabView: View {
     TabView(selection: $selectedTab) {
       NavigationStack {
         HomeView(
-          screenTime: screenTime, isAuthenticated: isAuthenticated, requestSignIn: showWelcome)
+          screenTime: screenTime,
+          isAuthenticated: isAuthenticated,
+          isVisible: selectedTab == 0,
+          requestSignIn: showWelcome
+        )
           .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("ホーム", systemImage: "house") }

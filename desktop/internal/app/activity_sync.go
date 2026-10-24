@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jphacks/tkb_2622/desktop/internal/cloud"
@@ -79,10 +81,47 @@ func (s *stateStore) LoadActivitySyncState() (activitySyncState, bool, error) {
 	if err := decoder.Decode(&state); err != nil {
 		return activitySyncState{}, false, fmt.Errorf("activity outbox is invalid: %w", err)
 	}
+	if normalizeActivitySyncIDs(&state) {
+		if err := s.SaveActivitySyncState(state); err != nil {
+			return activitySyncState{}, false, err
+		}
+	}
 	if err := validateActivitySyncState(state); err != nil {
 		return activitySyncState{}, false, err
 	}
 	return state, true, nil
+}
+
+// normalizeActivitySyncIDs upgrades IDs written by earlier Desktop builds. Those builds
+// stored UUID bytes without separators, which the backend correctly rejects as invalid IDs.
+func normalizeActivitySyncIDs(state *activitySyncState) bool {
+	changed := false
+	for index := range state.Items {
+		item := &state.Items[index]
+		if item.Batch != nil {
+			if id, ok := canonicalUUID(item.Batch.BatchID); ok {
+				item.Batch.BatchID = id
+				changed = true
+			}
+		}
+		if item.Operation != nil {
+			if id, ok := canonicalUUID(item.Operation.ID); ok {
+				item.Operation.ID = id
+				changed = true
+			}
+		}
+	}
+	return changed
+}
+
+func canonicalUUID(id string) (string, bool) {
+	if len(id) != 32 {
+		return id, false
+	}
+	if _, err := hex.DecodeString(id); err != nil {
+		return id, false
+	}
+	return id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:], true
 }
 
 func (s *stateStore) SaveActivitySyncState(state activitySyncState) error {
@@ -484,11 +523,22 @@ func (a *App) sendActivityOperation(ctx context.Context, auth cloud.AuthSession,
 	}
 }
 
-func (a *App) markActivitySyncPending() {
+func (a *App) markActivitySyncPending(cause ...error) {
 	a.mu.Lock()
 	now := time.Now()
+	message := "作業記録はこのMacに保存され、サーバーへの送信を待っています。"
+	if len(cause) > 0 && cause[0] != nil {
+		detail := strings.TrimSpace(cause[0].Error())
+		if detail != "" {
+			runes := []rune(detail)
+			if len(runes) > 240 {
+				detail = string(runes[:240])
+			}
+			message += " " + detail
+		}
+	}
 	a.engine.SetSyncStatus("pending", now)
-	a.engine.SetFailure("cloud_activity_sync", "作業記録はこのMacに保存され、サーバーへの送信を待っています。", true, now)
+	a.engine.SetFailure("cloud_activity_sync", message, true, now)
 	a.persistLocked(now)
 	state := a.engine.Snapshot()
 	a.mu.Unlock()
@@ -720,7 +770,7 @@ func (a *App) syncActivity(ctx context.Context) {
 	if state.Session != nil && state.Session.ServerVersion > 0 {
 		if state.Session.Status == "RUNNING" && !state.CloudOperationPending {
 			if err := a.prepareActivitySync(time.Now(), false); err != nil {
-				a.markActivitySyncPending()
+				a.markActivitySyncPending(err)
 				return
 			}
 		} else if state.Session.Status == "PAUSED" || state.Session.Status == "FINALIZED" || state.Session.Status == "ABORTED" {
@@ -730,13 +780,13 @@ func (a *App) syncActivity(ctx context.Context) {
 			if store != nil {
 				syncState, exists, err := store.LoadActivitySyncState()
 				if err != nil {
-					a.markActivitySyncPending()
+					a.markActivitySyncPending(err)
 					return
 				}
 				if exists {
 					if operation := pendingFinalActivityOperation(syncState.Items); operation != nil && syncState.ProducedThrough.Before(operation.OccurredAt) {
 						if err := a.prepareActivitySync(operation.OccurredAt, true); err != nil {
-							a.markActivitySyncPending()
+							a.markActivitySyncPending(err)
 							return
 						}
 					}
@@ -752,7 +802,7 @@ func (a *App) syncActivity(ctx context.Context) {
 	}
 	syncState, exists, err := store.LoadActivitySyncState()
 	if err != nil {
-		a.markActivitySyncPending()
+		a.markActivitySyncPending(err)
 		return
 	}
 	if !exists || len(syncState.Items) == 0 {
@@ -766,7 +816,7 @@ func (a *App) syncActivity(ctx context.Context) {
 		return
 	}
 	if err := a.flushActivitySync(ctx); err != nil {
-		a.markActivitySyncPending()
+		a.markActivitySyncPending(err)
 	}
 }
 

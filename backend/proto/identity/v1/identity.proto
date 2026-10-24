@@ -10,6 +10,8 @@ service IdentityService {
   rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  rpc RegisterNotificationEndpoint(RegisterNotificationEndpointRequest) returns (RegisterNotificationEndpointResponse);
+  rpc DeleteNotificationEndpoint(DeleteNotificationEndpointRequest) returns (DeleteNotificationEndpointResponse);
 }
 message User {
   string id = 1;
@@ -61,3 +63,16 @@ message RevokeDeviceRequest {
   int64 expected_version = 3;
 }
 message RevokeDeviceResponse { Device device = 1; }
+enum APNsEnvironment {
+  AP_NS_ENVIRONMENT_UNSPECIFIED = 0;
+  AP_NS_ENVIRONMENT_DEVELOPMENT = 1;
+  AP_NS_ENVIRONMENT_PRODUCTION = 2;
+}
+message RegisterNotificationEndpointRequest {
+  string apns_token = 1;
+  APNsEnvironment environment = 2;
+  string registration_id = 3;
+}
+message RegisterNotificationEndpointResponse { bool registered = 1; }
+message DeleteNotificationEndpointRequest { string registration_id = 1; }
+message DeleteNotificationEndpointResponse { bool deleted = 1; }

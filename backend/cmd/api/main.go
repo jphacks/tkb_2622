@@ -20,6 +20,7 @@ import (
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/auth"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/persistence"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/application"
+	"github.com/jphacks/tkb_2622/backend/internal/notification"
 	restrictionpersistence "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/persistence"
 	restriction "github.com/jphacks/tkb_2622/backend/internal/restriction/application"
 	rewardpersistence "github.com/jphacks/tkb_2622/backend/internal/reward/adapter/persistence"
@@ -61,16 +62,25 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer db.Close()
+	apnsSender, apnsEnabled, apnsErr := notification.NewAPNsSenderFromEnv()
+	if apnsErr != nil {
+		logger.Warn("APNs notifications are disabled", "error", apnsErr.Error())
+	} else if !apnsEnabled {
+		logger.Info("APNs notifications are disabled; APNs configuration is not set")
+	}
+	notifications := notification.NewDispatcher(db, apnsSender)
+	go notifications.Run(ctx, 30*time.Second)
 	identityService := application.New(persistence.New(db))
 	handler := server.Handler(server.Deps{
-		Identity:    identityService,
-		Verifier:    verifier,
-		Focus:       focus.New(focuspersistence.NewStore(db)),
-		Groups:      group.New(grouppersistence.New(db)),
-		Sessions:    workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
-		Wallets:     reward.New(rewardpersistence.New(db)),
-		Restriction: restriction.New(restrictionpersistence.NewStore(db)),
-		EnableDocs:  os.Getenv("API_DOCS_ENABLED") == "true",
+		Identity:      identityService,
+		Verifier:      verifier,
+		Focus:         focus.New(focuspersistence.NewStore(db)),
+		Groups:        group.New(grouppersistence.New(db)),
+		Sessions:      workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
+		Wallets:       reward.New(rewardpersistence.New(db)),
+		Restriction:   restriction.New(restrictionpersistence.NewStore(db)),
+		EnableDocs:    os.Getenv("API_DOCS_ENABLED") == "true",
+		Notifications: notifications,
 	})
 	srv := &http.Server{
 		Addr: net.JoinHostPort("", port), Handler: handler,

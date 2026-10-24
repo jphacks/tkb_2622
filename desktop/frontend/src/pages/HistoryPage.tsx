@@ -52,23 +52,29 @@ const statusColors: Record<SessionStatus, { background: string; foreground: stri
 
 const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 
-export function HistoryPage({ history, onSelect, mode }: { history: Result[]; onSelect: (result: Result) => void; mode: 'demo' | 'local-monitor' }) {
+export function HistoryPage({ history, onSelect, onRefresh, mode, cloudConnected, historyError, balanceSeconds }: { history: Result[]; onSelect: (result: Result) => void; onRefresh: () => void; mode: 'demo' | 'local-monitor'; cloudConnected: boolean; historyError?: string; balanceSeconds: number | null }) {
   const hasHistory = history.length > 0;
+  const historySynced = cloudConnected && !historyError;
   const recordedWorkSeconds = history.reduce((total, item) => total + item.workSeconds, 0);
   const recordedEarnedSeconds = history.reduce((total, item) => total + item.earnedSeconds, 0);
   const recordedSessions = hasHistory ? String(history.length) : '—';
   const workSummary = hasHistory ? duration(recordedWorkSeconds) : '—';
-  const rewardSummary = mode === 'local-monitor' ? '未確定' : hasHistory ? duration(recordedEarnedSeconds) : '—';
+  const rewardSummary = mode === 'local-monitor' && !historySynced ? '未確定' : hasHistory ? duration(recordedEarnedSeconds) : '—';
+  const scoredSessions = history.filter(item => item.b100 !== undefined);
+  const averageScore = scoredSessions.length === 0 ? '—' : String(Math.round(scoredSessions.reduce((total, item) => total + (item.b100 ?? 0), 0) / scoredSessions.length));
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
     <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, color: colors.ink, fontSize: 26, lineHeight: 1.4, fontWeight: 700 }}>これまでの記録</h1>
-        <div style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>日時データ未取得 · 期間絞り込み未対応</div>
+        <div style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>{historySynced ? 'サーバーから同期した記録' : 'この端末に保存された記録'} · 期間絞り込み未対応</div>
       </div>
-      <div role="group" aria-label="期間（日時データ未取得のため選択できません）" style={{ display: 'inline-flex', padding: 4, borderRadius: 12, background: '#ECE9FF', gap: 4 }}>
-        <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>週</button>
-        <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>月</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div role="group" aria-label="期間（期間絞り込みは未対応です）" style={{ display: 'inline-flex', padding: 4, borderRadius: 12, background: '#ECE9FF', gap: 4 }}>
+          <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>週</button>
+          <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>月</button>
+        </div>
+        <button type="button" onClick={onRefresh} style={{ minHeight: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${colors.border}`, background: '#FFFFFF', color: colors.purple, fontSize: 13 }}>更新</button>
       </div>
     </header>
 
@@ -80,18 +86,18 @@ export function HistoryPage({ history, onSelect, mode }: { history: Result[]; on
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: colors.muted }}>平均集中スコア</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.ink }}>—</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>スコアデータ未取得</div>
+        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.ink }}>{averageScore}</div>
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>スコア取得済み · {scoredSessions.length}件</div>
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: colors.muted }}>記録内の獲得報酬</div>
         <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.reward, fontVariantNumeric: 'tabular-nums' }}>{rewardSummary}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{mode === 'local-monitor' ? '報酬換算式・APIは未接続です' : '全セッションの合計 · ' + recordedSessions + '件'}</div>
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{mode === 'local-monitor' && !historySynced ? 'サーバー未同期の記録は未確定です' : '取得したセッション · ' + recordedSessions + '件'}</div>
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: colors.muted }}>現在の報酬残高</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.balance }}>—</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>残高データ未取得</div>
+        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.balance }}>{cloudConnected ? duration(balanceSeconds ?? 0) : '—'}</div>
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{cloudConnected ? '進行中セッションの残高' : 'ログイン後に表示されます'}</div>
       </div>
     </section>
 
@@ -116,6 +122,8 @@ export function HistoryPage({ history, onSelect, mode }: { history: Result[]; on
       </div>
     </section>
 
+    {historyError && <p role="status" style={{ margin: 0, color: colors.muted, fontSize: 13 }}>{historyError}</p>}
+
     <section style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
       <div style={{ ...cardStyle, flex: '3 1 520px', minWidth: 0, gap: 12 }}>
         <h2 style={headingStyle}>セッション</h2>
@@ -138,10 +146,10 @@ export function HistoryPage({ history, onSelect, mode }: { history: Result[]; on
                 return <tr key={item.sessionId}>
                   <td style={tableCellStyle}>
                     <div style={{ fontWeight: 500 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: colors.muted }}>日時未取得</div>
+                    <div style={{ fontSize: 12, color: colors.muted }}>{item.startedAt ? new Date(item.startedAt).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' }) : '日時未取得'}</div>
                   </td>
                   <td style={tableCellStyle}>{duration(item.workSeconds)}</td>
-                  <td style={{ ...tableCellStyle, fontWeight: 700 }} title="集中スコアは未取得">—</td>
+                  <td style={{ ...tableCellStyle, fontWeight: 700 }} title="集中スコア">{item.b100 === undefined ? '—' : Math.round(item.b100)}</td>
                   <td style={tableCellStyle}><span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: statusColor.background, color: statusColor.foreground, whiteSpace: 'nowrap' }}>{statusLabels[item.status] ?? '状態未取得'}</span></td>
                   <td style={{ ...tableCellStyle, textAlign: 'right' }}><button type="button" onClick={() => onSelect(item)} style={{ padding: 0, border: 0, background: 'transparent', color: '#5B4BDB', fontSize: 13 }}>詳しく<span className="sr-only">：{item.name}</span></button></td>
                 </tr>;
@@ -153,11 +161,11 @@ export function HistoryPage({ history, onSelect, mode }: { history: Result[]; on
 
       <div style={{ ...cardStyle, flex: '2 1 300px', minWidth: 0, gap: 4 }}>
         <h2 style={{ ...headingStyle, marginBottom: 8 }}>報酬の履歴</h2>
-        {mode === 'local-monitor' ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬換算式と報酬APIは未接続のため、獲得報酬は表示していません。</p> : history.length === 0 ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬に関するセッション記録はありません。</p> : <>
+        {mode === 'local-monitor' && !historySynced ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>サーバーに未同期の記録は、報酬が未確定です。</p> : history.length === 0 ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬に関するセッション記録はありません。</p> : <>
           {history.map(item => <div key={item.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${colors.softBorder}`, fontVariantNumeric: 'tabular-nums' }}>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{item.name} の獲得報酬</span>
-              <span style={{ fontSize: 12, color: colors.muted }}>日時未取得 · セッション集計</span>
+              <span style={{ fontSize: 12, color: colors.muted }}>{item.startedAt ? new Date(item.startedAt).toLocaleString('ja-JP', { dateStyle: 'short' }) : '日時未取得'} · セッション集計</span>
             </span>
             <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: colors.purple }}>+{duration(item.earnedSeconds)}</span>

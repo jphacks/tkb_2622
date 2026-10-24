@@ -37,6 +37,18 @@ export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
     ? state.cloudSession && state.balanceSeconds !== null ? `未終了セッションの報酬残高　${duration(state.balanceSeconds)}` : '作業中の報酬残高は開始後に表示'
     : state.balanceSeconds === null ? '利用できる時間　未取得' : `利用できる時間　${duration(state.balanceSeconds)}（デモ）`;
   const cloudSessionHint = state.cloudSession?.message || (session?.serverVersion ? state.actions.pause.reason : '');
+  const phoneRestriction = state.iPhoneRestriction;
+  const desiredRestrictionLabel: Record<string, string> = {
+    SHIELDED: '制限する要求', TIMED_UNLOCK: '利用枠中の解除要求',
+    SESSION_ENDED: '作業終了後の解除要求', UNRESTRICTED: '制限解除要求',
+  };
+  const expectedShieldStatus = phoneRestriction?.desiredMode === 'SHIELDED' ? 'SHIELDED'
+    : ['TIMED_UNLOCK', 'SESSION_ENDED', 'UNRESTRICTED'].includes(phoneRestriction?.desiredMode ?? '') ? 'UNSHIELDED' : '';
+  const restrictionApplied = Boolean(phoneRestriction?.lastReportedAt)
+    && phoneRestriction!.appliedRevision >= phoneRestriction!.controlRevision
+    && phoneRestriction!.shieldStatus === expectedShieldStatus
+    && phoneRestriction!.permissionStatus === 'GRANTED';
+  const phoneShieldLabel: Record<string, string> = { SHIELDED: '制限中', UNSHIELDED: '解除中', UNKNOWN: '状態不明', ERROR: '適用エラー' };
   const act = (action: SessionAction, label: string, primary = false) => <button className={primary ? 'button primary panel-button' : 'button panel-button'} disabled={busy || !state.actions[action].allowed} title={state.actions[action].reason} onClick={() => execute({ action, name })}>{label}</button>;
   const abort = () => {
     // ローカル計測とWindowsアプリでは，Go側がOSのダイアログで確認する．
@@ -72,6 +84,17 @@ export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
     {!paused && cloudManaged && session.trackingOnly ? <div className="balance-row"><span>このセッションの報酬残高</span><strong>{state.balanceSeconds === null ? '未取得' : duration(state.balanceSeconds)}</strong></div> : null}
     <p className="panel-note">{monitorLine}</p>
     {cloudSessionHint ? <p className="panel-note" role="status">{cloudSessionHint}</p> : null}
+    {cloudManaged && !session.trackingOnly ? <div className="panel-note iphone-restriction-status" role="status">
+      <strong>iPhone制限</strong>
+      {phoneRestriction?.deviceId ? <>
+        <p>サーバー要求: {desiredRestrictionLabel[phoneRestriction.desiredMode] ?? '状態確認が必要'}</p>
+        <p>iPhone報告: {restrictionApplied ? '適用確認済み' : phoneShieldLabel[phoneRestriction.shieldStatus] ?? '未報告'}
+          {phoneRestriction.controlRevision > 0 ? `（更新 ${phoneRestriction.appliedRevision}/${phoneRestriction.controlRevision}）` : ''}</p>
+        {phoneRestriction.failureReason ? <p>{phoneRestriction.failureReason}</p> : null}
+      </> : <p>iPhoneの制限状態は未登録または未取得です。</p>}
+      {state.iPhoneRestrictionError ? <p>{state.iPhoneRestrictionError} 前回の報告が表示されている場合があります。</p> : null}
+      {!restrictionApplied && phoneRestriction?.deviceId ? <p>この表示はサーバーが受け取った報告です。iOS上の現在の制限を直接検査した結果ではありません。</p> : null}
+    </div> : null}
     {unmatchedCloudSession?.ownedByThisDevice && <button className="link-button danger-link" disabled={busy || !state.actions.abort.allowed} title={state.actions.abort.reason} onClick={() => execute({ action: 'abortCloudSession' })}>未照合のサーバー作業を中止</button>}
     {paused && state.mode === 'demo' && <div className="balance-row"><span>報酬の残高</span><strong>{state.balanceSeconds === null ? '未取得' : `${duration(state.balanceSeconds)}（デモ）`}</strong></div>}
     {paused && <div className="paused-explanation"><p className="panel-note">{cloudManaged ? session.trackingOnly ? '記録専用セッションです。再開するとmacOS計測とサーバーへの記録同期を再開します。iPhoneの利用制限は行いません。' : '再開するとmacOS計測とサーバーへの記録同期を再開します。' : state.mode === 'local-monitor' ? '再開するとローカル計測を再開します。報酬の付与・iPhone利用枠は未接続です。' : '再開すると、残っている利用枠は破棄されます。実際のiPhone利用枠はありません。'}</p>{state.mode === 'demo' && (session.evaluation !== 'complete' || state.sync !== 'synced') ? <button className="link-button" disabled={busy} onClick={() => execute({ action: 'retry' })}>記録の送信・評価を確認する（デモ）</button> : null}</div>}

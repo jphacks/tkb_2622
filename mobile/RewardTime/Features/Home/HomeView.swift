@@ -2,21 +2,26 @@ import Combine
 import SwiftUI
 
 struct HomeView: View {
+  private static let synchronizationIntervalNanoseconds: UInt64 = 30_000_000_000
+
   @Environment(\.scenePhase) private var scenePhase
   @StateObject private var viewModel: HomeViewModel
   @ObservedObject private var screenTime: MobileScreenTimeController
   private let isAuthenticated: Bool
+  private let isVisible: Bool
   private let requestSignIn: () -> Void
 
   init(
     repository: any HomeRepository = ConfiguredHomeRepository(),
     screenTime: MobileScreenTimeController,
     isAuthenticated: Bool = true,
+    isVisible: Bool = true,
     requestSignIn: @escaping () -> Void = {}
   ) {
     _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
     _screenTime = ObservedObject(wrappedValue: screenTime)
     self.isAuthenticated = isAuthenticated
+    self.isVisible = isVisible
     self.requestSignIn = requestSignIn
   }
 
@@ -47,28 +52,47 @@ struct HomeView: View {
     }
     .navigationTitle("Focus Link")
     .navigationBarTitleDisplayMode(.inline)
-    .task {
-      if isAuthenticated, case .loading = viewModel.state {
-        await loadAndReconcile()
+    .task(id: shouldSynchronize) {
+      guard shouldSynchronize else { return }
+      await refreshAndReconcile()
+
+      while !Task.isCancelled {
+        do {
+          try await Task.sleep(nanoseconds: Self.synchronizationIntervalNanoseconds)
+        } catch {
+          return
+        }
+        guard shouldSynchronize else { return }
+        await refreshAndReconcile()
       }
     }
     .refreshable {
       if isAuthenticated { await loadAndReconcile() }
     }
-    .onChange(of: scenePhase) { _, phase in
-      if phase == .active && isAuthenticated { Task { await loadAndReconcile() } }
-    }
-    .onChange(of: isAuthenticated) { _, authenticated in
-      if authenticated { Task { await loadAndReconcile() } }
-    }
     .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-      if isAuthenticated { Task { await loadAndReconcile() } }
+      if shouldSynchronize { Task { await refreshAndReconcile() } }
     }
+  }
+
+  private var shouldSynchronize: Bool {
+    isAuthenticated && isVisible && scenePhase == .active
   }
 
   @MainActor
   private func loadAndReconcile() async {
     await viewModel.load()
+    await reconcileLoadedSnapshot()
+  }
+
+  @MainActor
+  private func refreshAndReconcile() async {
+    await viewModel.refresh()
+    guard !Task.isCancelled else { return }
+    await reconcileLoadedSnapshot()
+  }
+
+  @MainActor
+  private func reconcileLoadedSnapshot() async {
     guard case .loaded(let snapshot) = viewModel.state else { return }
     await screenTime.reconcileServerRestriction(snapshot)
   }

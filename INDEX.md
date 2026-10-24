@@ -8,10 +8,8 @@
 | --- | --- |
 | [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restrictionのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-=======
 | [mobile/](mobile/) | SwiftUIアプリ。ホーム・認証・履歴・グループ・Screen TimeのAPI／OS連携を順次実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
->>>>>>> origin/main
 | [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
@@ -38,6 +36,7 @@
 | [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
 | [フロントエンド構成](docs/spec/6.フロントエンド構成.md) | Wails v2・React・TypeScript・ViteとSwiftUIの構成，責務・状態・検証方針を記載．デスクトップ共通基盤はデモ実装済み，API・計測・iPhone連携は未接続 |
 | [デスクトップ共同開発](docs/spec/7.デスクトップ共同開発.md) | Mac担当者が先行する共通基盤，OS別UIの境界・配置・接続契約，引き渡し条件・分担・検証を記載 |
+| [Desktop・iPhone連携の現状と本番化課題](docs/spec/8.desktop-mobile連携の現状と課題.md) | 同一アカウントで共有される状態，未接続範囲，環境設定と本番化の優先課題を記載 |
 
 ## UIモック
 

@@ -219,6 +219,36 @@ export namespace session {
 	        this.retryable = source["retryable"];
 	    }
 	}
+	export class IPhoneRestrictionState {
+	    sessionId: string;
+	    deviceId: string;
+	    controlRevision: number;
+	    desiredMode: string;
+	    appliedRevision: number;
+	    shieldStatus: string;
+	    permissionStatus: string;
+	    lastAppliedAt?: string;
+	    lastReportedAt?: string;
+	    failureReason?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new IPhoneRestrictionState(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.deviceId = source["deviceId"];
+	        this.controlRevision = source["controlRevision"];
+	        this.desiredMode = source["desiredMode"];
+	        this.appliedRevision = source["appliedRevision"];
+	        this.shieldStatus = source["shieldStatus"];
+	        this.permissionStatus = source["permissionStatus"];
+	        this.lastAppliedAt = source["lastAppliedAt"];
+	        this.lastReportedAt = source["lastReportedAt"];
+	        this.failureReason = source["failureReason"];
+	    }
+	}
 	export class MonitorStatus {
 	    state: string;
 	    appId: string;
@@ -345,6 +375,8 @@ export namespace session {
 	    updatedAt: string;
 	    session?: WorkSession;
 	    cloudSession?: CloudSession;
+	    iPhoneRestriction?: IPhoneRestrictionState;
+	    iPhoneRestrictionError?: string;
 	    cloudOperationPending?: boolean;
 	    balanceSeconds?: number;
 	    sync: string;
@@ -372,6 +404,8 @@ export namespace session {
 	        this.updatedAt = source["updatedAt"];
 	        this.session = this.convertValues(source["session"], WorkSession);
 	        this.cloudSession = this.convertValues(source["cloudSession"], CloudSession);
+	        this.iPhoneRestriction = this.convertValues(source["iPhoneRestriction"], IPhoneRestrictionState);
+	        this.iPhoneRestrictionError = source["iPhoneRestrictionError"];
 	        this.cloudOperationPending = source["cloudOperationPending"];
 	        this.balanceSeconds = source["balanceSeconds"];
 	        this.sync = source["sync"];

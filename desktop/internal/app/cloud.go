@@ -54,6 +54,7 @@ func (a *App) syncCloud(ctx context.Context) {
 	}
 	if !found {
 		a.authSession = cloud.AuthSession{}
+		a.setIPhoneRestrictionState(nil, nil)
 		status := session.AccountState{Status: "signedOut"}
 		if a.pendingEmail != "" {
 			status.Status = "otpPending"
@@ -169,7 +170,7 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	a.persistLocked(time.Now())
 	a.mu.Unlock()
 	if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
-		a.markActivitySyncPending()
+		a.markActivitySyncPending(err)
 	}
 	currentSession, err := a.cloudClient.GetCurrentSession(ctx, *current)
 	if err != nil {
@@ -178,16 +179,16 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	local := a.snapshot()
 	if currentSession != nil && local.Session != nil && local.Session.ID == currentSession.ID && local.Session.ServerVersion > 0 {
 		if err := a.ensureActivitySyncStateLocked(currentSession.ID, currentSession.AcceptedThroughSeq); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		} else if currentSession.Status == "RUNNING" && local.Session.Status == "PAUSED" {
 			pausedAt := time.Now()
 			if err := a.queueCloudOperationLocked("pause", pausedAt, nil); err != nil {
-				a.markActivitySyncPending()
+				a.markActivitySyncPending(err)
 			} else if err := a.prepareActivitySyncLocked(pausedAt, true); err != nil {
-				a.markActivitySyncPending()
+				a.markActivitySyncPending(err)
 			} else {
 				if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
-					a.markActivitySyncPending()
+					a.markActivitySyncPending(err)
 				}
 			}
 			currentSession, err = a.cloudClient.GetCurrentSession(ctx, *current)
@@ -211,7 +212,120 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	if balance != nil {
 		a.applyCloudBalance(balance.SessionID, *balance)
 	}
+	_ = a.refreshCloudHistory(ctx, *current)
+	a.fetchIPhoneRestrictionState(ctx, *current)
 	return nil
+}
+
+func (a *App) refreshCloudHistory(ctx context.Context, auth cloud.AuthSession) error {
+	entries, err := a.cloudClient.ListSessionHistory(ctx, auth)
+	if err != nil {
+		a.mu.Lock()
+		a.engine.SetHistoryError("作業履歴を更新できませんでした。接続を確認して「更新」を押してください。", time.Now())
+		a.persistLocked(time.Now())
+		snapshot := a.engine.Snapshot()
+		ctxApp := a.ctx
+		a.mu.Unlock()
+		if ctxApp != nil {
+			wailsruntime.EventsEmit(ctxApp, StateEvent, snapshot)
+		}
+		return err
+	}
+	history := make([]session.Result, 0, len(entries))
+	for _, entry := range entries {
+		work := entry.Session.Durations.WorkMillis / 1000
+		related := entry.Session.Durations.RelatedTransitionMillis / 1000
+		distracted := entry.Session.Durations.DistractionMillis / 1000
+		unknown := entry.Session.Durations.UnknownMillis / 1000
+		inactive := entry.Session.Durations.IdleMillis / 1000
+		result := session.Result{
+			SessionID: entry.Session.ID, Name: entry.Session.TaskSettings.Name,
+			Status: entry.Session.Status, StartedAt: entry.Session.StartedAt.Format(time.RFC3339Nano),
+			ElapsedSeconds: int(entry.Session.Durations.ActiveMillis / 1000),
+			TaskSeconds:    int(entry.Session.Durations.TaskMillis / 1000), RelatedSeconds: int(related),
+			WorkSeconds: int(work), DistractedSeconds: int(distracted), UncertainSeconds: int(unknown),
+			InactiveSeconds: int(inactive), EarnedSeconds: int(entry.EarnedSeconds),
+			UsedSeconds: int(entry.SpentSeconds), DiscardedSeconds: int(entry.DiscardedSeconds),
+			B100: entry.Session.FocusScore, Q: entry.Session.Quality, WorkRate: entry.Session.WorkRate,
+		}
+		if !entry.Session.EndedAt.IsZero() {
+			result.EndedAt = entry.Session.EndedAt.Format(time.RFC3339Nano)
+		}
+		history = append(history, result)
+	}
+	a.mu.Lock()
+	a.engine.SetCloudHistory(history, time.Now())
+	a.persistLocked(time.Now())
+	snapshot := a.engine.Snapshot()
+	ctxApp := a.ctx
+	a.mu.Unlock()
+	if ctxApp != nil {
+		wailsruntime.EventsEmit(ctxApp, StateEvent, snapshot)
+	}
+	return nil
+}
+
+func (a *App) fetchIPhoneRestrictionState(ctx context.Context, auth cloud.AuthSession) {
+	state, err := a.cloudClient.GetRestrictionState(ctx, auth)
+	if err != nil {
+		a.setIPhoneRestrictionState(nil, err)
+		return
+	}
+	lastAppliedAt, lastReportedAt := "", ""
+	if state.LastAppliedAt != nil {
+		lastAppliedAt = state.LastAppliedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if state.LastReportedAt != nil {
+		lastReportedAt = state.LastReportedAt.UTC().Format(time.RFC3339Nano)
+	}
+	a.setIPhoneRestrictionState(&session.IPhoneRestrictionState{
+		SessionID: state.SessionID, DeviceID: state.DeviceID,
+		ControlRevision: state.ControlRevision, DesiredMode: state.DesiredMode,
+		AppliedRevision: state.AppliedRevision, ShieldStatus: state.ShieldStatus,
+		PermissionStatus: state.PermissionStatus, LastAppliedAt: lastAppliedAt,
+		LastReportedAt: lastReportedAt, FailureReason: state.FailureReason,
+	}, nil)
+}
+
+func (a *App) setIPhoneRestrictionState(state *session.IPhoneRestrictionState, err error) {
+	a.mu.Lock()
+	if err != nil {
+		state = a.engine.Snapshot().IPhoneRestriction
+	}
+	message := ""
+	if err != nil {
+		message = "iPhoneの適用状態を取得できません。"
+	}
+	a.engine.SetIPhoneRestrictionState(state, message, time.Now())
+	snapshot, ctx := a.engine.Snapshot(), a.ctx
+	a.mu.Unlock()
+	if ctx != nil {
+		wailsruntime.EventsEmit(ctx, StateEvent, snapshot)
+	}
+}
+
+func (a *App) syncIPhoneRestrictionState(ctx context.Context) {
+	a.cloudMu.Lock()
+	defer a.cloudMu.Unlock()
+	if a.cloudClient == nil || a.credentials == nil {
+		return
+	}
+	auth, found, err := a.credentials.Load()
+	if err != nil {
+		a.setIPhoneRestrictionState(nil, err)
+		return
+	}
+	if !found {
+		a.setIPhoneRestrictionState(nil, nil)
+		return
+	}
+	updated, err := a.refreshSessionIfNeeded(ctx, auth)
+	if err != nil {
+		a.setIPhoneRestrictionState(nil, err)
+		return
+	}
+	a.authSession = updated
+	a.fetchIPhoneRestrictionState(ctx, updated)
 }
 
 func (a *App) reconcileCloudSession(current *cloud.Session, localDeviceID string) {
@@ -519,6 +633,7 @@ func (a *App) SignOut() session.Snapshot {
 	}
 	a.authSession = cloud.AuthSession{}
 	a.pendingEmail = ""
+	a.setIPhoneRestrictionState(nil, nil)
 	a.setAccountStatus(session.AccountState{Status: "signedOut", Message: message}, time.Now())
 	return a.snapshot()
 }
