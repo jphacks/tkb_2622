@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GroupView: View {
     @StateObject private var model = GroupViewModel(repository: ConfiguredGroupRepository())
+    @State private var selectedGroupID: String?
 
     var body: some View {
         ScreenContainer {
@@ -33,14 +34,16 @@ struct GroupView: View {
                         .foregroundStyle(AppTheme.secondaryInk)
                 }
             case .loaded(let groups):
-                ForEach(groups) { group in
+                groupPicker(groups)
+
+                if let group = selectedGroup(in: groups) {
                     groupCard(group)
                 }
 
                 SurfaceCard {
-                    Label("表示できる情報", systemImage: "info.circle")
+                    Label("未対応のグループ機能", systemImage: "info.circle")
                         .font(.subheadline.weight(.bold))
-                    Text("グループ名と参加メンバーをサーバーから取得しています。メンバー名と作業開始履歴は、対応するAPIがまだないため表示していません。")
+                    Text("作業開始フィード、メンバーの表示名、招待、退出はbackend APIが未対応です。")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
@@ -51,6 +54,40 @@ struct GroupView: View {
         .task { await model.load() }
         .navigationTitle("グループ")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func groupPicker(_ groups: [MobileGroup]) -> some View {
+        if groups.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(groups) { group in
+                        let isSelected = selectedGroup(in: groups)?.id == group.id
+                        Button {
+                            selectedGroupID = group.id
+                        } label: {
+                            Text(group.name)
+                                .font(.subheadline.weight(isSelected ? .bold : .medium))
+                                .foregroundStyle(isSelected ? .white : AppTheme.ink)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 38)
+                                .background(isSelected ? AppTheme.ink : .white, in: Capsule())
+                                .overlay(Capsule().stroke(isSelected ? .clear : AppTheme.secondaryInk.opacity(0.25), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    }
+                }
+            }
+        }
+    }
+
+    private func selectedGroup(in groups: [MobileGroup]) -> MobileGroup? {
+        if let selectedGroupID,
+           let selected = groups.first(where: { $0.id == selectedGroupID }) {
+            return selected
+        }
+        return groups.first
     }
 
     private func groupCard(_ group: MobileGroup) -> some View {

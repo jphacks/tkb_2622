@@ -39,22 +39,22 @@ HomeRepository（ホーム情報取得の境界）
 
 ## 現在の実装
 
-`ios-reward-time.xcodeproj` にSwiftUIアプリを作成し、モック08〜14に対応する画面を配置した。ホームはAPI設定がある場合に読み取りAPIへ接続し、Debugで未設定なら仮データを表示する。
+`ios-reward-time.xcodeproj` にSwiftUIアプリを作成し、モック08〜14に対応する画面を配置した。ホームはAPIへ接続し、設定がない場合はサンプルを実データのように表示せず接続案内を出す。Debugの開発用ツールから選んだ場合のみサンプル状態を表示する。
 
 | モック | 実装場所・現在の動作 |
 | --- | --- |
-| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenをアイコン・アプリ名付きで表示。Debugで接続設定がない場合は仮データ表示。小休憩へ進めるのは一時停止中だけ |
+| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。設定タブとScreen Time選択を共有し、端末に保存したApplicationTokenをアイコン・アプリ名付きで表示。接続設定がない場合は設定案内を表示し、Debugの開発用ツールから選んだ場合だけ仮データを表示。小休憩へ進めるのは一時停止中だけ |
 | 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`は画面案の静的プレビュー。実際のShieldはFamilyControlsの選択をManagedSettingsへ適用するとiOSが対象アプリ上に表示する。セッション状態との同期コードも実装済みだが、実機での表示確認は未完了 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |
 | 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。「選んだアプリを制限」を選ぶと直下にアプリ選択ボタンを表示し、「標準以外を制限」ではカテゴリ全体へShieldを適用する。セッション連動・適用状態報告・利用時間計測のコードは実装済み。実機動作は未確認 |
-| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`でDBの所属グループ、作成日、メンバー数、各メンバーの参加日を取得。表示名・作業開始履歴・招待・退出は未接続 |
+| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`でDBの所属グループ、作成日、メンバー数、各メンバーの参加日を取得。複数グループは切替表示。表示名・作業開始履歴・招待・退出は未接続 |
 | 履歴 | `Features/History/HistoryView.swift`, `Data/HistoryRepository.swift`。`ListSessions`で終了・中止済み作業と報酬要約を、`ListTransactions`で獲得・利用・破棄の台帳をページング表示 |
 | 14 通知設定 | `Features/Notifications/NotificationSettingsView.swift`。iOS通知許可の実状態を取得し、未決定時の許可要求・拒否後の設定画面への誘導を行う。APNs登録・配信は未接続 |
 
 08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可・アプリ選択・手動Shield、iPhone登録、制限ポリシー同期、利用枠API、DeviceActivity monitor extensionを本番アプリ側に追加した。OSの監視イベントによる計測は1分単位で、backend同期はアプリ表示中・foreground復帰時または利用中画面で行う。物理iPhoneでのApp Groups署名、監視イベント、期限後の自動Shieldは未検証であり、実機受け入れが必要。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進める。同じ選択メニューの「通信エラー」で失敗表示と再読み込み導線を確認できるが、実際の通信は発生しない。履歴タブは作業と報酬のAPI履歴へ接続した。
 
-backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。Debug設定画面にSupabase Project URL、publishable/anon key、Connect API URLを入力すると、OTP認証後に`EnsureUser`と`GetMe`を呼び出せる。グループタブも同じAuth sessionで`ListGroups`を呼び出す。Supabase URL・キー・OTPメール設定、staging JWT検証は利用者のプロジェクト設定が必要で、実環境での接続確認は未完了。`MockHomeRepository`はPreview・Debugの未設定時表示として残し、実APIへの切り替えはSupabase接続設定と有効なAuth sessionがある場合に行う。利用枠確保・利用報告・作業／報酬履歴はAPI接続済みだが、APNs通知配信、グループの作成・招待・退出、メンバー表示名、グループ作業開始フィードはAPI未対応。
+backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。Debug設定画面にSupabase Project URL、publishable/anon key、Connect API URLを入力すると、OTP認証後に`EnsureUser`と`GetMe`を呼び出せる。グループタブも同じAuth sessionで`ListGroups`を呼び出す。Supabase URL・キー・OTPメール設定、staging JWT検証は利用者のプロジェクト設定が必要で、実環境での接続確認は未完了。`MockHomeRepository`はSwiftUI PreviewとDebugの明示的なサンプル表示に限る。利用枠確保・利用報告・作業／報酬履歴はAPI接続済みだが、APNs通知配信、グループの作成・招待・退出、メンバー表示名、グループ作業開始フィードはAPI未対応。
 
 認証の確認はSimulatorまたは実機でアプリの「設定」タブを開き、「アカウント接続」にProject URL、公開用キー、Connect API URLを入力する。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可する。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。実機でMac上のAPIに接続する場合は、API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
 
