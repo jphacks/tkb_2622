@@ -7,6 +7,8 @@
 set -euo pipefail
 
 DESKTOP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# go.mod の replace（focuspocket/macos-native => ../poc/macos-native）が参照するため，desktop/ と同じ相対位置へ同期する
+POC_DIR="$DESKTOP_DIR/../poc/macos-native"
 POWERSHELL="$(command -v powershell.exe || echo /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe)"
 
 if [[ ! -x "$POWERSHELL" ]]; then
@@ -32,13 +34,19 @@ sync_to_windows() {
 		--filter 'P /*.syso' \
 		--filter 'P /build/windows/' \
 		"$DESKTOP_DIR/" "$WIN_DESKTOP_DIR/"
+	rsync -rlt --delete \
+		--exclude '/.archive/' \
+		--exclude '/.tools/' \
+		--exclude '/data/' \
+		--exclude '/bin/' \
+		"$POC_DIR/" "$WIN_DESKTOP_DIR/../poc/macos-native/"
 }
 
 run_powershell() {
 	"$POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$WIN_DESKTOP_DIR/scripts/windows/$1")"
 }
 
-mkdir -p "$WIN_DESKTOP_DIR"
+mkdir -p "$WIN_DESKTOP_DIR" "$WIN_DESKTOP_DIR/../poc/macos-native"
 echo "==> $DESKTOP_DIR を $(wslpath -w "$WIN_DESKTOP_DIR") へ同期します"
 sync_to_windows
 
