@@ -12,11 +12,9 @@ struct SettingsView: View {
 
     var body: some View {
         ScreenContainer {
-            #if DEBUG
             AuthenticationSettingsSection {
                 Task { await syncDeviceSettings() }
             }
-            #endif
 
             SurfaceCard {
                 sectionTitle("スクリーンタイム", icon: "hourglass")

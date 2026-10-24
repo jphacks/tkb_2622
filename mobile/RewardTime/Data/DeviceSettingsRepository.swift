@@ -74,9 +74,9 @@ struct ConfiguredDeviceSettingsRepository {
     }
 
     func sync(settings: DeviceRestrictionSettings) async throws -> SyncedDevicePolicy {
-        let projectURLText = defaults.string(forKey: "mobile.supabase.projectURL") ?? ""
-        let publishableKey = defaults.string(forKey: "mobile.supabase.publishableKey") ?? ""
-        let apiBaseURLText = defaults.string(forKey: "mobile.api.baseURL") ?? "http://127.0.0.1:8080"
+        let projectURLText = MobileAppConfiguration.supabaseProjectURL ?? ""
+        let publishableKey = MobileAppConfiguration.supabasePublishableKey ?? ""
+        let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL ?? ""
         guard !projectURLText.isEmpty, !publishableKey.isEmpty else {
             throw DeviceSettingsRepositoryError.missingConfiguration
         }

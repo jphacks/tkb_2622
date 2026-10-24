@@ -107,9 +107,9 @@ struct ConfiguredUsageGrantRepository {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) throws {
-        let projectURLText = defaults.string(forKey: "mobile.supabase.projectURL") ?? ""
-        let publishableKey = defaults.string(forKey: "mobile.supabase.publishableKey") ?? ""
-        let apiBaseURLText = defaults.string(forKey: "mobile.api.baseURL") ?? "http://127.0.0.1:8080"
+        let projectURLText = MobileAppConfiguration.supabaseProjectURL ?? ""
+        let publishableKey = MobileAppConfiguration.supabasePublishableKey ?? ""
+        let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL ?? ""
         guard let projectURL = Self.validatedURL(projectURLText),
               !publishableKey.isEmpty,
               !publishableKey.localizedCaseInsensitiveContains("service_role"),

@@ -1,6 +1,51 @@
 import Foundation
 import Supabase
 
+enum MobileAppConfiguration {
+    static var supabaseProjectURL: String? {
+        configuredURL(value(userDefaultsKey: "mobile.supabase.projectURL", infoKey: "SUPABASE_PROJECT_URL"))
+    }
+
+    static var supabasePublishableKey: String? {
+        value(userDefaultsKey: "mobile.supabase.publishableKey", infoKey: "SUPABASE_PUBLISHABLE_KEY")
+    }
+
+    static var connectAPIBaseURL: String? {
+        configuredURL(value(userDefaultsKey: "mobile.api.baseURL", infoKey: "CONNECT_API_BASE_URL"))
+    }
+
+    private static func value(userDefaultsKey: String, infoKey: String) -> String? {
+#if DEBUG
+        if let storedValue = configuredValue(UserDefaults.standard.string(forKey: userDefaultsKey)) {
+            return storedValue
+        }
+        if infoKey == "CONNECT_API_BASE_URL" {
+            return "http://127.0.0.1:8080"
+        }
+#endif
+        return configuredValue(Bundle.main.object(forInfoDictionaryKey: infoKey) as? String)
+    }
+
+    private static func configuredValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("$(") else { return nil }
+        return trimmed
+    }
+
+    private static func configuredURL(_ value: String?) -> String? {
+        guard let value else { return nil }
+#if DEBUG
+        return value
+#else
+        guard let url = URL(string: value), url.scheme?.lowercased() == "https", url.host != nil else {
+            return nil
+        }
+        return value
+#endif
+    }
+}
+
 struct SupabaseAuthService: AccessTokenProviding {
     let client: SupabaseClient
 

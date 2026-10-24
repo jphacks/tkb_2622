@@ -215,10 +215,9 @@ struct ConfiguredGroupRepository: GroupRepository {
     }
 
     private func repository() throws -> APIGroupRepository {
-        let defaults = UserDefaults.standard
-        let projectURLText = defaults.string(forKey: "mobile.supabase.projectURL") ?? ""
-        let publishableKey = defaults.string(forKey: "mobile.supabase.publishableKey") ?? ""
-        let apiBaseURLText = defaults.string(forKey: "mobile.api.baseURL") ?? "http://127.0.0.1:8080"
+        let projectURLText = MobileAppConfiguration.supabaseProjectURL ?? ""
+        let publishableKey = MobileAppConfiguration.supabasePublishableKey ?? ""
+        let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL ?? ""
 
         guard !projectURLText.isEmpty, !publishableKey.isEmpty else {
             throw GroupRepositoryError.missingConfiguration
