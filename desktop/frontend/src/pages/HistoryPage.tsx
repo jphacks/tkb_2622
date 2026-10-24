@@ -52,13 +52,13 @@ const statusColors: Record<SessionStatus, { background: string; foreground: stri
 
 const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 
-export function HistoryPage({ history, onSelect }: { history: Result[]; onSelect: (result: Result) => void }) {
+export function HistoryPage({ history, onSelect, mode }: { history: Result[]; onSelect: (result: Result) => void; mode: 'demo' | 'local-monitor' }) {
   const hasHistory = history.length > 0;
   const recordedWorkSeconds = history.reduce((total, item) => total + item.workSeconds, 0);
   const recordedEarnedSeconds = history.reduce((total, item) => total + item.earnedSeconds, 0);
   const recordedSessions = hasHistory ? String(history.length) : '—';
   const workSummary = hasHistory ? duration(recordedWorkSeconds) : '—';
-  const rewardSummary = hasHistory ? duration(recordedEarnedSeconds) : '—';
+  const rewardSummary = mode === 'local-monitor' ? '未確定' : hasHistory ? duration(recordedEarnedSeconds) : '—';
 
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
     <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -86,7 +86,7 @@ export function HistoryPage({ history, onSelect }: { history: Result[]; onSelect
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: colors.muted }}>記録内の獲得報酬</div>
         <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.reward, fontVariantNumeric: 'tabular-nums' }}>{rewardSummary}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>全セッションの合計 · {recordedSessions}件</div>
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{mode === 'local-monitor' ? '報酬換算式・APIは未接続です' : '全セッションの合計 · ' + recordedSessions + '件'}</div>
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 13, color: colors.muted }}>現在の報酬残高</div>
@@ -153,7 +153,7 @@ export function HistoryPage({ history, onSelect }: { history: Result[]; onSelect
 
       <div style={{ ...cardStyle, flex: '2 1 300px', minWidth: 0, gap: 4 }}>
         <h2 style={{ ...headingStyle, marginBottom: 8 }}>報酬の履歴</h2>
-        {history.length === 0 ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬に関するセッション記録はありません。</p> : <>
+        {mode === 'local-monitor' ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬換算式と報酬APIは未接続のため、獲得報酬は表示していません。</p> : history.length === 0 ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬に関するセッション記録はありません。</p> : <>
           {history.map(item => <div key={item.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${colors.softBorder}`, fontVariantNumeric: 'tabular-nums' }}>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{item.name} の獲得報酬</span>

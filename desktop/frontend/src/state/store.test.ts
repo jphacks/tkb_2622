@@ -60,7 +60,12 @@ function controlledBridge() {
   const callbacks: Array<(snapshot: Snapshot) => void> = [];
   const bridge: DesktopBridge = {
     getStartupState: vi.fn(async () => makeSnapshot(0)),
+    getClassificationCandidates: vi.fn(async () => []),
+    captureCurrentClassificationCandidate: vi.fn(async () => ({ name: 'Code', appId: 'com.microsoft.VSCode', appName: 'Code', domain: '', sampleCount: 1 })),
     execute: vi.fn(async () => makeSnapshot(1)),
+    requestEmailOTP: vi.fn(async () => makeSnapshot(1)),
+    verifyEmailOTP: vi.fn(async () => makeSnapshot(1)),
+    signOut: vi.fn(async () => makeSnapshot(1)),
     subscribe: vi.fn((listener: (snapshot: Snapshot) => void) => {
       active.add(listener);
       callbacks.push(listener);

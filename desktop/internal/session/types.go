@@ -1,19 +1,26 @@
 package session
 
 type Task struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	PlannedSeconds int    `json:"plannedSeconds"`
-	MinimumSeconds int    `json:"minimumSeconds"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Category            string `json:"category"`
+	Mode                string `json:"mode"`
+	PlannedSeconds      int    `json:"plannedSeconds"`
+	MinimumSeconds      int    `json:"minimumSeconds"`
+	Version             int64  `json:"version"`
+	PendingOperationID  string `json:"pendingOperationId,omitempty"`
+	PendingSettingsHash string `json:"pendingSettingsHash,omitempty"`
 }
 
 type WorkSession struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Status         string `json:"status"`
-	Task           Task   `json:"task"`
-	ElapsedSeconds int    `json:"elapsedSeconds"`
-	Evaluation     string `json:"evaluation"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Status          string           `json:"status"`
+	Task            Task             `json:"task"`
+	Classifications []Classification `json:"classifications,omitempty"`
+	RulesVersion    string           `json:"rulesVersion,omitempty"`
+	ElapsedSeconds  int              `json:"elapsedSeconds"`
+	Evaluation      string           `json:"evaluation"`
 }
 
 type Capability struct {
@@ -27,8 +34,21 @@ type Failure struct {
 	Retryable bool   `json:"retryable"`
 }
 
+type MonitorStatus struct {
+	State       string `json:"state"`
+	AppID       string `json:"appId"`
+	AppName     string `json:"appName"`
+	BrowserName string `json:"browserName"`
+	Domain      string `json:"domain"`
+	LastSample  string `json:"lastSample"`
+	SampleCount int    `json:"sampleCount"`
+	Message     string `json:"message"`
+}
+
 type Classification struct {
 	Name     string `json:"name"`
+	AppID    string `json:"appId,omitempty"`
+	Domain   string `json:"domain,omitempty"`
 	Category string `json:"category"`
 }
 
@@ -43,9 +63,13 @@ type Result struct {
 	Name              string `json:"name"`
 	Status            string `json:"status"`
 	ElapsedSeconds    int    `json:"elapsedSeconds"`
+	TaskSeconds       int    `json:"taskSeconds"`
+	RelatedSeconds    int    `json:"relatedSeconds"`
 	WorkSeconds       int    `json:"workSeconds"`
 	DistractedSeconds int    `json:"distractedSeconds"`
 	UncertainSeconds  int    `json:"uncertainSeconds"`
+	InactiveSeconds   int    `json:"inactiveSeconds"`
+	EvaluatorVersion  string `json:"evaluatorVersion,omitempty"`
 	EarnedSeconds     int    `json:"earnedSeconds"`
 	UsedSeconds       int    `json:"usedSeconds"`
 	DiscardedSeconds  int    `json:"discardedSeconds"`
@@ -61,6 +85,7 @@ type Snapshot struct {
 	Sync                 string                `json:"sync"`
 	Permission           string                `json:"permission"`
 	Online               bool                  `json:"online"`
+	Monitor              MonitorStatus         `json:"monitor"`
 	RestrictionDesired   string                `json:"restrictionDesired"`
 	RestrictionConfirmed bool                  `json:"restrictionConfirmed"`
 	Settings             Settings              `json:"settings"`
@@ -68,6 +93,14 @@ type Snapshot struct {
 	Result               *Result               `json:"result"`
 	Actions              map[string]Capability `json:"actions"`
 	Failure              *Failure              `json:"failure"`
+	Account              AccountState          `json:"account"`
+}
+
+type AccountState struct {
+	Status           string `json:"status"`
+	Email            string `json:"email"`
+	DeviceRegistered bool   `json:"deviceRegistered"`
+	Message          string `json:"message"`
 }
 
 type Scenario struct {
@@ -95,4 +128,5 @@ type Command struct {
 	ScenarioID     string         `json:"scenarioId"`
 	Task           Task           `json:"task"`
 	Classification Classification `json:"classification"`
+	Settings       Settings       `json:"settings"`
 }

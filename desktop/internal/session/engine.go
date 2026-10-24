@@ -9,12 +9,13 @@ import (
 	"github.com/jphacks/tkb_2622/desktop/fixtures"
 )
 
-// Engineは表示・結合確認用のデモであり，クラウドの業務状態を確定しない．
+// Engineは表示確認用のデモとローカル計測を管理し，クラウドの業務状態を確定しない．
 type Engine struct {
-	state    Snapshot
-	fixtures FixtureSet
-	lastTick time.Time
-	sequence int
+	state             Snapshot
+	fixtures          FixtureSet
+	lastTick          time.Time
+	sequence          int
+	localStorageReady bool
 }
 
 func New(platform string, now time.Time) *Engine {
@@ -22,10 +23,10 @@ func New(platform string, now time.Time) *Engine {
 	if err := json.Unmarshal(fixtures.Scenarios, &data); err != nil {
 		panic(err)
 	}
-	e := &Engine{fixtures: data, lastTick: now}
+	e := &Engine{fixtures: data, lastTick: now, localStorageReady: true}
 	e.state = Snapshot{Platform: platform, Mode: "demo", Settings: Settings{
 		Tasks: data.Tasks, SelectedTaskID: data.Task.ID, Classifications: data.Classifications,
-	}, History: []Result{}}
+	}, History: []Result{}, Monitor: MonitorStatus{State: "demo"}}
 	e.applyScenario("ready")
 	e.touch(now)
 	return e
@@ -44,6 +45,135 @@ func (e *Engine) Snapshot() Snapshot {
 	return copy
 }
 
+func (e *Engine) SetMode(mode string, now time.Time) {
+	e.state.Mode = mode
+	e.touch(now)
+}
+
+func (e *Engine) SetLocalStorageReady(ready bool, now time.Time) {
+	if e.localStorageReady == ready {
+		return
+	}
+	e.localStorageReady = ready
+	if ready && e.state.Failure != nil && e.state.Failure.Code == "local_storage" {
+		e.state.Failure = nil
+	}
+	e.touch(now)
+}
+
+func (e *Engine) SetAccount(account AccountState, now time.Time) {
+	e.state.Account = account
+	e.touch(now)
+}
+
+func (e *Engine) SetTasks(tasks []Task, selectedTaskID string, now time.Time) bool {
+	settings := e.state.Settings
+	settings.Tasks = append([]Task(nil), tasks...)
+	settings.SelectedTaskID = selectedTaskID
+	selectedExists := false
+	for _, task := range settings.Tasks {
+		if task.ID == settings.SelectedTaskID {
+			selectedExists = true
+			break
+		}
+	}
+	if !selectedExists {
+		settings.SelectedTaskID = ""
+		if len(settings.Tasks) > 0 {
+			settings.SelectedTaskID = settings.Tasks[0].ID
+		}
+	}
+	normalized, valid := normalizeSettings(settings)
+	if !valid {
+		return false
+	}
+	e.state.Settings = normalized
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) Restore(snapshot Snapshot, now time.Time) bool {
+	if snapshot.Platform != e.state.Platform {
+		return false
+	}
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return false
+	}
+	var restored Snapshot
+	if err := json.Unmarshal(data, &restored); err != nil {
+		return false
+	}
+	if _, valid := normalizeSettings(restored.Settings); !valid {
+		return false
+	}
+	if restored.Session != nil && restored.Session.Status == "RUNNING" {
+		restored.Session.Status = "PAUSED"
+		restored.Session.Evaluation = "pending"
+		if restored.Mode == "local-monitor" {
+			restored.Monitor.State = "paused"
+		}
+	}
+	e.state = restored
+	e.lastTick = now
+	e.touch(now)
+	e.updateActions()
+	return true
+}
+
+func (e *Engine) SetMonitor(status MonitorStatus, now time.Time) {
+	e.state.Monitor = status
+	if status.State == "running" && status.Message == "" && e.state.Failure != nil && e.state.Failure.Code == "monitor_sample" {
+		e.state.Failure = nil
+	}
+	e.touch(now)
+}
+
+func (e *Engine) SetFailure(code, message string, retryable bool, now time.Time) {
+	e.fail(code, message, retryable)
+	e.touch(now)
+}
+
+func (e *Engine) ApplyLocalEvaluation(result Result, now time.Time) bool {
+	if e.state.Mode != "local-monitor" || e.state.Session == nil || e.state.Session.ID != result.SessionID || result.EvaluatorVersion == "" {
+		return false
+	}
+	e.state.Session.Evaluation = "complete"
+	e.state.Result = &result
+	for index := range e.state.History {
+		if e.state.History[index].SessionID == result.SessionID {
+			e.state.History[index] = result
+			e.touch(now)
+			return true
+		}
+	}
+	e.state.History = append([]Result{result}, e.state.History...)
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) FailLocalEvaluation(sessionID string, now time.Time) {
+	if e.state.Mode != "local-monitor" || e.state.Session == nil || e.state.Session.ID != sessionID {
+		return
+	}
+	e.state.Session.Evaluation = "failed"
+	e.fail("local_evaluation", "ローカルの5分類評価に失敗しました。設定と保存済み観測データを確認してください。", false)
+	e.touch(now)
+}
+
+func (e *Engine) PauseForShutdown(now time.Time) {
+	if e.state.Session == nil || e.state.Session.Status != "RUNNING" {
+		return
+	}
+	e.state.Session.Status = "PAUSED"
+	e.state.Session.Evaluation = "pending"
+	if e.state.Mode == "local-monitor" && e.state.Monitor.State == "running" {
+		e.state.Monitor.State = "paused"
+	}
+	e.lastTick = now
+	e.touch(now)
+}
+
 func (e *Engine) Tick(now time.Time) bool {
 	if e.state.Session == nil || e.state.Session.Status != "RUNNING" {
 		e.lastTick = now
@@ -59,7 +189,67 @@ func (e *Engine) Tick(now time.Time) bool {
 	return true
 }
 
+func normalizeSettings(input Settings) (Settings, bool) {
+	settings := Settings{
+		SelectedTaskID:  strings.TrimSpace(input.SelectedTaskID),
+		Tasks:           make([]Task, len(input.Tasks)),
+		Classifications: make([]Classification, len(input.Classifications)),
+	}
+	taskIDs := make(map[string]struct{}, len(input.Tasks))
+	selectedTaskExists := false
+	for index, task := range input.Tasks {
+		task.ID = strings.TrimSpace(task.ID)
+		task.Name = strings.TrimSpace(task.Name)
+		if task.ID == "" || task.Name == "" || len([]rune(task.Name)) > 80 || task.MinimumSeconds < 1 || task.MinimumSeconds > 86400 || task.PlannedSeconds < task.MinimumSeconds || task.PlannedSeconds > 86400 {
+			return Settings{}, false
+		}
+		if _, exists := taskIDs[task.ID]; exists {
+			return Settings{}, false
+		}
+		taskIDs[task.ID] = struct{}{}
+		selectedTaskExists = selectedTaskExists || task.ID == settings.SelectedTaskID
+		settings.Tasks[index] = task
+	}
+	if len(settings.Tasks) == 0 {
+		if settings.SelectedTaskID != "" {
+			return Settings{}, false
+		}
+	} else if !selectedTaskExists {
+		return Settings{}, false
+	}
+	classificationNames := make(map[string]struct{}, len(input.Classifications))
+	classificationTargets := make(map[string]struct{}, len(input.Classifications))
+	for index, classification := range input.Classifications {
+		classification.Name = strings.TrimSpace(classification.Name)
+		classification.AppID = strings.TrimSpace(classification.AppID)
+		classification.Domain = strings.TrimSpace(classification.Domain)
+		if classification.Name == "" || len([]rune(classification.Name)) > 200 || len(classification.AppID) > 256 || len(classification.Domain) > 253 ||
+			(classification.Category != "work" && classification.Category != "related" && classification.Category != "distraction" && classification.Category != "uncertain") ||
+			(classification.Domain != "" && !browserAppID(classification.AppID)) ||
+			(classification.AppID != "" && browserAppID(classification.AppID) && classification.Domain == "") {
+			return Settings{}, false
+		}
+		if _, exists := classificationNames[classification.Name]; exists {
+			return Settings{}, false
+		}
+		classificationNames[classification.Name] = struct{}{}
+		if classification.AppID != "" {
+			target := strings.ToLower(classification.AppID) + "|" + strings.ToLower(classification.Domain)
+			if _, exists := classificationTargets[target]; exists {
+				return Settings{}, false
+			}
+			classificationTargets[target] = struct{}{}
+		}
+		settings.Classifications[index] = classification
+	}
+	return settings, true
+}
+
 func (e *Engine) Execute(command Command, now time.Time) Snapshot {
+	return e.ExecuteWithSessionID(command, "", now)
+}
+
+func (e *Engine) ExecuteWithSessionID(command Command, requestedSessionID string, now time.Time) Snapshot {
 	e.Tick(now)
 	e.state.Failure = nil
 	e.updateActions()
@@ -85,13 +275,23 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 				task = candidate
 			}
 		}
-		e.state.Session = &WorkSession{ID: fmt.Sprintf("demo-%d-%d", now.UnixNano(), e.sequence), Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task, Evaluation: "pending"}
+		sessionID := requestedSessionID
+		if sessionID == "" {
+			sessionID = fmt.Sprintf("demo-%d-%d", now.UnixNano(), e.sequence)
+		}
+		e.state.Session = &WorkSession{
+			ID: sessionID, Name: strings.TrimSpace(command.Name), Status: "RUNNING", Task: task,
+			Classifications: append([]Classification(nil), e.state.Settings.Classifications...),
+			RulesVersion:    "desktop-classifications-v1", Evaluation: "pending",
+		}
 		if e.state.Session.Name == "" {
 			e.state.Session.Name = task.Name
 		}
 		e.state.Result = nil
 		e.state.BalanceSeconds = nil
-		e.state.RestrictionDesired = "restricted"
+		if e.state.Mode == "demo" {
+			e.state.RestrictionDesired = "restricted"
+		}
 	case "pause":
 		e.state.Session.Status = "PAUSED"
 		e.state.Session.Evaluation = "pending"
@@ -114,7 +314,9 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 	case "resume":
 		e.state.Session.Status = "RUNNING"
 		e.state.Session.Evaluation = "pending"
-		e.state.RestrictionDesired = "restricted"
+		if e.state.Mode == "demo" {
+			e.state.RestrictionDesired = "restricted"
+		}
 	case "finish", "abort":
 		s := e.state.Session
 		if command.Action == "abort" {
@@ -122,7 +324,7 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 		} else {
 			s.Status = "FINALIZED"
 		}
-		if !e.state.Online {
+		if !e.state.Online && e.state.Mode != "local-monitor" {
 			if command.Action == "abort" {
 				s.Status = "ABORTED_LOCAL"
 			} else {
@@ -134,6 +336,13 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 		}
 	case "connection":
 		e.state.Online = !e.state.Online
+	case "saveSettings":
+		settings, valid := normalizeSettings(command.Settings)
+		if !valid {
+			e.fail("invalid_input", "設定内容を確認してください。", false)
+			break
+		}
+		e.state.Settings = settings
 	case "saveTask":
 		task := command.Task
 		task.Name = strings.TrimSpace(task.Name)
@@ -185,14 +394,22 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 
 func (e *Engine) complete() {
 	s := e.state.Session
-	s.Evaluation = "complete"
-	e.state.Sync = "synced"
-	e.state.RestrictionDesired = "unrestricted"
+	if e.state.Mode == "local-monitor" {
+		s.Evaluation = "pending"
+		e.state.Sync = "pending"
+		e.state.RestrictionDesired = "unknown"
+	} else {
+		s.Evaluation = "complete"
+		e.state.Sync = "synced"
+		e.state.RestrictionDesired = "unrestricted"
+	}
 	discarded := 0
-	if e.state.BalanceSeconds != nil { discarded = *e.state.BalanceSeconds }
+	if e.state.BalanceSeconds != nil {
+		discarded = *e.state.BalanceSeconds
+	}
 	zero := 0
 	e.state.BalanceSeconds = &zero
-	// 計測未接続のため全時間を保留とし，作業時間や報酬を推定しない．
+	// 活動分類未接続のため全時間を保留とし，作業時間や報酬を推定しない．
 	result := Result{SessionID: s.ID, Name: s.Name, Status: s.Status, ElapsedSeconds: s.ElapsedSeconds, UncertainSeconds: s.ElapsedSeconds, DiscardedSeconds: discarded}
 	e.state.Result = &result
 	for _, previous := range e.state.History {
@@ -233,13 +450,16 @@ func (e *Engine) updateActions() {
 	s := e.state.Session
 	active := s != nil && (s.Status == "RUNNING" || s.Status == "PAUSED")
 	available := s == nil || terminal(s.Status)
+	monitorReady := e.state.Mode != "local-monitor" || e.state.Monitor.State == "ready" || e.state.Monitor.State == "finished" || e.state.Monitor.State == "aborted"
+	monitorCanResume := e.state.Mode != "local-monitor" || e.state.Monitor.State == "paused" || e.state.Monitor.State == "ready"
+	storageReady := e.state.Mode != "local-monitor" || e.localStorageReady
 	rules := map[string]bool{
-		"start":  available && e.state.Online && e.state.Permission != "denied",
+		"start":  available && monitorReady && storageReady && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
 		"pause":  active && s.Status == "RUNNING",
-		"resume": active && s.Status == "PAUSED" && e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete" && e.state.Permission != "denied",
+		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && (e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
 		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds,
 		"abort":  active,
-		"retry":  e.state.Sync != "synced",
+		"retry":  e.state.Mode != "local-monitor" && e.state.Sync != "synced",
 	}
 	e.state.Actions = map[string]Capability{}
 	for action, allowed := range rules {
@@ -251,6 +471,26 @@ func (e *Engine) updateActions() {
 	}
 	if !rules["start"] && !e.state.Online {
 		e.state.Actions["start"] = Capability{Reason: "開始にはオンライン接続が必要です。"}
+	}
+	if !rules["start"] && e.state.Mode == "local-monitor" && !monitorReady {
+		reason := e.state.Monitor.Message
+		if reason == "" {
+			reason = "macOS計測ヘルパーを利用できません。アプリ用ビルド手順を確認してください。"
+		}
+		e.state.Actions["start"] = Capability{Reason: reason}
+	}
+	if !rules["start"] && e.state.Mode == "local-monitor" && !storageReady {
+		e.state.Actions["start"] = Capability{Reason: "作業状態を保存できません。保存先の権限を確認してください。"}
+	}
+	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !storageReady {
+		e.state.Actions["resume"] = Capability{Reason: "作業状態を保存できないため再開できません。保存先の権限を確認してください。"}
+	}
+	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !monitorCanResume {
+		reason := e.state.Monitor.Message
+		if reason == "" {
+			reason = "macOS計測ヘルパーを利用できません。アプリ用ビルド手順を確認してください。"
+		}
+		e.state.Actions["resume"] = Capability{Reason: reason}
 	}
 	if !rules["start"] && e.state.Permission == "denied" {
 		e.state.Actions["start"] = Capability{Reason: "計測権限が拒否されています。設定を確認してください。"}
@@ -266,4 +506,13 @@ func (e *Engine) touch(now time.Time) {
 }
 func (e *Engine) fail(code, message string, retryable bool) {
 	e.state.Failure = &Failure{Code: code, Message: message, Retryable: retryable}
+}
+
+func browserAppID(appID string) bool {
+	switch strings.ToLower(appID) {
+	case "com.google.chrome", "com.apple.safari":
+		return true
+	default:
+		return false
+	}
 }

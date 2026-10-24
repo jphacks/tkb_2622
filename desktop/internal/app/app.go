@@ -2,20 +2,37 @@ package app
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"time"
 
+	"github.com/jphacks/tkb_2622/desktop/internal/cloud"
+	offlineevaluation "github.com/jphacks/tkb_2622/desktop/internal/evaluation"
+	"github.com/jphacks/tkb_2622/desktop/internal/monitor"
 	"github.com/jphacks/tkb_2622/desktop/internal/session"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const StateEvent = "desktop:state"
+const (
+	StateEvent                 = "desktop:state"
+	classificationCaptureDelay = 5 * time.Second
+)
 
 type App struct {
-	mu     sync.Mutex
-	engine *session.Engine
-	ctx    context.Context
+	mu                 sync.Mutex
+	engine             *session.Engine
+	recorder           *monitor.Recorder
+	store              *stateStore
+	stateLoaded        bool
+	ctx                context.Context
+	cloudMu            sync.Mutex
+	cloudClient        *cloud.Client
+	cloudConfigError   error
+	credentials        *credentialStore
+	credentialStoreErr error
+	authSession        cloud.AuthSession
+	pendingEmail       string
 }
 
 // ライフサイクル関数をバインド対象から分け，画面に公開する操作を限定する．
@@ -25,6 +42,7 @@ type Host struct {
 }
 
 func New() *Host {
+	now := time.Now()
 	platform := "unsupported"
 	if runtime.GOOS == "darwin" {
 		platform = "macos"
@@ -32,7 +50,68 @@ func New() *Host {
 	if runtime.GOOS == "windows" {
 		platform = "windows"
 	}
-	return &Host{API: &App{engine: session.New(platform, time.Now())}}
+	engine := session.New(platform, now)
+	client, clientErr := cloud.NewClient(cloud.ConfigFromEnv())
+	credentials, credentialErr := newCredentialStore()
+	app := &App{
+		engine: engine, cloudClient: client, cloudConfigError: clientErr,
+		credentials: credentials, credentialStoreErr: credentialErr,
+	}
+	app.setAccountStatus(session.AccountState{Status: "unconfigured", Message: "Connect APIとSupabase Authの接続先を設定してください。"}, now)
+	if platform == "macos" {
+		engine.SetMode("local-monitor", now)
+		app.recorder = monitor.New(monitor.ResolveHelper())
+		engine.SetMonitor(toSessionMonitor(app.recorder.Status()), now)
+		store, storeErr := newStateStore()
+		if storeErr != nil {
+			engine.SetLocalStorageReady(false, now)
+			engine.SetFailure("local_storage_unavailable", "作業状態の保存先を準備できませんでした。保存先の権限を確認してください。", true, now)
+		} else {
+			app.store = store
+			snapshot, exists, loadErr := store.Load()
+			if loadErr != nil {
+				engine.SetLocalStorageReady(false, now)
+				engine.SetFailure("local_state_read", "前回の作業状態を読み込めませんでした。", true, now)
+			} else {
+				app.stateLoaded = true
+				if exists {
+					snapshot.Mode = "local-monitor"
+					currentMonitor := toSessionMonitor(app.recorder.Status())
+					if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
+						currentMonitor.State = "paused"
+						currentMonitor.AppID = snapshot.Monitor.AppID
+						currentMonitor.AppName = snapshot.Monitor.AppName
+						currentMonitor.BrowserName = snapshot.Monitor.BrowserName
+						currentMonitor.Domain = snapshot.Monitor.Domain
+						currentMonitor.LastSample = snapshot.Monitor.LastSample
+						currentMonitor.SampleCount = snapshot.Monitor.SampleCount
+					} else {
+						currentMonitor = toSessionMonitor(app.recorder.Status())
+					}
+					snapshot.Monitor = currentMonitor
+					if !engine.Restore(snapshot, now) {
+						app.stateLoaded = false
+						engine.SetLocalStorageReady(false, now)
+						engine.SetFailure("local_state_invalid", "前回の作業状態を復元できませんでした。保存ファイルを確認してください。", false, now)
+					} else if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
+						if err := app.recorder.RestoreSession(snapshot.Session.ID, toMonitorStatus(currentMonitor)); err != nil {
+							monitorStatus := currentMonitor
+							monitorStatus.State = "error"
+							monitorStatus.Message = "前回のローカル計測記録を復元できませんでした。"
+							engine.SetMonitor(monitorStatus, now)
+							engine.SetFailure("local_capture_restore", monitorStatus.Message, true, now)
+						}
+					} else if app.recorder.Status().State == "unavailable" {
+						monitorStatus := engine.Snapshot().Monitor
+						monitorStatus.State = "unavailable"
+						monitorStatus.Message = app.recorder.Status().Message
+						engine.SetMonitor(monitorStatus, now)
+					}
+				}
+			}
+		}
+	}
+	return &Host{API: app}
 }
 
 func (h *Host) Startup(ctx context.Context) { h.API.ctx = ctx }
@@ -50,13 +129,7 @@ func (h *Host) DomReady(ctx context.Context) {
 		for {
 			select {
 			case now := <-ticker.C:
-				a.mu.Lock()
-				changed := a.engine.Tick(now)
-				state := a.engine.Snapshot()
-				a.mu.Unlock()
-				if changed {
-					wailsruntime.EventsEmit(ctx, StateEvent, state)
-				}
+				a.tick(loop, now)
 			case <-loop.Done():
 				return
 			}
@@ -68,21 +141,294 @@ func (h *Host) Shutdown(context.Context) {
 	if h.cancel != nil {
 		h.cancel()
 	}
+	h.API.shutdown()
+}
+
+func (a *App) tick(ctx context.Context, now time.Time) {
+	a.mu.Lock()
+	changed := a.engine.Tick(now)
+	state := a.engine.Snapshot()
+	if state.Mode == "local-monitor" && state.Session != nil && state.Session.Status == "RUNNING" {
+		if a.recorder == nil {
+			a.engine.SetFailure("monitor_unavailable", "macOS計測ヘルパーを利用できません。", false, now)
+		} else {
+			status, err := a.recorder.Sample(ctx)
+			a.engine.SetMonitor(toSessionMonitor(status), now)
+			if err != nil {
+				a.engine.SetFailure("monitor_sample", status.Message, true, now)
+			}
+		}
+		changed = true
+	}
+	if changed {
+		a.persistLocked(now)
+	}
+	state = a.engine.Snapshot()
+	a.mu.Unlock()
+	if changed && a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
+	}
+}
+
+func (a *App) shutdown() {
+	now := time.Now()
+	a.mu.Lock()
+	state := a.engine.Snapshot()
+	if state.Mode == "local-monitor" && state.Session != nil && state.Session.Status == "RUNNING" {
+		if a.recorder != nil {
+			status, err := a.recorder.Pause()
+			a.engine.SetMonitor(toSessionMonitor(status), now)
+			if err != nil {
+				a.engine.SetFailure("monitor_pause", status.Message, true, now)
+			}
+		}
+		a.engine.PauseForShutdown(now)
+	}
+	a.persistLocked(now)
+	a.mu.Unlock()
 }
 
 func (a *App) GetStartupState() session.Snapshot {
+	ctx, cancel := context.WithTimeout(a.context(), 15*time.Second)
+	defer cancel()
+	a.syncCloud(ctx)
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.engine.Tick(time.Now())
+	now := time.Now()
+	if a.engine.Tick(now) {
+		a.persistLocked(now)
+	}
 	return a.engine.Snapshot()
 }
 
-func (a *App) Execute(command session.Command) session.Snapshot {
+func (a *App) GetClassificationCandidates() ([]monitor.ClassificationCandidate, error) {
 	a.mu.Lock()
-	state := a.engine.Execute(command, time.Now())
+	defer a.mu.Unlock()
+	state := a.engine.Snapshot()
+	if state.Session == nil {
+		return []monitor.ClassificationCandidate{}, nil
+	}
+	return monitor.ReadClassificationCandidates(state.Session.ID)
+}
+
+func (a *App) CaptureCurrentClassificationCandidate() (monitor.ClassificationCandidate, error) {
+	ctx := a.context()
+	a.mu.Lock()
+	state := a.engine.Snapshot()
+	if state.Session != nil && (state.Session.Status == "RUNNING" || state.Session.Status == "PAUSED") {
+		a.mu.Unlock()
+		return monitor.ClassificationCandidate{}, errors.New("cannot read a candidate during an active work session")
+	}
+	if a.recorder == nil {
+		a.mu.Unlock()
+		return monitor.ClassificationCandidate{}, errors.New("native collector is unavailable")
+	}
+	a.mu.Unlock()
+
+	timer := time.NewTimer(classificationCaptureDelay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		return monitor.ClassificationCandidate{}, ctx.Err()
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	state = a.engine.Snapshot()
+	if state.Session != nil && (state.Session.Status == "RUNNING" || state.Session.Status == "PAUSED") {
+		return monitor.ClassificationCandidate{}, errors.New("cannot read a candidate during an active work session")
+	}
+	return a.recorder.CaptureCurrentCandidate(ctx)
+}
+
+func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "abort" {
+		a.mu.Lock()
+		current := a.engine.Snapshot()
+		shouldConfirm := current.Mode == "local-monitor" && current.Actions["abort"].Allowed
+		a.mu.Unlock()
+		if shouldConfirm {
+			confirmed, err := a.confirmAbort()
+			if err != nil {
+				a.mu.Lock()
+				now := time.Now()
+				a.engine.SetFailure("abort_confirmation", "中止の確認を表示できませんでした。もう一度お試しください。", true, now)
+				state := a.engine.Snapshot()
+				a.mu.Unlock()
+				return state
+			}
+			if !confirmed {
+				return current
+			}
+		}
+	}
+	if command.Action == "saveSettings" {
+		return a.saveTaskSettings(command)
+	}
+	now := time.Now()
+	a.mu.Lock()
+	before := a.engine.Snapshot()
+	sessionID := ""
+	if before.Mode == "local-monitor" && command.Action == "start" {
+		generatedSessionID, err := monitor.NewSessionID()
+		if err != nil {
+			a.engine.SetFailure("session_id", "ローカル作業IDを作成できませんでした。", false, now)
+			state := a.engine.Snapshot()
+			a.mu.Unlock()
+			return state
+		}
+		sessionID = generatedSessionID
+	}
+	state := a.engine.ExecuteWithSessionID(command, sessionID, now)
+	if state.Failure == nil && state.Mode == "local-monitor" {
+		switch command.Action {
+		case "start":
+			a.startMonitoring(state, before, now)
+		case "pause":
+			a.pauseMonitoring(now)
+		case "resume":
+			a.resumeMonitoring(state, before, now)
+		case "finish":
+			a.finishMonitoring("finished", now)
+		case "abort":
+			a.finishMonitoring("aborted", now)
+		}
+	}
+	a.persistLocked(now)
+	state = a.engine.Snapshot()
 	a.mu.Unlock()
 	if a.ctx != nil {
 		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
 	}
 	return state
+}
+
+func (a *App) confirmAbort() (bool, error) {
+	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
+		Type:          wailsruntime.QuestionDialog,
+		Title:         "作業を中止しますか？",
+		Message:       "計測を停止します。報酬は付与されません。",
+		Buttons:       []string{"中止する", "作業に戻る"},
+		DefaultButton: "作業に戻る",
+		CancelButton:  "作業に戻る",
+	})
+	return result == "中止する", err
+}
+
+func (a *App) startMonitoring(state, before session.Snapshot, now time.Time) {
+	if a.recorder == nil || state.Session == nil {
+		a.engine.Restore(before, now)
+		a.engine.SetFailure("monitor_unavailable", "macOS計測ヘルパーを利用できません。", false, now)
+		return
+	}
+	status, err := a.recorder.Start(a.context(), state.Session.ID)
+	if err != nil && status.State == "running" {
+		if aborted, finishErr := a.recorder.Finish("aborted"); finishErr == nil {
+			aborted.Message = status.Message
+			status = aborted
+		}
+	}
+	a.engine.SetMonitor(toSessionMonitor(status), now)
+	if err != nil {
+		a.engine.Restore(before, now)
+		a.engine.SetMonitor(toSessionMonitor(status), now)
+		a.engine.SetFailure("monitor_start", status.Message, true, now)
+	}
+}
+
+func (a *App) pauseMonitoring(now time.Time) {
+	if a.recorder == nil {
+		return
+	}
+	status, err := a.recorder.Pause()
+	a.engine.SetMonitor(toSessionMonitor(status), now)
+	if err != nil {
+		a.engine.SetFailure("monitor_pause", status.Message, true, now)
+	}
+}
+
+func (a *App) resumeMonitoring(state, before session.Snapshot, now time.Time) {
+	if a.recorder == nil || state.Session == nil {
+		a.engine.Restore(before, now)
+		a.engine.SetFailure("monitor_unavailable", "macOS計測ヘルパーを利用できません。", false, now)
+		return
+	}
+	status, err := a.recorder.Resume(a.context(), state.Session.ID, toMonitorStatus(state.Monitor))
+	if err != nil {
+		if paused, pauseErr := a.recorder.Pause(); pauseErr == nil {
+			status = paused
+		}
+	}
+	a.engine.SetMonitor(toSessionMonitor(status), now)
+	if err != nil {
+		a.engine.Restore(before, now)
+		a.engine.SetMonitor(toSessionMonitor(status), now)
+		a.engine.SetFailure("monitor_resume", status.Message, true, now)
+	}
+}
+
+func (a *App) finishMonitoring(outcome string, now time.Time) {
+	if a.recorder == nil {
+		return
+	}
+	status, err := a.recorder.Finish(outcome)
+	a.engine.SetMonitor(toSessionMonitor(status), now)
+	state := a.engine.Snapshot()
+	if state.Session == nil {
+		return
+	}
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		a.engine.SetFailure("monitor_finish", status.Message, true, now)
+		return
+	}
+	records, err := a.recorder.ReadRecords()
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		return
+	}
+	result, err := offlineevaluation.Evaluate(records, *state.Session)
+	if err != nil {
+		a.engine.FailLocalEvaluation(state.Session.ID, now)
+		return
+	}
+	a.engine.ApplyLocalEvaluation(result, now)
+}
+
+func (a *App) persistLocked(now time.Time) {
+	if a.store == nil || !a.stateLoaded {
+		a.engine.SetLocalStorageReady(false, now)
+		a.engine.SetFailure("local_storage_unavailable", "作業状態を読み込み・保存できません。保存先の権限と状態ファイルを確認してください。", false, now)
+		return
+	}
+	if err := a.store.Save(a.engine.Snapshot()); err != nil {
+		a.engine.SetLocalStorageReady(false, now)
+		a.engine.SetFailure("local_storage", "作業状態をこのMacに保存できませんでした。保存先の空き容量と権限を確認してください。", true, now)
+	} else {
+		a.engine.SetLocalStorageReady(true, now)
+	}
+}
+
+func (a *App) context() context.Context {
+	if a.ctx != nil {
+		return a.ctx
+	}
+	return context.Background()
+}
+
+func toMonitorStatus(status session.MonitorStatus) monitor.Status {
+	return monitor.Status{
+		State: status.State, AppID: status.AppID, AppName: status.AppName, BrowserName: status.BrowserName,
+		Domain: status.Domain, LastSample: status.LastSample, SampleCount: status.SampleCount,
+		Message: status.Message,
+	}
+}
+
+func toSessionMonitor(status monitor.Status) session.MonitorStatus {
+	return session.MonitorStatus{
+		State: status.State, AppID: status.AppID, AppName: status.AppName, BrowserName: status.BrowserName,
+		Domain: status.Domain, LastSample: status.LastSample, SampleCount: status.SampleCount,
+		Message: status.Message,
+	}
 }

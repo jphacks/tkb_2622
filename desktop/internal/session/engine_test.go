@@ -1,9 +1,34 @@
 package session
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestEngineSaveSettingsIsAtomic(t *testing.T) {
+	now := time.Date(2026, time.October, 24, 9, 0, 0, 0, time.UTC)
+	engine := New("macos", now)
+	draft := Settings{
+		Tasks:           []Task{{ID: "writing", Name: "論文執筆", PlannedSeconds: 7200, MinimumSeconds: 3600}},
+		SelectedTaskID:  "writing",
+		Classifications: []Classification{{Name: "Notion", Category: "work"}},
+	}
+	saved := engine.Execute(Command{Action: "saveSettings", Settings: draft}, now)
+	if saved.Failure != nil || saved.Settings.SelectedTaskID != "writing" || len(saved.Settings.Tasks) != 1 || len(saved.Settings.Classifications) != 1 {
+		t.Fatalf("設定の保存結果 = %#v", saved)
+	}
+
+	invalid := draft
+	invalid.Tasks = append(invalid.Tasks, draft.Tasks[0])
+	rejected := engine.Execute(Command{Action: "saveSettings", Settings: invalid}, now)
+	if rejected.Failure == nil || rejected.Failure.Code != "invalid_input" {
+		t.Fatalf("重複IDを含む設定が拒否されない: %#v", rejected.Failure)
+	}
+	if !reflect.DeepEqual(rejected.Settings, saved.Settings) {
+		t.Fatalf("無効な設定の一部が反映された: %#v", rejected.Settings)
+	}
+}
 
 func TestEngineFinishHonorsMinimumTime(t *testing.T) {
 	start := time.Date(2026, time.October, 24, 10, 0, 0, 0, time.UTC)
