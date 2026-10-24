@@ -158,7 +158,8 @@ struct ConfiguredUsageGrantRepository {
         deviceID: String,
         grantID: String,
         controlRevision: Int64,
-        shieldStatus: String
+        shieldStatus: String,
+        appliedAt: Date = Date()
     ) async throws {
         try await reportRestrictionState(
             operationID: operationID,
@@ -166,7 +167,8 @@ struct ConfiguredUsageGrantRepository {
             controlRevision: controlRevision,
             grantID: grantID,
             shieldStatus: shieldStatus,
-            permissionStatus: "PERMISSION_STATUS_GRANTED"
+            permissionStatus: "PERMISSION_STATUS_GRANTED",
+            appliedAt: appliedAt
         )
     }
 
@@ -224,20 +226,48 @@ struct ConfiguredUsageGrantRepository {
             let shieldStatus = localStatus == "SHIELD_STATUS_ERROR"
                 ? "SHIELD_STATUS_ERROR"
                 : (shouldShield ? "SHIELD_STATUS_SHIELDED" : "SHIELD_STATUS_UNSHIELDED")
-            let stateKey = "mobile.usage.lastReportedShieldStatus.\(grantID)"
-            if shared.string(forKey: stateKey) != shieldStatus {
-                let operationKey = "mobile.usage.stateReportOperationID.\(grantID).\(shieldStatus)"
-                let operationID = shared.string(forKey: operationKey) ?? UUID().uuidString.lowercased()
-                shared.set(operationID, forKey: operationKey)
+            let reportedGrantID = ["SHIELD_STATUS_UNSHIELDED", "SHIELD_STATUS_ERROR"].contains(shieldStatus) ? grantID : ""
+            let stateKey = "mobile.usage.lastReportedStateFingerprint.\(grantID).\(revision)"
+            let requestFingerprint = [
+                deviceID,
+                String(revision),
+                reportedGrantID,
+                shieldStatus,
+                "PERMISSION_STATUS_GRANTED",
+                ""
+            ].joined(separator: "\u{1f}")
+            if shared.string(forKey: stateKey) != requestFingerprint {
+                let operationKey = "mobile.usage.stateReportOperationID.\(grantID).\(revision).\(shieldStatus)"
+                let appliedAtKey = "\(operationKey).appliedAt"
+                let fingerprintKey = "\(operationKey).requestFingerprint"
+                let hasMatchingPendingRequest = shared.string(forKey: fingerprintKey) == requestFingerprint
+                    && shared.object(forKey: appliedAtKey) as? Date != nil
+                let operationID: String
+                let appliedAt: Date
+                if hasMatchingPendingRequest,
+                   let pendingOperationID = shared.string(forKey: operationKey),
+                   let pendingAppliedAt = shared.object(forKey: appliedAtKey) as? Date {
+                    operationID = pendingOperationID
+                    appliedAt = pendingAppliedAt
+                } else {
+                    operationID = UUID().uuidString.lowercased()
+                    appliedAt = Date()
+                    shared.set(operationID, forKey: operationKey)
+                    shared.set(appliedAt, forKey: appliedAtKey)
+                    shared.set(requestFingerprint, forKey: fingerprintKey)
+                }
                 try await reportActivation(
                     operationID: operationID,
                     deviceID: deviceID,
-                    grantID: ["SHIELD_STATUS_UNSHIELDED", "SHIELD_STATUS_ERROR"].contains(shieldStatus) ? grantID : "",
+                    grantID: reportedGrantID,
                     controlRevision: revision,
-                    shieldStatus: shieldStatus
+                    shieldStatus: shieldStatus,
+                    appliedAt: appliedAt
                 )
-                shared.set(shieldStatus, forKey: stateKey)
+                shared.set(requestFingerprint, forKey: stateKey)
                 shared.removeObject(forKey: operationKey)
+                shared.removeObject(forKey: appliedAtKey)
+                shared.removeObject(forKey: fingerprintKey)
             }
         }
 
