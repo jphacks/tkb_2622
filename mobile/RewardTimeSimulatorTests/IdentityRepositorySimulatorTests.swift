@@ -77,6 +77,22 @@ final class IdentityRepositorySimulatorTests: XCTestCase {
         XCTAssertEqual(identity.avatarID, "fox")
     }
 
+    func testUpdateDisplayNameUsesBackendFieldAndRoute() async throws {
+        let requests = LockedIdentityRequests()
+        IdentityRepositoryURLProtocol.handler = { request in
+            requests.append(request)
+            return (200, #"{"user":{"id":"user-1","status":"ACTIVE","createdAt":"2026-10-25T09:00:00Z","displayName":"Chiho Focus","avatarId":"fox"}}"#)
+        }
+
+        let identity = try await repository().updateDisplayName("Chiho Focus")
+
+        let request = try XCTUnwrap(requests.values.first)
+        XCTAssertEqual(request.url?.path, "/identity.v1.IdentityService/UpdateDisplayName")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer simulator-test-token")
+        XCTAssertEqual(try payload(from: request)["displayName"] as? String, "Chiho Focus")
+        XCTAssertEqual(identity.displayName, "Chiho Focus")
+    }
+
     private func repository() -> IdentityAPIRepository {
         IdentityAPIRepository(client: ConnectJSONClient(
             baseURL: URL(string: "https://api.example.test")!,
