@@ -116,3 +116,12 @@ xcrun devicectl device process launch \
 ```
 
 初回はXcodeがiPhoneの開発サポート情報を準備するため、Devices and Simulatorsに準備中と表示されることがある。iPhoneを接続・ロック解除したまま完了を待ってからビルドする。Family Controls (Development) の表示に配布向けentitlement申請の警告が併記される場合、それは配布時の要件であり、開発用の実機検証とは区別する。
+
+## 実機起動の現在状況（2026-10-24）
+
+- iPhoneへのビルド、インストール、`devicectl device process launch` は成功した。
+- 起動後にiPhoneで白画面になり、Xcodeは `Launching suspended and the debugger is responsible for resuming` の後、アプリへのデバッガ接続待ちになった。
+- 使用環境はmacOS 26.5.2 / Xcode 26.5 / iPhone SE (第3世代)・iOS 27.0.1。Xcode 26.5がこのiOSバージョンの実機デバッグに対応していないことが原因候補だが、白画面の直接原因としては未確定。
+- Family Controlsの認可ダイアログは表示されたが、許可状態とShieldの動作は未確認。配布向け `Family Controls (Distribution)` の警告は、今回の起動待ちとは別の項目。
+
+macOS 26.6以降とiOS 27対応のXcodeに更新した後、Xcodeからプロジェクトを開き、iPhoneのロックを解除して実行先に選び、⌘Rで起動する。アプリ画面が表示されたら、認可状態、アプリ選択、Shield設定・解除の順に実機確認を再開する。白画面が続く場合は、XcodeのデバッグコンソールとDevices and Simulatorsの端末状態を記録し、原因を切り分ける。
