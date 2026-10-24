@@ -128,6 +128,9 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .app-shell { grid-template-columns: 200px minmax(0, 1fr); min-height: 100vh; background: #F7F5FF; }
 .sidebar { padding: 24px 14px; gap: 22px; background: #fff; border-right: 1px solid var(--border); }
 .brand { padding: 0 8px; gap: 10px; color: var(--ink); font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif; font-size: 19px; letter-spacing: 0; }
+.brand-button { width: fit-content; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.brand-button:hover { opacity: .84; }
+.brand-button:focus-visible { outline: 3px solid #9C8DED; outline-offset: 4px; border-radius: 8px; }
 .brand-symbol { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #5B4BDB; color: #fff; }
 .main-navigation { display: flex; flex-direction: column; gap: 4px; }
 .nav-item { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px; color: var(--ink); background: transparent; text-align: left; font-size: 14px; font-weight: 400; }
