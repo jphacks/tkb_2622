@@ -73,6 +73,79 @@ final class UsageGrantRepositorySimulatorTests: XCTestCase {
         }
     }
 
+    func testGetGrantAndReportUsageUseBackendRoutesAndProtoJSONValues() async throws {
+        let requests = LockedUsageGrantRequests()
+        UsageGrantRepositoryURLProtocol.handler = { request in
+            requests.append(request)
+            switch request.url?.lastPathComponent {
+            case "GetUsageGrant":
+                return (200, #"{"grant":{"id":"grant-1","reservedSeconds":"300","reportedSeconds":"60","status":"GRANT_STATUS_ACTIVE","controlRevision":"9","consumedSeconds":"60"}}"#)
+            case "ReportUsage":
+                return (200, #"{"grant":{"id":"grant-1","reservedSeconds":"300","reportedSeconds":"120","status":"GRANT_STATUS_ACTIVE","controlRevision":"10"}}"#)
+            default:
+                return (404, #"{"code":"not_found","message":"unknown route"}"#)
+            }
+        }
+        let repository = repository()
+
+        let current = try await repository.getGrant(grantID: "grant-1")
+        let reported = try await repository.reportUsage(
+            operationID: "report-operation-1",
+            grantID: "grant-1",
+            reportSequence: 2,
+            cumulativeSeconds: 120,
+            observedAt: ISO8601DateFormatter().date(from: "2026-10-25T10:00:00Z")!,
+            final: false
+        )
+
+        let captured = requests.values
+        XCTAssertEqual(captured.map { $0.url?.lastPathComponent }, ["GetUsageGrant", "ReportUsage"])
+        XCTAssertEqual(captured.map { $0.value(forHTTPHeaderField: "Authorization") }, [
+            "Bearer simulator-test-token", "Bearer simulator-test-token",
+        ])
+        let getPayload = try requestPayload(from: captured[0])
+        XCTAssertEqual(getPayload["grantId"] as? String, "grant-1")
+        let reportPayload = try requestPayload(from: captured[1])
+        XCTAssertEqual(reportPayload["operationId"] as? String, "report-operation-1")
+        XCTAssertEqual(reportPayload["grantId"] as? String, "grant-1")
+        XCTAssertEqual(reportPayload["reportSeq"] as? String, "2")
+        XCTAssertEqual(reportPayload["cumulativeSeconds"] as? String, "120")
+        XCTAssertEqual(reportPayload["observedAt"] as? String, "2026-10-25T10:00:00.000Z")
+        XCTAssertEqual(reportPayload["final"] as? Bool, false)
+        XCTAssertEqual(current.reportedSeconds, 60)
+        XCTAssertTrue(current.isSettled)
+        XCTAssertEqual(reported.reportedSeconds, 120)
+        XCTAssertEqual(reported.controlRevision, 10)
+    }
+
+    func testReservationOperationDistinguishesSucceededAndNotFound() async throws {
+        let requests = LockedUsageGrantRequests()
+        var operationCount = 0
+        UsageGrantRepositoryURLProtocol.handler = { request in
+            requests.append(request)
+            operationCount += 1
+            if operationCount == 1 {
+                return (200, #"{"status":"OPERATION_STATUS_SUCCEEDED","resourceId":"grant-1"}"#)
+            }
+            return (200, #"{"status":"OPERATION_STATUS_NOT_FOUND","resourceId":""}"#)
+        }
+        let repository = repository()
+
+        let succeeded = try await repository.reservationOperation(operationID: "reserve-operation-1")
+        let pending = try await repository.reservationOperation(operationID: "reserve-operation-2")
+
+        XCTAssertEqual(succeeded, "grant-1")
+        XCTAssertNil(pending)
+        XCTAssertEqual(requests.values.map { $0.url?.lastPathComponent }, [
+            "GetRestrictionOperation", "GetRestrictionOperation",
+        ])
+        for (request, expectedOperationID) in zip(requests.values, ["reserve-operation-1", "reserve-operation-2"]) {
+            let payload = try requestPayload(from: request)
+            XCTAssertEqual(payload["kind"] as? String, "OPERATION_KIND_RESERVE")
+            XCTAssertEqual(payload["operationId"] as? String, expectedOperationID)
+        }
+    }
+
     private func repository() -> ConfiguredUsageGrantRepository {
         ConfiguredUsageGrantRepository(client: client(), defaults: defaults)
     }
@@ -101,6 +174,11 @@ final class UsageGrantRepositorySimulatorTests: XCTestCase {
             body.append(buffer, count: count)
         }
         return body.isEmpty ? nil : body
+    }
+
+    private func requestPayload(from request: URLRequest) throws -> [String: Any] {
+        let body = try XCTUnwrap(requestBody(from: request))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
     }
 }
 
