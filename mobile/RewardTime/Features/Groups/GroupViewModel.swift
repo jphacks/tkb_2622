@@ -10,6 +10,7 @@ final class GroupViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    @Published private(set) var loadError: String?
     @Published private(set) var workStarts: [MobileGroupWorkStart] = []
     @Published private(set) var workStartError: String?
     private let repository: any GroupRepository
@@ -23,14 +24,28 @@ final class GroupViewModel: ObservableObject {
     func load() async {
         loadGeneration += 1
         let requestGeneration = loadGeneration
-        state = .loading
+        let previousGroups: [MobileGroup]?
+        if case .loaded(let groups) = state {
+            previousGroups = groups
+        } else {
+            previousGroups = nil
+            state = .loading
+        }
+        loadError = nil
         do {
             let groups = try await repository.fetchGroups()
             guard requestGeneration == loadGeneration else { return }
             state = .loaded(groups)
+            loadError = nil
         } catch {
             guard requestGeneration == loadGeneration else { return }
-            state = .failed(Self.failureMessage(for: error))
+            let message = Self.failureMessage(for: error)
+            if let previousGroups {
+                state = .loaded(previousGroups)
+                loadError = message
+            } else {
+                state = .failed(message)
+            }
         }
     }
 
@@ -71,6 +86,7 @@ final class GroupViewModel: ObservableObject {
         } else {
             state = .loaded([group])
         }
+        loadError = nil
         return group
     }
 
@@ -85,6 +101,7 @@ final class GroupViewModel: ObservableObject {
         } else {
             state = .loaded([group])
         }
+        loadError = nil
         return group
     }
 

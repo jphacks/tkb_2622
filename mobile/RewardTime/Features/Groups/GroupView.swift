@@ -62,6 +62,9 @@ struct GroupView: View {
             .tint(AppTheme.primary)
           }
         case .loaded(let groups) where groups.isEmpty:
+          if let loadError = model.loadError {
+            loadFailureWarning(loadError)
+          }
           SurfaceCard {
             Label("所属グループはありません", systemImage: "person.2")
               .font(.headline)
@@ -75,6 +78,9 @@ struct GroupView: View {
             .tint(AppTheme.primary)
           }
         case .loaded(let groups):
+          if let loadError = model.loadError {
+            loadFailureWarning(loadError)
+          }
           groupPicker(groups)
 
           if let group = selectedGroup(in: groups) {
@@ -183,6 +189,21 @@ struct GroupView: View {
       }
     } message: {
       Text(groupNotice ?? invitationError ?? leaveError ?? "もう一度お試しください。")
+    }
+  }
+
+  private func loadFailureWarning(_ message: String) -> some View {
+    SurfaceCard {
+      Label("最新のグループ一覧を取得できませんでした", systemImage: "wifi.exclamationmark")
+        .font(.subheadline.weight(.semibold))
+      Text("前回取得したグループ情報を表示しています。通信が回復したら再読み込みしてください。")
+        .font(.footnote)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Text(message)
+        .font(.caption)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Button("再読み込み") { Task { await model.load() } }
+        .buttonStyle(.bordered)
     }
   }
 

@@ -225,6 +225,38 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testGroupRefreshFailureKeepsPreviouslyLoadedGroups() async throws {
+        let repository = SimulatorGroupRepository(groups: [try group(id: "group-1")])
+        let viewModel = GroupViewModel(repository: repository)
+
+        await viewModel.load()
+        repository.fetchGroupsError = ConnectJSONClient.ClientError.connect(code: "unavailable")
+        await viewModel.load()
+
+        guard case .loaded(let groups) = viewModel.state else {
+            return XCTFail("A failed refresh should retain the last successful group list")
+        }
+        XCTAssertEqual(groups.map(\.id), ["group-1"])
+        XCTAssertNotNil(viewModel.loadError)
+
+        repository.fetchGroupsError = nil
+        repository.groups.append(try group(id: "group-2"))
+        await viewModel.load()
+        guard case .loaded(let refreshedGroups) = viewModel.state else {
+            return XCTFail("A successful retry should replace the retained group list")
+        }
+        XCTAssertEqual(Set(refreshedGroups.map(\.id)), ["group-1", "group-2"])
+        XCTAssertNil(viewModel.loadError)
+    }
+
+    private func group(id: String) throws -> MobileGroup {
+        try JSONDecoder().decode(
+            MobileGroup.self,
+            from: Data("{\"id\":\"\(id)\",\"name\":\"Study\",\"members\":[]}".utf8)
+        )
+    }
+
     private func repository() -> ConfiguredDeviceRevocationRepository {
         ConfiguredDeviceRevocationRepository(defaults: defaults)
     }
@@ -259,6 +291,29 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         }
         return data
     }
+}
+
+@MainActor
+private final class SimulatorGroupRepository: GroupRepository {
+    var groups: [MobileGroup]
+    var fetchGroupsError: Error?
+
+    init(groups: [MobileGroup]) {
+        self.groups = groups
+    }
+
+    func fetchGroups() async throws -> [MobileGroup] {
+        if let fetchGroupsError { throw fetchGroupsError }
+        return groups
+    }
+
+    func fetchWorkStarts() async throws -> [MobileGroupWorkStart] { [] }
+    func createGroup(name: String, operationID: String) async throws -> MobileGroup { groups[0] }
+    func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
+        fatalError("Not used by this test")
+    }
+    func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup { groups[0] }
+    func leaveGroup(groupID: String, operationID: String) async throws -> Bool { false }
 }
 
 private struct SimulatorTestTokenProvider: AccessTokenProviding {
