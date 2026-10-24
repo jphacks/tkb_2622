@@ -270,9 +270,9 @@ struct GroupView: View {
       if let clientError = error as? ConnectJSONClient.ClientError,
         case .connect(code: "invalid_argument") = clientError
       {
-        createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。"
+        createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。 (API: CreateGroup)"
       } else {
-        createError = GroupAPIErrorMessage.describe(error)
+        createError = GroupAPIErrorMessage.describe(error, operation: .createGroup)
       }
     }
   }
@@ -302,7 +302,7 @@ struct GroupView: View {
       clearInvitationToken()
       await model.refreshWorkStarts()
     } catch {
-      acceptError = invitationFailureMessage(error)
+      acceptError = GroupAPIErrorMessage.describe(error, operation: .acceptInvitation)
       isShowingAcceptInvitation = true
     }
   }
@@ -325,7 +325,7 @@ struct GroupView: View {
       invitationGroupID = groupID
       invitationOperationID = nil
     } catch {
-      invitationError = invitationFailureMessage(error)
+      invitationError = GroupAPIErrorMessage.describe(error, operation: .createInvitation)
     }
   }
 
@@ -352,7 +352,7 @@ struct GroupView: View {
         groupNotice = "グループから退出しました。"
       }
     } catch {
-      leaveError = invitationFailureMessage(error)
+      leaveError = GroupAPIErrorMessage.describe(error, operation: .leaveGroup)
     }
   }
 
@@ -361,15 +361,6 @@ struct GroupView: View {
     acceptOperationID = nil
     acceptError = nil
     isShowingAcceptInvitation = false
-  }
-
-  private func invitationFailureMessage(_ error: Error) -> String {
-    if let clientError = error as? ConnectJSONClient.ClientError,
-      case .connect(code: "failed_precondition") = clientError
-    {
-      return "招待リンクは期限切れか、すでに使用されています。新しいリンクを発行してもらってください。"
-    }
-    return GroupAPIErrorMessage.describe(error)
   }
 
   @ViewBuilder

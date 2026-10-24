@@ -39,7 +39,7 @@ final class GroupViewModel: ObservableObject {
             loadError = nil
         } catch {
             guard requestGeneration == loadGeneration else { return }
-            let message = Self.failureMessage(for: error)
+            let message = Self.failureMessage(for: error, operation: .listGroups)
             if let previousGroups {
                 state = .loaded(previousGroups)
                 loadError = message
@@ -75,7 +75,7 @@ final class GroupViewModel: ObservableObject {
                 .sorted { $0.startedAt.date > $1.startedAt.date }
                 .prefix(30))
         } catch {
-            workStartError = GroupAPIErrorMessage.describe(error)
+            workStartError = GroupAPIErrorMessage.describe(error, operation: .workStartFeed)
         }
     }
 
@@ -113,18 +113,21 @@ final class GroupViewModel: ObservableObject {
         return groupDeleted
     }
 
-    private static func failureMessage(for error: Error) -> String {
+    private static func failureMessage(
+        for error: Error,
+        operation: GroupAPIErrorMessage.Operation
+    ) -> String {
         switch error {
         case GroupRepositoryError.missingConfiguration:
-            return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。"
+            return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。 (API: \(operation.rawValue))"
         case GroupRepositoryError.invalidConfiguration:
-            return "設定タブのSupabase接続情報とAPI URLを確認してください。"
+            return "設定タブのSupabase接続情報とAPI URLを確認してください。 (API: \(operation.rawValue))"
         case let clientError as ConnectJSONClient.ClientError:
-            return GroupAPIErrorMessage.describe(clientError)
+            return GroupAPIErrorMessage.describe(clientError, operation: operation)
         case let error as LocalizedError:
-            return error.errorDescription ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+            return GroupAPIErrorMessage.describe(error, operation: operation)
         default:
-            return "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+            return GroupAPIErrorMessage.describe(error, operation: operation)
         }
     }
 }

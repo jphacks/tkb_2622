@@ -1,12 +1,33 @@
 import Foundation
 
 enum GroupAPIErrorMessage {
+    enum Operation: String {
+        case listGroups = "ListGroups"
+        case workStartFeed = "GET /v1/group/work-starts"
+        case createGroup = "CreateGroup"
+        case createInvitation = "CreateInvitation"
+        case acceptInvitation = "AcceptInvitation"
+        case leaveGroup = "LeaveGroup"
+    }
+
     static func describe(_ error: Error) -> String {
         if let clientError = error as? ConnectJSONClient.ClientError {
             return describe(clientError)
         }
         return (error as? LocalizedError)?.errorDescription
             ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+    }
+
+    static func describe(_ error: Error, operation: Operation) -> String {
+        let detail: String
+        if operation == .acceptInvitation,
+           let clientError = error as? ConnectJSONClient.ClientError,
+           case .connect(code: "failed_precondition") = clientError {
+            detail = "招待リンクは期限切れか、すでに使用されています。新しいリンクを発行してもらってください (failed_precondition)。"
+        } else {
+            detail = describe(error)
+        }
+        return "\(detail) (API: \(operation.rawValue))"
     }
 
     static func describe(_ error: ConnectJSONClient.ClientError) -> String {

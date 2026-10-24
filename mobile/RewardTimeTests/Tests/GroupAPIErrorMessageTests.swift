@@ -38,4 +38,29 @@ final class GroupAPIErrorMessageTests: XCTestCase {
 
         XCTAssertTrue(GroupAPIErrorMessage.describe(error).contains("再ログイン"))
     }
+
+    func testFailedPreconditionGuidanceIsSpecificToAcceptInvitation() {
+        let error = ConnectJSONClient.ClientError.connect(code: "failed_precondition")
+
+        let accept = GroupAPIErrorMessage.describe(error, operation: .acceptInvitation)
+        let create = GroupAPIErrorMessage.describe(error, operation: .createInvitation)
+        let leave = GroupAPIErrorMessage.describe(error, operation: .leaveGroup)
+
+        XCTAssertTrue(accept.contains("招待リンクは期限切れ"))
+        XCTAssertFalse(create.contains("期限切れ"))
+        XCTAssertFalse(leave.contains("期限切れ"))
+        XCTAssertTrue(create.contains("CreateInvitation"))
+        XCTAssertTrue(leave.contains("LeaveGroup"))
+    }
+
+    func testGroupErrorIncludesOperationNameForBackendLogMatching() {
+        let message = GroupAPIErrorMessage.describe(
+            ConnectJSONClient.ClientError.connect(code: "internal"),
+            operation: .createGroup
+        )
+
+        XCTAssertTrue(message.contains("CreateGroup"))
+        XCTAssertTrue(message.contains("internal"))
+        XCTAssertTrue(message.contains("APIログ"))
+    }
 }
