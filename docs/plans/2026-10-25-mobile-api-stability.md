@@ -23,7 +23,7 @@
 - 2026-10-25 サインアウトAPIのエラー照合：`ListDevices`・`RevokeDevice`・サインアウト時の`DeleteNotificationEndpoint`失敗にRPC名を付与。修正前のRevokeDevice／DeleteNotificationEndpointテスト失敗を確認後、修正し、対象4件・Simulator全44件pass。`permission_denied`での既失効端末処理と`aborted`後の同一operation再試行もpass。
 - 2026-10-25 Identity APIのエラー照合：`EnsureUser`・`GetMe`・`UpdateAvatar`・`UpdateDisplayName`のConnect errorへRPC名を付与。修正前に新規失敗テスト4件がred、修正後green。アイコン404の再現表示とプロフィール更新失敗経路を確認するSimulator全47件pass。実backendが404を返す原因は認証付き実API確認待ち。
 - 2026-10-25 利用枠APIのエラー照合：Reserve／ReportRestrictionState／GetUsageGrant／ReportUsage／GetRestrictionOperationの失敗へRPC名を付け、Connect codeも維持。ラップされたエラーでも予約失敗の確定／不確定を元のConnect codeで分類し、曖昧な応答ではoperation IDを保つ。host 45件、iPhone 17 Simulator 50件、初回ログインUI test 1件がpass。実backendへの利用枠操作は未確認。
-- 2026-10-25 Desktop–Mobile同一アカウント連携の切り分け：backend `EnsureUser`は一意な`(auth_provider, auth_subject)`をupsertし、`GetCurrentSession`は同じ業務User IDで作業を検索する。異なるクライアント操作IDでも同じsubjectが同じUser IDへ対応するloopback PostgreSQL統合testを追加し、稼働中のlocal DBでpass。Desktop全Go tests、backend全Go testsもpass。アプリ2台が実際に同じSupabase subject／project／API環境を使うE2Eは未確認。サーバーにHTTP method・RPC path・status・所要時間のみを出すログを追加し、Authorization／request bodyを記録しないtestを追加。`make -C backend up`でローカルAPIを再build・再起動し、`GET /healthz` HTTP 200、およびcredentialなしの`EnsureUser`が401になり、path/statusが記録されることを確認。次はiPhoneとDesktopで同一アカウントの作業同期を実行し、RPC path／statusを照合する。
+- 2026-10-25 Desktop–Mobile同一アカウント連携の切り分け：backend `EnsureUser`は一意な`(auth_provider, auth_subject)`をupsertし、`GetCurrentSession`は同じ業務User IDで作業を検索する。異なる認証session ID／operation IDでも同じsubjectが同じUser IDへ対応するloopback PostgreSQL統合testを追加し、稼働中のlocal DBでpass。Desktop全Go tests、backend全Go testsもpass。アプリ2台が実際に同じSupabase subject／project／API環境を使うE2Eは未確認。サーバーにHTTP method・RPC path・status・所要時間のみを出すログを追加し、Authorization／request bodyを記録しないtestを追加。`make -C backend up`でローカルAPIを再build・再起動し、`GET /healthz` HTTP 200、およびcredentialなしの`EnsureUser`が401になり、path/statusが記録されることを確認。次はiPhoneとDesktopで同一アカウントの作業同期を実行し、RPC path／statusを照合する。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -45,7 +45,7 @@
 ## デモで優先する連携確認
 
 - 仕様：アプリ間ペアリング操作はなく、両方が同一Supabase project・同一Authアカウント・同一backendを使えば、JWT `sub`から同じ`app.users.id`へ解決される。Desktopが開始した作業セッションをMobileが`GetCurrentSession`で読む。
-- 自動テスト：loopbackのマイグレーション済みPostgreSQLに限るopt-in統合testで、同一Supabase subjectを異なるoperation IDから`EnsureUser`した結果が同じ業務User IDであることを確認した。`IDENTITY_TEST_DATABASE_URL`なしの通常テストではskipされる。
+- 自動テスト：loopbackのマイグレーション済みPostgreSQLに限るopt-in統合testで、同一Supabase subjectを異なる認証session ID／operation IDから`EnsureUser`した結果が同じ業務User IDであることを確認した。`IDENTITY_TEST_DATABASE_URL`なしの通常テストではskipされる。
 - 実機受け入れ：DesktopとiPhoneの両方で同じメールを使うだけでなく、同じSupabase project URL／backend環境であることを確認する。両方をログアウト・ログインし、Desktopで作業を開始してからiPhoneのホームを更新（自動同期は前景中30秒間隔）し、同じ作業状態が表示されることを確認する。Mobileの「ログイン済み」だけでなくbackend同期成功が必要で、端末内利用を選んだ状態ではサーバー同期しない。
 - 切り分け：backendは各API requestについてmethod／RPC path／HTTP status／所要時間を記録する。`401`はAuth project／session、`404`はroute、`5xx`はserver/DB側を中心に確認する。token、request body、メールアドレスはログへ出さない。ローカルAPI更新後は`make -C backend up`で再ビルド・起動し、`docker compose --project-directory backend -f backend/compose.local.yaml logs --since=5m api`で確認する。
 - 未確認：2台から届くJWT subjectが同じか、実Auth user同期後の業務User IDが同じか、Desktopの開始セッションをMobileが受信するか。ここは同一環境を使ったE2Eを完了するまで「連携済み」と扱わない。

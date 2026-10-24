@@ -44,19 +44,27 @@ func TestEnsureUserReturnsSameBusinessUserForSameSupabaseSubject(t *testing.T) {
 
 	subject := uuid.New()
 	defer func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM app.identity_operations WHERE user_id IN (
+		if _, err := db.ExecContext(ctx, `DELETE FROM app.identity_operations WHERE user_id IN (
 			SELECT id FROM app.users WHERE auth_provider = 'supabase' AND auth_subject = $1
-		)`, subject)
-		_, _ = db.ExecContext(ctx, `DELETE FROM app.users WHERE auth_provider = 'supabase' AND auth_subject = $1`, subject)
+		)`, subject); err != nil {
+			t.Errorf("remove temporary identity operations: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM app.users WHERE auth_provider = 'supabase' AND auth_subject = $1`, subject); err != nil {
+			t.Errorf("remove temporary business user: %v", err)
+		}
 	}()
 
 	repository := New(db)
-	principal := application.Principal{Subject: subject.String(), SessionID: uuid.NewString()}
-	first, err := repository.EnsureUser(ctx, principal, uuid.NewString())
+	firstPrincipal := application.Principal{Subject: subject.String(), SessionID: uuid.NewString()}
+	secondPrincipal := application.Principal{Subject: subject.String(), SessionID: uuid.NewString()}
+	if firstPrincipal.SessionID == secondPrincipal.SessionID {
+		t.Fatal("test clients must use different authentication session IDs")
+	}
+	first, err := repository.EnsureUser(ctx, firstPrincipal, uuid.NewString())
 	if err != nil {
 		t.Fatalf("ensure user from first client session: %v", err)
 	}
-	second, err := repository.EnsureUser(ctx, principal, uuid.NewString())
+	second, err := repository.EnsureUser(ctx, secondPrincipal, uuid.NewString())
 	if err != nil {
 		t.Fatalf("ensure user from second client session: %v", err)
 	}
