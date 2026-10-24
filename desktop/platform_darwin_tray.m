@@ -29,7 +29,7 @@ static FocusLinkStatusController *focusLinkStatusController;
         return;
     }
 
-    _statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
+    _statusItem = [[[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength] retain];
     if (_statusItem == nil) {
         return;
     }
@@ -61,6 +61,7 @@ static FocusLinkStatusController *focusLinkStatusController;
 - (void)removeStatusItem {
     if (_statusItem != nil) {
         [[NSStatusBar systemStatusBar] removeStatusItem:_statusItem];
+        [_statusItem release];
         _statusItem = nil;
     }
 }

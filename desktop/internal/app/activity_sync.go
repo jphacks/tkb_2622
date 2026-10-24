@@ -509,6 +509,7 @@ func (a *App) markActivitySyncComplete() {
 	a.mu.Lock()
 	now := time.Now()
 	a.engine.SetSyncStatus("synced", now)
+	a.engine.SetCloudOperationPending(false, now)
 	state := a.engine.Snapshot()
 	a.persistLocked(now)
 	state = a.engine.Snapshot()

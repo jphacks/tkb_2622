@@ -4,6 +4,7 @@ import type { Result } from './bridge/types';
 import { DesktopStore } from './state/store';
 import { MacShell } from './platforms/macos/Shell';
 import { WindowsShell } from './platforms/windows/Shell';
+import { setWindowsContentSize } from './platforms/windows/window';
 import type { Page } from './components/Shell';
 import { SessionPage } from './pages/SessionPage';
 import { StartupPage } from './pages/StartupPage';
@@ -24,7 +25,7 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
     if (!snapshot || !isNative()) return;
     const active = snapshot.session && ['RUNNING', 'PAUSED'].includes(snapshot.session.status);
     const size = page !== 'session' ? [1080, 780] : showStartup ? [440, active ? 490 : 280] : active ? [360, 500] : [360, 580];
-    void import('../wailsjs/runtime/runtime').then(runtime => runtime.WindowSetSize(size[0], size[1]));
+    void import('../wailsjs/runtime/runtime').then(runtime => snapshot.platform === 'windows' ? setWindowsContentSize(runtime, size[0], size[1]) : runtime.WindowSetSize(size[0], size[1]));
   }, [page, showStartup, view.snapshot?.platform, view.snapshot?.session?.status]);
   useEffect(() => {
     if (view.snapshot && view.snapshot.settings.tasks.length === 0) {
@@ -63,7 +64,7 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
   const currentSession = state.session;
   const hasCurrentCloudBalance = state.account?.status === 'signedIn' && (currentSession?.serverVersion ?? 0) > 0 && ['RUNNING', 'PAUSED'].includes(currentSession?.status ?? '') && state.balanceSeconds !== null;
   const balanceLabel = hasCurrentCloudBalance ? duration(state.balanceSeconds ?? 0) : '—';
-  const body = openMain ? <Shell page={page} balanceLabel={balanceLabel} onNavigate={next => { setPage(next); setSelectedResult(null); }}><div className="page-content">{content}</div></Shell> : <div className={showStartup ? 'compact-window startup-window' : 'compact-window'}>{content}</div>;
+  const body = openMain ? <Shell page={page} balanceLabel={balanceLabel} onNavigate={next => { setPage(next); setSelectedResult(null); }}><div className="page-content">{content}</div></Shell> : <div className={`${showStartup ? 'compact-window startup-window' : 'compact-window'}${state.platform === 'windows' ? ' windows' : ''}`}>{content}</div>;
   return <>{(error || state.failure) && <div className="error-banner" role="alert">{error || state.failure?.message}{error && <button className="text-button" onClick={() => void store.connect()}>状態を再取得</button>}</div>}{body}<details hidden={isNative()} className="demo-tools"><summary>デモの状態を切り替えて確認する</summary><div className="demo-controls"><label>シナリオ<select defaultValue="" disabled={busy} onChange={event => { props.execute({ action: 'scenario', scenarioId: event.target.value }); setPage(event.target.value === 'result' ? 'feedback' : 'session'); setShowStartup(event.target.value === 'ready'); setSelectedResult(null); }}><option value="" disabled>確認したい状態を選択</option>{scenarios.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>プレビューするOS<select value={state.platform} onChange={event => { const url = new URL(window.location.href); url.searchParams.set('platform', event.target.value); window.location.assign(url); }}><option value="macos">Mac</option><option value="windows">Windows</option></select></label><button className="button" disabled={busy} onClick={() => props.execute({ action: 'connection' })}>{state.online ? 'オフラインを再現' : 'オンラインに戻す'}</button></div><p>デモ表示です。実際の計測・報酬・iPhone制限は未接続です。Go接続は終了時に初期化されます。ブラウザはデモ専用のローカル保存を使います。</p></details></>;
 }
 

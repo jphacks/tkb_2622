@@ -90,6 +90,7 @@ func EvaluateDetailed(records []monitor.Record, workSession session.WorkSession,
 		WorkSeconds: totals.task + totals.related, DistractedSeconds: totals.distraction,
 		UncertainSeconds: totals.unknown, InactiveSeconds: totals.inactive,
 		EvaluatorVersion: evaluated.EvaluatorVersion,
+		B100:             evaluated.B, Q: evaluated.Q, WorkRate: evaluated.WorkRate,
 	}
 	segments := make([]ActivitySegment, 0, len(evaluated.Segments))
 	for _, segment := range evaluated.Segments {
