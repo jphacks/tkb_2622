@@ -36,11 +36,15 @@ const (
 	// RewardServiceGetBalanceProcedure is the fully-qualified name of the RewardService's GetBalance
 	// RPC.
 	RewardServiceGetBalanceProcedure = "/reward.v1.RewardService/GetBalance"
+	// RewardServiceListTransactionsProcedure is the fully-qualified name of the RewardService's
+	// ListTransactions RPC.
+	RewardServiceListTransactionsProcedure = "/reward.v1.RewardService/ListTransactions"
 )
 
 // RewardServiceClient is a client for the reward.v1.RewardService service.
 type RewardServiceClient interface {
 	GetBalance(context.Context, *connect.Request[v1.GetBalanceRequest]) (*connect.Response[v1.GetBalanceResponse], error)
+	ListTransactions(context.Context, *connect.Request[v1.ListTransactionsRequest]) (*connect.Response[v1.ListTransactionsResponse], error)
 }
 
 // NewRewardServiceClient constructs a client for the reward.v1.RewardService service. By default,
@@ -58,12 +62,18 @@ func NewRewardServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			baseURL+RewardServiceGetBalanceProcedure,
 			opts...,
 		),
+		listTransactions: connect.NewClient[v1.ListTransactionsRequest, v1.ListTransactionsResponse](
+			httpClient,
+			baseURL+RewardServiceListTransactionsProcedure,
+			opts...,
+		),
 	}
 }
 
 // rewardServiceClient implements RewardServiceClient.
 type rewardServiceClient struct {
-	getBalance *connect.Client[v1.GetBalanceRequest, v1.GetBalanceResponse]
+	getBalance       *connect.Client[v1.GetBalanceRequest, v1.GetBalanceResponse]
+	listTransactions *connect.Client[v1.ListTransactionsRequest, v1.ListTransactionsResponse]
 }
 
 // GetBalance calls reward.v1.RewardService.GetBalance.
@@ -71,9 +81,15 @@ func (c *rewardServiceClient) GetBalance(ctx context.Context, req *connect.Reque
 	return c.getBalance.CallUnary(ctx, req)
 }
 
+// ListTransactions calls reward.v1.RewardService.ListTransactions.
+func (c *rewardServiceClient) ListTransactions(ctx context.Context, req *connect.Request[v1.ListTransactionsRequest]) (*connect.Response[v1.ListTransactionsResponse], error) {
+	return c.listTransactions.CallUnary(ctx, req)
+}
+
 // RewardServiceHandler is an implementation of the reward.v1.RewardService service.
 type RewardServiceHandler interface {
 	GetBalance(context.Context, *connect.Request[v1.GetBalanceRequest]) (*connect.Response[v1.GetBalanceResponse], error)
+	ListTransactions(context.Context, *connect.Request[v1.ListTransactionsRequest]) (*connect.Response[v1.ListTransactionsResponse], error)
 }
 
 // NewRewardServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -87,10 +103,17 @@ func NewRewardServiceHandler(svc RewardServiceHandler, opts ...connect.HandlerOp
 		svc.GetBalance,
 		opts...,
 	)
+	rewardServiceListTransactionsHandler := connect.NewUnaryHandler(
+		RewardServiceListTransactionsProcedure,
+		svc.ListTransactions,
+		opts...,
+	)
 	return "/reward.v1.RewardService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RewardServiceGetBalanceProcedure:
 			rewardServiceGetBalanceHandler.ServeHTTP(w, r)
+		case RewardServiceListTransactionsProcedure:
+			rewardServiceListTransactionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -102,4 +125,8 @@ type UnimplementedRewardServiceHandler struct{}
 
 func (UnimplementedRewardServiceHandler) GetBalance(context.Context, *connect.Request[v1.GetBalanceRequest]) (*connect.Response[v1.GetBalanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("reward.v1.RewardService.GetBalance is not implemented"))
+}
+
+func (UnimplementedRewardServiceHandler) ListTransactions(context.Context, *connect.Request[v1.ListTransactionsRequest]) (*connect.Response[v1.ListTransactionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("reward.v1.RewardService.ListTransactions is not implemented"))
 }

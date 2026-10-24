@@ -9,6 +9,7 @@ package rewardv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -232,11 +233,199 @@ func (x *GetBalanceResponse) GetBalance() *RewardBalance {
 	return nil
 }
 
+type RewardTransaction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	AmountSeconds int64                  `protobuf:"varint,4,opt,name=amount_seconds,json=amountSeconds,proto3" json:"amount_seconds,omitempty"`
+	BalanceAfter  int64                  `protobuf:"varint,5,opt,name=balance_after,json=balanceAfter,proto3" json:"balance_after,omitempty"`
+	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RewardTransaction) Reset() {
+	*x = RewardTransaction{}
+	mi := &file_reward_v1_reward_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RewardTransaction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RewardTransaction) ProtoMessage() {}
+
+func (x *RewardTransaction) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_v1_reward_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RewardTransaction.ProtoReflect.Descriptor instead.
+func (*RewardTransaction) Descriptor() ([]byte, []int) {
+	return file_reward_v1_reward_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RewardTransaction) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RewardTransaction) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RewardTransaction) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *RewardTransaction) GetAmountSeconds() int64 {
+	if x != nil {
+		return x.AmountSeconds
+	}
+	return 0
+}
+
+func (x *RewardTransaction) GetBalanceAfter() int64 {
+	if x != nil {
+		return x.BalanceAfter
+	}
+	return 0
+}
+
+func (x *RewardTransaction) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+type ListTransactionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTransactionsRequest) Reset() {
+	*x = ListTransactionsRequest{}
+	mi := &file_reward_v1_reward_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTransactionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTransactionsRequest) ProtoMessage() {}
+
+func (x *ListTransactionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_v1_reward_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTransactionsRequest.ProtoReflect.Descriptor instead.
+func (*ListTransactionsRequest) Descriptor() ([]byte, []int) {
+	return file_reward_v1_reward_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListTransactionsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListTransactionsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListTransactionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transactions  []*RewardTransaction   `protobuf:"bytes,1,rep,name=transactions,proto3" json:"transactions,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTransactionsResponse) Reset() {
+	*x = ListTransactionsResponse{}
+	mi := &file_reward_v1_reward_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTransactionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTransactionsResponse) ProtoMessage() {}
+
+func (x *ListTransactionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_reward_v1_reward_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTransactionsResponse.ProtoReflect.Descriptor instead.
+func (*ListTransactionsResponse) Descriptor() ([]byte, []int) {
+	return file_reward_v1_reward_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListTransactionsResponse) GetTransactions() []*RewardTransaction {
+	if x != nil {
+		return x.Transactions
+	}
+	return nil
+}
+
+func (x *ListTransactionsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_reward_v1_reward_proto protoreflect.FileDescriptor
 
 const file_reward_v1_reward_proto_rawDesc = "" +
 	"\n" +
-	"\x16reward/v1/reward.proto\x12\treward.v1\"\xa5\x01\n" +
+	"\x16reward/v1/reward.proto\x12\treward.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa5\x01\n" +
 	"\rRewardBalance\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12'\n" +
@@ -249,10 +438,27 @@ const file_reward_v1_reward_proto_rawDesc = "" +
 	"\x11discarded_seconds\x18\x03 \x01(\x03R\x10discardedSeconds\"\x13\n" +
 	"\x11GetBalanceRequest\"H\n" +
 	"\x12GetBalanceResponse\x122\n" +
-	"\abalance\x18\x01 \x01(\v2\x18.reward.v1.RewardBalanceR\abalance2Z\n" +
+	"\abalance\x18\x01 \x01(\v2\x18.reward.v1.RewardBalanceR\abalance\"\xdf\x01\n" +
+	"\x11RewardTransaction\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12%\n" +
+	"\x0eamount_seconds\x18\x04 \x01(\x03R\ramountSeconds\x12#\n" +
+	"\rbalance_after\x18\x05 \x01(\x03R\fbalanceAfter\x12;\n" +
+	"\voccurred_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\"U\n" +
+	"\x17ListTransactionsRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"\x84\x01\n" +
+	"\x18ListTransactionsResponse\x12@\n" +
+	"\ftransactions\x18\x01 \x03(\v2\x1c.reward.v1.RewardTransactionR\ftransactions\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\xb7\x01\n" +
 	"\rRewardService\x12I\n" +
 	"\n" +
-	"GetBalance\x12\x1c.reward.v1.GetBalanceRequest\x1a\x1d.reward.v1.GetBalanceResponseB<Z:github.com/jphacks/tkb_2622/backend/gen/reward/v1;rewardv1b\x06proto3"
+	"GetBalance\x12\x1c.reward.v1.GetBalanceRequest\x1a\x1d.reward.v1.GetBalanceResponse\x12[\n" +
+	"\x10ListTransactions\x12\".reward.v1.ListTransactionsRequest\x1a#.reward.v1.ListTransactionsResponseB<Z:github.com/jphacks/tkb_2622/backend/gen/reward/v1;rewardv1b\x06proto3"
 
 var (
 	file_reward_v1_reward_proto_rawDescOnce sync.Once
@@ -266,22 +472,30 @@ func file_reward_v1_reward_proto_rawDescGZIP() []byte {
 	return file_reward_v1_reward_proto_rawDescData
 }
 
-var file_reward_v1_reward_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_reward_v1_reward_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_reward_v1_reward_proto_goTypes = []any{
-	(*RewardBalance)(nil),      // 0: reward.v1.RewardBalance
-	(*RewardSummary)(nil),      // 1: reward.v1.RewardSummary
-	(*GetBalanceRequest)(nil),  // 2: reward.v1.GetBalanceRequest
-	(*GetBalanceResponse)(nil), // 3: reward.v1.GetBalanceResponse
+	(*RewardBalance)(nil),            // 0: reward.v1.RewardBalance
+	(*RewardSummary)(nil),            // 1: reward.v1.RewardSummary
+	(*GetBalanceRequest)(nil),        // 2: reward.v1.GetBalanceRequest
+	(*GetBalanceResponse)(nil),       // 3: reward.v1.GetBalanceResponse
+	(*RewardTransaction)(nil),        // 4: reward.v1.RewardTransaction
+	(*ListTransactionsRequest)(nil),  // 5: reward.v1.ListTransactionsRequest
+	(*ListTransactionsResponse)(nil), // 6: reward.v1.ListTransactionsResponse
+	(*timestamppb.Timestamp)(nil),    // 7: google.protobuf.Timestamp
 }
 var file_reward_v1_reward_proto_depIdxs = []int32{
 	0, // 0: reward.v1.GetBalanceResponse.balance:type_name -> reward.v1.RewardBalance
-	2, // 1: reward.v1.RewardService.GetBalance:input_type -> reward.v1.GetBalanceRequest
-	3, // 2: reward.v1.RewardService.GetBalance:output_type -> reward.v1.GetBalanceResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	7, // 1: reward.v1.RewardTransaction.occurred_at:type_name -> google.protobuf.Timestamp
+	4, // 2: reward.v1.ListTransactionsResponse.transactions:type_name -> reward.v1.RewardTransaction
+	2, // 3: reward.v1.RewardService.GetBalance:input_type -> reward.v1.GetBalanceRequest
+	5, // 4: reward.v1.RewardService.ListTransactions:input_type -> reward.v1.ListTransactionsRequest
+	3, // 5: reward.v1.RewardService.GetBalance:output_type -> reward.v1.GetBalanceResponse
+	6, // 6: reward.v1.RewardService.ListTransactions:output_type -> reward.v1.ListTransactionsResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_reward_v1_reward_proto_init() }
@@ -295,7 +509,7 @@ func file_reward_v1_reward_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_reward_v1_reward_proto_rawDesc), len(file_reward_v1_reward_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	q "github.com/jphacks/tkb_2622/backend/internal/reward/adapter/persistence/sqlc"
@@ -15,9 +17,12 @@ import (
 var ErrVersion = errors.New("reward wallet was modified concurrently")
 
 // Repository works on a *sql.DB or on the *sql.Tx of a workflow transaction.
-type Repository struct{ q *q.Queries }
+type Repository struct {
+	q  *q.Queries
+	db q.DBTX
+}
 
-func New(db q.DBTX) *Repository { return &Repository{q: q.New(db)} }
+func New(db q.DBTX) *Repository { return &Repository{q: q.New(db), db: db} }
 
 func nullID(s string) uuid.NullUUID {
 	if s == "" {
@@ -69,4 +74,31 @@ func (r *Repository) Summary(ctx context.Context, sessionID string) (domain.Summ
 		return domain.Summary{}, err
 	}
 	return domain.Summary{EarnedSeconds: s.Earned, SpentSeconds: s.Spent, DiscardedSeconds: s.Discarded}, nil
+}
+
+func (r *Repository) ListTransactions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]application.Transaction, error) {
+	query := `SELECT id, user_id, session_id, type, amount_seconds, source_id, balance_after, occurred_at
+FROM app.reward_transactions WHERE user_id = $1`
+	args := []any{uuid.MustParse(userID)}
+	if !before.IsZero() {
+		query += ` AND (occurred_at, id) < ($2, $3)`
+		args = append(args, before, uuid.MustParse(beforeID))
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(` ORDER BY occurred_at DESC, id DESC LIMIT $%d`, len(args))
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]application.Transaction, 0, limit)
+	for rows.Next() {
+		var tx application.Transaction
+		if err := rows.Scan(&tx.ID, &tx.UserID, &tx.SessionID, &tx.Type, &tx.AmountSeconds, &tx.SourceID, &tx.BalanceAfter, &tx.OccurredAt); err != nil {
+			return nil, err
+		}
+		tx.OccurredAt = tx.OccurredAt.UTC()
+		out = append(out, tx)
+	}
+	return out, rows.Err()
 }

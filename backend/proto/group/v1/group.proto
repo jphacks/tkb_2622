@@ -1,0 +1,53 @@
+syntax = "proto3";
+package group.v1;
+option go_package = "github.com/jphacks/tkb_2622/backend/gen/group/v1;groupv1";
+
+import "google/protobuf/timestamp.proto";
+
+service GroupService {
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse);
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
+}
+
+message GroupMember {
+  bool is_current_user = 1;
+  google.protobuf.Timestamp joined_at = 2;
+  string display_name = 3;
+}
+
+message Group {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  repeated GroupMember members = 4;
+}
+
+message ListGroupsRequest {}
+message ListGroupsResponse { repeated Group groups = 1; }
+message CreateGroupRequest {
+  string operation_id = 1;
+  string name = 2;
+}
+message CreateGroupResponse { Group group = 1; }
+message CreateInvitationRequest {
+  string operation_id = 1;
+  string group_id = 2;
+}
+message CreateInvitationResponse {
+  string invitation_id = 1;
+  string token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message AcceptInvitationRequest {
+  string operation_id = 1;
+  string token = 2;
+}
+message AcceptInvitationResponse { Group group = 1; }
+message LeaveGroupRequest {
+  string operation_id = 1;
+  string group_id = 2;
+}
+message LeaveGroupResponse { bool group_deleted = 1; }

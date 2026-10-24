@@ -90,6 +90,45 @@ struct ConnectJSONClient {
         }
         return try JSONDecoder().decode(responseType, from: data)
     }
+
+    func get<Response: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem],
+        responseType: Response.Type
+    ) async throws -> Response {
+        guard let accessToken = try await tokenProvider.accessToken(), !accessToken.isEmpty else {
+            throw ClientError.missingAccessToken
+        }
+
+        let endpoint = path.split(separator: "/").reduce(baseURL) {
+            $0.appendingPathComponent(String($1))
+        }
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw ClientError.invalidResponse
+        }
+        components.queryItems = queryItems
+        guard let url = components.url else {
+            throw ClientError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        guard let response = response as? HTTPURLResponse else {
+            throw ClientError.invalidResponse
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            if let connectError = try? JSONDecoder().decode(ConnectErrorResponse.self, from: data) {
+                throw ClientError.connect(code: connectError.code)
+            }
+            throw ClientError.httpStatus(response.statusCode)
+        }
+        return try JSONDecoder().decode(responseType, from: data)
+    }
 }
 
 extension ConnectJSONClient.ClientError: LocalizedError {

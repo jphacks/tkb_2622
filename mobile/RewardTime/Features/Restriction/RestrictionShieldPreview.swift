@@ -25,9 +25,10 @@ struct RestrictionShieldPreview: View {
 
             Spacer()
 
-            Text("FamilyControls未接続の画面プレビュー")
+            Text("静的な画面プレビューです。実際の制限表示は対象アプリを開いて確認してください。")
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondaryInk)
+                .multilineTextAlignment(.center)
                 .padding(.bottom, 28)
         }
         .padding(.horizontal, 28)
@@ -40,6 +41,6 @@ struct RestrictionShieldPreview: View {
 struct RestrictionShieldPreview_Previews: PreviewProvider {
     static var previews: some View {
         RestrictionShieldPreview()
-            .previewDisplayName("09 Shield画面案（静的プレビュー）")
+            .previewDisplayName("09 Shield（静的プレビュー）")
     }
 }

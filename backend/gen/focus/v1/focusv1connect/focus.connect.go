@@ -64,6 +64,9 @@ const (
 	FocusServiceGetCurrentSessionProcedure = "/focus.v1.FocusService/GetCurrentSession"
 	// FocusServiceGetSessionProcedure is the fully-qualified name of the FocusService's GetSession RPC.
 	FocusServiceGetSessionProcedure = "/focus.v1.FocusService/GetSession"
+	// FocusServiceListSessionsProcedure is the fully-qualified name of the FocusService's ListSessions
+	// RPC.
+	FocusServiceListSessionsProcedure = "/focus.v1.FocusService/ListSessions"
 	// FocusServiceGetSessionOperationProcedure is the fully-qualified name of the FocusService's
 	// GetSessionOperation RPC.
 	FocusServiceGetSessionOperationProcedure = "/focus.v1.FocusService/GetSessionOperation"
@@ -85,6 +88,7 @@ type FocusServiceClient interface {
 	AbortSession(context.Context, *connect.Request[v1.AbortSessionRequest]) (*connect.Response[v1.AbortSessionResponse], error)
 	GetCurrentSession(context.Context, *connect.Request[v1.GetCurrentSessionRequest]) (*connect.Response[v1.GetCurrentSessionResponse], error)
 	GetSession(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
+	ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	GetSessionOperation(context.Context, *connect.Request[v1.GetSessionOperationRequest]) (*connect.Response[v1.GetSessionOperationResponse], error)
 }
 
@@ -158,6 +162,11 @@ func NewFocusServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			baseURL+FocusServiceGetSessionProcedure,
 			opts...,
 		),
+		listSessions: connect.NewClient[v1.ListSessionsRequest, v1.ListSessionsResponse](
+			httpClient,
+			baseURL+FocusServiceListSessionsProcedure,
+			opts...,
+		),
 		getSessionOperation: connect.NewClient[v1.GetSessionOperationRequest, v1.GetSessionOperationResponse](
 			httpClient,
 			baseURL+FocusServiceGetSessionOperationProcedure,
@@ -180,6 +189,7 @@ type focusServiceClient struct {
 	abortSession        *connect.Client[v1.AbortSessionRequest, v1.AbortSessionResponse]
 	getCurrentSession   *connect.Client[v1.GetCurrentSessionRequest, v1.GetCurrentSessionResponse]
 	getSession          *connect.Client[v1.GetSessionRequest, v1.GetSessionResponse]
+	listSessions        *connect.Client[v1.ListSessionsRequest, v1.ListSessionsResponse]
 	getSessionOperation *connect.Client[v1.GetSessionOperationRequest, v1.GetSessionOperationResponse]
 }
 
@@ -243,6 +253,11 @@ func (c *focusServiceClient) GetSession(ctx context.Context, req *connect.Reques
 	return c.getSession.CallUnary(ctx, req)
 }
 
+// ListSessions calls focus.v1.FocusService.ListSessions.
+func (c *focusServiceClient) ListSessions(ctx context.Context, req *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
+	return c.listSessions.CallUnary(ctx, req)
+}
+
 // GetSessionOperation calls focus.v1.FocusService.GetSessionOperation.
 func (c *focusServiceClient) GetSessionOperation(ctx context.Context, req *connect.Request[v1.GetSessionOperationRequest]) (*connect.Response[v1.GetSessionOperationResponse], error) {
 	return c.getSessionOperation.CallUnary(ctx, req)
@@ -264,6 +279,7 @@ type FocusServiceHandler interface {
 	AbortSession(context.Context, *connect.Request[v1.AbortSessionRequest]) (*connect.Response[v1.AbortSessionResponse], error)
 	GetCurrentSession(context.Context, *connect.Request[v1.GetCurrentSessionRequest]) (*connect.Response[v1.GetCurrentSessionResponse], error)
 	GetSession(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error)
+	ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error)
 	GetSessionOperation(context.Context, *connect.Request[v1.GetSessionOperationRequest]) (*connect.Response[v1.GetSessionOperationResponse], error)
 }
 
@@ -333,6 +349,11 @@ func NewFocusServiceHandler(svc FocusServiceHandler, opts ...connect.HandlerOpti
 		svc.GetSession,
 		opts...,
 	)
+	focusServiceListSessionsHandler := connect.NewUnaryHandler(
+		FocusServiceListSessionsProcedure,
+		svc.ListSessions,
+		opts...,
+	)
 	focusServiceGetSessionOperationHandler := connect.NewUnaryHandler(
 		FocusServiceGetSessionOperationProcedure,
 		svc.GetSessionOperation,
@@ -364,6 +385,8 @@ func NewFocusServiceHandler(svc FocusServiceHandler, opts ...connect.HandlerOpti
 			focusServiceGetCurrentSessionHandler.ServeHTTP(w, r)
 		case FocusServiceGetSessionProcedure:
 			focusServiceGetSessionHandler.ServeHTTP(w, r)
+		case FocusServiceListSessionsProcedure:
+			focusServiceListSessionsHandler.ServeHTTP(w, r)
 		case FocusServiceGetSessionOperationProcedure:
 			focusServiceGetSessionOperationHandler.ServeHTTP(w, r)
 		default:
@@ -421,6 +444,10 @@ func (UnimplementedFocusServiceHandler) GetCurrentSession(context.Context, *conn
 
 func (UnimplementedFocusServiceHandler) GetSession(context.Context, *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("focus.v1.FocusService.GetSession is not implemented"))
+}
+
+func (UnimplementedFocusServiceHandler) ListSessions(context.Context, *connect.Request[v1.ListSessionsRequest]) (*connect.Response[v1.ListSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("focus.v1.FocusService.ListSessions is not implemented"))
 }
 
 func (UnimplementedFocusServiceHandler) GetSessionOperation(context.Context, *connect.Request[v1.GetSessionOperationRequest]) (*connect.Response[v1.GetSessionOperationResponse], error) {

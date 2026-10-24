@@ -8,7 +8,7 @@
 | --- | --- |
 | [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restrictionのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-| [mobile/](mobile/) | SwiftUIアプリの画面モック実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
+| [mobile/](mobile/) | SwiftUIアプリ。ホーム・認証・履歴・グループ・Screen TimeのAPI／OS連携を順次実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
 | [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
