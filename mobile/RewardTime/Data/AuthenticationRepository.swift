@@ -83,6 +83,10 @@ struct SupabaseAuthService: AccessTokenProviding {
     )
   }
 
+  init(client: SupabaseClient) {
+    self.client = client
+  }
+
   func sendEmailOTP(to email: String) async throws {
     try await client.auth.signInWithOTP(email: email, shouldCreateUser: true)
   }

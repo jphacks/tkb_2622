@@ -56,7 +56,7 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 
 backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。初回未認証時はログイン画面を表示し、ログインを後回しにした場合も端末内設定を利用できる。起動時に保存済みAuth sessionがあれば`EnsureUser`／`GetMe`でbackend上の業務Userを確認し、成功するまでログイン済みAPI画面へ進まない。同期失敗時はエラー・再試行・端末内利用・別アカウントでのログインを表示する。ホーム・グループ・履歴では必要に応じてログインへ案内する。Debugではログイン画面・設定画面からSupabase Project URL、publishable/anon key、Connect API URLを入力する。Releaseではログイン／ログアウトを使い、接続先は`Info-Release.plist`が参照する`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`のBuild Settings値から読む設計だが、現在のXcode projectにはこれらのRelease値を注入する`.xcconfig`／CI設定がないため、配布設定が必要。通常利用者にURLやキーを入力させる画面はReleaseに表示しない。値はアプリへ組み込まれるため、publishable/anon keyと公開可能なHTTPS API URLだけを設定する。secret keyやservice_role keyは設定しない。Desktop・iPhoneは同じSupabase project／メールアカウント／backend環境で同じ業務Userへ対応する設計で、ペアリングコードは不要。iPhoneにbackend端末IDが保存されている場合、ログアウト時は`ListDevices`／`RevokeDevice`で端末を失効し、`DeleteNotificationEndpoint`で通知先を解除してregistration IDを破棄した後にAuthセッションを消す。通信失敗時はoperation ID・端末ID・versionを保存し、同一操作を再試行できる状態を保つため、ログアウトは中断する。実環境の新規・既存アカウントE2E、端末失効付きログアウト、Release値注入・接続は未確認。`MockHomeRepository`はSwiftUI Preview専用。APNs token登録・解除、作業開始通知のOutbox・配信コードは実装済み。PC表示連携、Apple Push署名設定を伴う実機配信、本番の永続workerは未確認。
 
-認証の確認は初回起動時のログイン画面、または設定タブの「アカウント接続」から行う。DebugではProject URL、公開用キー、Connect API URLを入力する。ReleaseではXcodeのRewardTime targetのRelease Build Settingsへ`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`をUser-Defined設定として追加し、アプリをビルドする。Supabase URLとAPI URLにはHTTPSを指定する（ReleaseはHTTP接続を拒否）。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可する。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。起動時にAuth sessionがある場合も`EnsureUser`／`GetMe`が成功するまでAPI利用画面へ進まず、失敗時は再試行・端末内利用・別アカウントでのログインを選べる。ログインを後回しにした後は、グループ・履歴・ホームのログイン案内から再開できる。実機でMac上のAPIに接続する場合は、Debug API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
+認証の確認は初回起動時のログイン画面、または設定タブの「アカウント接続」から行う。Debugでは開発者がProject URL、公開用キー、Connect API URLを入力する。ReleaseではXcodeのRewardTime targetのRelease Build Settingsへ`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`をUser-Defined設定として追加し、アプリをビルドする。現状はRelease値を注入する`.xcconfig`／CI設定がないため、一般利用者へ入力を求めずに使える配布設定は未完成。Supabase URLとAPI URLにはHTTPSを指定する（ReleaseはHTTP接続を拒否）。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可し、登録済みメールも同じOTP導線を使う。Simulator testでは共通OTP routeと`create_user: true`、期限切れsessionのSupabase SDK自動refresh・新token保存をstub通信で確認した。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。起動時にAuth sessionがある場合も`EnsureUser`／`GetMe`が成功するまでAPI利用画面へ進まず、失敗時は再試行・端末内利用・別アカウントでのログインを選べる。ログインを後回しにした後は、グループ・履歴・ホームのログイン案内から再開できる。実機でMac上のAPIに接続する場合は、Debug API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
 
 未ログイン時はメールコードを送る前に、同梱の10種類からプロフィールアイコンを選べる。コード認証後に選択IDを本人のUserへ保存し、設定タブから変更できる。画像本体は`RewardTime/Avatars.xcassets`へ同梱し、DBにはカタログIDだけを保存する。
 
@@ -72,7 +72,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠のReserve／GetGrant／ReportUsage／予約operation照合のpath・認証header・ProtoJSON DTO・`not_found`保持、利用枠の確定拒否／結果不明時のoperation ID保持・破棄、サーバーで残高が減った後も保留予約を再試行できる条件を検証する。新規Simulatorで初回歓迎画面を目視したが、画面状態をassertするUI testと実Supabase OTP試験はない。
+Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で36件が通過し、Device失効、通知先削除、operation IDを保持した応答喪失後の再試行、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API、OTPの`create_user: true`、期限切れsession refreshを検証する。新規Simulatorで初回歓迎画面を目視したが、画面状態をassertするUI testと実Supabase OTP／Desktop同一アカウントE2Eはない。
 
 ## ソース構成
 
@@ -117,7 +117,7 @@ xcodebuild \
 - XcodeプロジェクトのSchemeとSimulatorを選び、ビルド・起動して対象画面を確認する。各画面のSwiftUI Previewでも状態を確認する。
 - 変更に対応するユニットテストまたは手動確認を追加し、空状態・通信失敗・期限切れなど該当する状態を確認する。
 - 実機制限の確認はシミュレータ画面確認と分け、[`poc/README.md`](../poc/README.md) の実機手順・記録に従う。
-- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止のユニットテストはSwift Packageで実行する。transport testsはBearer認証、Connect code、401／403、plain HTTP 404、REST Connect error、token欠落、通信断、timeout、JSON decode failureをmacOS host上で確認する。これらはiOS Simulator XCTestではなく、アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。Supabase SDKの失効session refreshとの結合は未確認。
+- Connect API transport、起動時認証分岐、APNs endpoint重複登録抑止の41件のユニットテストはSwift Packageで実行する。transport testsはBearer認証、Connect code、401／403、plain HTTP 404、REST Connect error、token欠落、通信断、timeout、JSON decode failureをmacOS host上で確認する。これらはiOS Simulator XCTestではなく、アプリのSimulator向けコンパイルは上の`xcodebuild`手順で別に確認する。Supabase SDK refresh testはSimulator上のstub応答を使用し、実Supabase接続は確認しない。
 
   ```sh
   swift test --package-path mobile/RewardTimeTests
