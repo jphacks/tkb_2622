@@ -31,7 +31,7 @@
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
 | 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない。コード上はendpoint登録前のDevice登録が保証されず、backendはregistration IDのDevice検索に失敗するとnot_foundを返すため、この経路も候補だった | 同一token重複抑止と「Device登録→通知先登録」の順序をXCTestで確認済み。以前のnot_foundとこの欠落が同一原因かは未確認。次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
-| Group作成時の`internal`／`not_found` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認。MobileのRPC名、camelCase field、Group protobuf Timestamp形式、work-startsのrequest query／snake_case responseはbackend handlerと一致し、明確なDTO不整合は見つからなかった | 発生時刻・画面操作・Connect codeと`CreateGroup`等のAPI要求受信／失敗ログ、migration状態を照合する。該当するbackend failureがない場合は、端末の接続先／ログ取得場所も確認する |
+| Group作成時の`internal`／`not_found`（過去に404報告もあり） | 現在のlocal API containerは稼働中。migration statusで1〜14がすべてapplied。認証なしの読み取り専用`ListGroups` probeはHTTP 401／Connect `unauthenticated`となり、現在のbackendにGroup routeがあることを確認。直近10分のAPI logsに要求・失敗記録はなく、過去エラーは再現していない。MobileのRPC名、camelCase field、Group protobuf Timestamp形式、work-startsのrequest query／snake_case responseはbackend handlerと一致し、明確なDTO不整合は見つからなかった | 以前の404は現在のbackendでは再現しない。次回は端末が向いているAPI URLとbackendログを同じ時刻で確認し、`CreateGroup` operation failureとSQLSTATEを照合する。現在の認証付き作成・migration前後の挙動は未確認 |
 
 発生時のサーバーログは次で絞る（プロジェクトrootから実行。migration状態は`make -C backend migrate-status`で読み取り確認）：
 
@@ -92,7 +92,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 ### P1 — 結合確認とドキュメント
 
-1. 最新migration・local Compose API・iOS Debug appの組み合わせで、認証付きAPIの往復を確認する。
+1. local Compose APIのmigration 1〜14適用を確認した（`make -C backend migrate-status`、status commandのみでmigration適用なし）。現在の`ListGroups` routeは存在するが、iOS Debug appとの認証付きAPI往復は引き続き未確認。
 2. APNsはendpoint登録、Outbox作成、配信、失効tokenを区別して確認する。配信試験はSandbox、登録済みrecipient、別メンバーによる新規作業開始を使う。
 3. 各修正後に`mobile/README.md`または該当仕様書へ実装状況・確認内容・残課題を記録する。
 4. 質問が必要になっても作業を止めず、決定が必要な理由・候補・安全な暫定方針を「未決事項」に書く。既存仕様で判断できる小さな点はその仕様に従う。
