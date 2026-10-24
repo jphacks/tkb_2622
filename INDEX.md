@@ -10,7 +10,7 @@
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
 | [mobile/](mobile/) | SwiftUIアプリの画面モック実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | インフラ構成の管理用 |
-| [poc/](poc/) | 必要な機能の PoC 用。[iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
+| [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
 ## 戦略資料
@@ -32,6 +32,8 @@
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | 途中報酬・小休憩，終了時の全未使用報酬破棄・制限解除，グループ・通知のモデルを記載 |
 | [iOSクライアント開発フロー](docs/spec/6.iOSクライアント開発フロー.md) | バックエンドAPI完成後のmobile接続順，開始条件，画面別API対応，iOS側の未決事項と担当を記載 |
 | [インフラ構成](docs/spec/2.インフラ構成.md) | 未記入（空ファイル） |
+| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLへの移行方針，接続・権限・環境設定を記載．移行未実施 |
+| [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
 
 ## UIモック
 

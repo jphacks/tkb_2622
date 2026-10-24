@@ -1,0 +1,38 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations/postgres
+    queries: internal/identity/adapter/persistence/queries.sql
+    gen:
+      go:
+        package: identitysql
+        out: internal/identity/adapter/persistence/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true
+  - engine: postgresql
+    schema: migrations/postgres
+    queries: internal/focus/adapter/persistence/queries.sql
+    gen:
+      go:
+        package: focussql
+        out: internal/focus/adapter/persistence/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true
+  - engine: postgresql
+    schema: migrations/postgres
+    queries: internal/reward/adapter/persistence/queries.sql
+    gen:
+      go:
+        package: rewardsql
+        out: internal/reward/adapter/persistence/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true
+  - engine: postgresql
+    schema: migrations/postgres
+    queries: internal/restriction/adapter/persistence/queries.sql
+    gen:
+      go:
+        package: restrictionsql
+        out: internal/restriction/adapter/persistence/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true

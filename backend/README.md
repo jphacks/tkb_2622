@@ -4,6 +4,10 @@ Go / `net/http`でHTTPとConnect互換のヘルスチェックを提供する最
 
 今後の業務実装は，6つの業務モジュールと横断処理のworkflowからなるモジュラーモノリスとし，各モジュール内でクリーンアーキテクチャの依存方向を守ります．目標のディレクトリ構成・責務・トランザクション境界は[バックエンド構成](../docs/spec/1.バックエンド構成.md)を参照してください．以下は現在実装済みの構成と起動手順です．
 
+## 採用方針の変更と移行状況
+
+目標構成は**Supabase Auth + Supabase PostgreSQL**へ変更しました．[認証構成](../docs/spec/6.認証構成.md)と[インフラ構成](../docs/spec/2.インフラ構成.md)を参照してください．コード・Docker Compose・SQLはまだSQLite／Turso向けです．以下の起動・デプロイ手順は現行実装用であり，Supabaseではそのまま実行できません．PostgreSQLの接続処理・マイグレーション・環境変数の移行後に手順を更新します．
+
 ## ローカル起動
 
 Docker Engine，Docker Compose v2，makeが必要です．ホストへのGoやDBのインストールは不要です．リポジトリルートから実行します．
@@ -29,8 +33,15 @@ HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を
 | `make -C backend build` | イメージをビルド |
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
+| `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
 
 SQLiteは名前付きボリューム`tkb-backend-local_sqlite-data`の`/data/app.db`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
+
+## APIドキュメント（Swagger UI）
+
+ローカル起動後，ブラウザで <http://localhost:8080/docs> を開くとRPCの一覧を確認・実行できます．仕様は`internal/docs/openapi.yaml`で，`make -C backend generate`がprotoから生成します．proto変更後は再生成してから`make -C backend up`で再ビルドしてください．
+
+RPCはSupabaseのアクセストークンが必要です．画面右上の「Authorize」にトークン（`Bearer`は不要）を入力してから「Try it out」で実行します．`/docs`は`API_DOCS_ENABLED=true`のときだけ公開し，`compose.local.yaml`でのみ有効にしています．
 
 ## 構成と環境変数
 
@@ -48,6 +59,7 @@ SQLiteは名前付きボリューム`tkb-backend-local_sqlite-data`の`/data/app
 | `SQLITE_PATH` | SQLiteのファイルパス．既定`app.db`，ローカルComposeでは`/data/app.db` |
 | `TURSO_DATABASE_URL` | libSQL互換Turso DBの`libsql://`または`https://` URL |
 | `TURSO_AUTH_TOKEN` | libSQL接続時に必須の認証トークン |
+| `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 
 Tursoは今回libSQL互換DBを対象とします．Tursoの別エンジンへの接続ドライバーは含みません．接続先や認証トークンをログへ出力しないよう，DBエラーは秘匿したメッセージに変換します．`.env`はコードから自動読み込みしません．必要な変数を実行環境から渡してください．
