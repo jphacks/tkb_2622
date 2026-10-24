@@ -8,8 +8,10 @@
 | --- | --- |
 | [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restrictionのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
+=======
 | [mobile/](mobile/) | SwiftUIアプリ。ホーム・認証・履歴・グループ・Screen TimeのAPI／OS連携を順次実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
 | [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
+>>>>>>> origin/main
 | [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
@@ -21,6 +23,7 @@
 | [機能・非機能要件](docs/strategy/2.機能-非機能要件.md) | アプリ・バックエンドの機能，品質要件案，受け入れシナリオ，未決事項を記載 |
 | [PoC戦略](docs/strategy/3.poc戦略.md) | 追加要件の実機検証計画を記載．検証は未実施 |
 | [機能分担戦略](docs/strategy/4.機能分担戦略.md) | 検討中：4人の担当案・責任の境界・並行開発の進め方を記載 |
+| [デスクトップアプリ配布](docs/strategy/5.デスクトップアプリ配布.md) | 検討中：OS別の配布形式，署名・公証，GitHub Releasesの運用，段階ごとの進め方を記載．配布用ビルド・CIは未実施 |
 
 ## 仕様資料
 
