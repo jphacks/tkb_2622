@@ -54,12 +54,9 @@ struct SupabaseAuthService: AccessTokenProviding {
     let client: SupabaseClient
 
     init(projectURL: URL, publishableKey: String) {
-        client = SupabaseClient(
-            supabaseURL: projectURL,
-            supabaseKey: publishableKey,
-            options: SupabaseClientOptions(
-                auth: .init(emitLocalSessionAsInitialSession: true)
-            )
+        client = SupabaseClientCache.shared.client(
+            projectURL: projectURL,
+            publishableKey: publishableKey
         )
     }
 
@@ -83,6 +80,38 @@ struct SupabaseAuthService: AccessTokenProviding {
 
     func signOutFromThisDevice() async throws {
         try await client.auth.signOut(scope: .local)
+    }
+}
+
+private final class SupabaseClientCache: @unchecked Sendable {
+    private struct Key: Hashable {
+        let projectURL: URL
+        let publishableKey: String
+    }
+
+    static let shared = SupabaseClientCache()
+
+    private let lock = NSLock()
+    private var clients: [Key: SupabaseClient] = [:]
+
+    func client(projectURL: URL, publishableKey: String) -> SupabaseClient {
+        let key = Key(projectURL: projectURL, publishableKey: publishableKey)
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let client = clients[key] {
+            return client
+        }
+
+        let client = SupabaseClient(
+            supabaseURL: projectURL,
+            supabaseKey: publishableKey,
+            options: SupabaseClientOptions(
+                auth: .init(emitLocalSessionAsInitialSession: true)
+            )
+        )
+        clients[key] = client
+        return client
     }
 }
 
