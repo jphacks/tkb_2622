@@ -32,17 +32,6 @@ private final class NotificationSettingsViewModel: ObservableObject {
         }
     }
 
-    var detail: String {
-        switch authorizationStatus {
-        case .notDetermined: "通知を使うにはiPhoneの許可が必要です。"
-        case .denied: "通知はiPhoneの設定で許可できます。"
-        case .authorized: "このアプリから通知を表示する許可があります。"
-        case .provisional: "通知は通知センターへ静かに表示されます。"
-        case .ephemeral: "通知の許可は一時的です。"
-        @unknown default: "iPhoneの通知設定を確認してください。"
-        }
-    }
-
     var symbol: String {
         switch authorizationStatus {
         case .notDetermined: "bell.badge"
@@ -72,14 +61,16 @@ struct NotificationSettingsView: View {
     var body: some View {
         ScreenContainer {
             SurfaceCard {
-                Label("iPhoneの通知許可", systemImage: model.symbol)
-                    .font(.headline)
-                    .foregroundStyle(model.isAllowed ? AppTheme.teal : AppTheme.primary)
+                HStack {
+                    Label("通知", systemImage: model.symbol)
+                        .font(.headline)
+                        .foregroundStyle(model.isAllowed ? AppTheme.teal : AppTheme.primary)
+                    Spacer()
+                    Text(model.title)
+                        .font(.subheadline.weight(.semibold))
+                }
 
-                Text(model.title)
-                    .font(.title3.weight(.bold))
-
-                Text(model.detail)
+                Text("アプリのお知らせ配信は準備中です。")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
 
@@ -104,27 +95,27 @@ struct NotificationSettingsView: View {
                 }
             }
 
-            SurfaceCard {
-                Label("通知配信は未接続です", systemImage: "info.circle")
-                    .font(.subheadline.weight(.bold))
-                Text("ここではiPhoneの通知許可だけを確認します。APNsの端末登録、グループ開始や報酬確定の配信、作業中の通知抑制はbackend未接続のため、通知は届きません。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            SurfaceCard {
-                Text("作業・報酬の履歴は、通知に頼らずアプリ内で確認できます。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
-            }
         }
         .task { await model.refresh() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model.refresh() } }
         }
-        .navigationTitle("通知設定")
+        .navigationTitle("通知")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct NotificationToolbarButton: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
+                Image(systemName: "bell")
+            }
+            .accessibilityLabel("通知")
+            .accessibilityIdentifier("notificationToolbarButton")
+        }
     }
 }
 
