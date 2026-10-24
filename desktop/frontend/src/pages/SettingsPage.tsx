@@ -260,26 +260,26 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
                 setAddingClassification(category);
               }}><span aria-hidden="true">＋</span>追加</button>
             </div>
+            {addingClassification === category && <div className="classification-form">
+              <div className="classification-form-fields">
+                <label>表示名<input autoFocus maxLength={200} placeholder="例：VS Code、github.com" value={classification.name} onChange={event => setClassification({ ...classification, name: event.target.value })} /></label>
+                <label>アプリID（Bundle ID）<input maxLength={256} placeholder="例：com.microsoft.VSCode" value={classification.appId ?? ''} onChange={event => setClassification({ ...classification, appId: event.target.value })} /></label>
+                <label>Domain（Chrome / Safari）<input maxLength={253} placeholder="例：github.com" value={classification.domain ?? ''} onChange={event => setClassification({ ...classification, domain: event.target.value })} /></label>
+                <label>分類<select value={classification.category} onChange={event => setClassification({ ...classification, category: event.target.value as Classification['category'] })}>
+                  {classificationCategories.map(formCategory => <option key={formCategory} value={formCategory}>{classificationCategoryLabels[formCategory]}</option>)}
+                </select></label>
+              </div>
+              <div className="classification-form-actions">
+                <button type="button" className="button" disabled={busy || !classificationFormValid} onClick={addClassification}>{editingClassificationName ? '変更を反映' : '追加'}</button>
+                <button type="button" className="text-button" onClick={() => {
+                  setClassification({ ...emptyClassification, category: classification.category });
+                  setEditingClassificationName(null);
+                  setAddingClassification(null);
+                }}>キャンセル</button>
+              </div>
+            </div>}
           </div>;
         })}
-        {addingClassification && <div className="classification-form">
-          <div className="classification-form-fields">
-            <label>表示名<input autoFocus maxLength={200} placeholder="例：VS Code、github.com" value={classification.name} onChange={event => setClassification({ ...classification, name: event.target.value })} /></label>
-            <label>アプリID（Bundle ID）<input maxLength={256} placeholder="例：com.microsoft.VSCode" value={classification.appId ?? ''} onChange={event => setClassification({ ...classification, appId: event.target.value })} /></label>
-            <label>Domain（Chrome / Safari）<input maxLength={253} placeholder="例：github.com" value={classification.domain ?? ''} onChange={event => setClassification({ ...classification, domain: event.target.value })} /></label>
-            <label>分類<select value={classification.category} onChange={event => setClassification({ ...classification, category: event.target.value as Classification['category'] })}>
-              {classificationCategories.map(category => <option key={category} value={category}>{classificationCategoryLabels[category]}</option>)}
-            </select></label>
-          </div>
-          <div className="classification-form-actions">
-            <button type="button" className="button" disabled={busy || !classificationFormValid} onClick={addClassification}>{editingClassificationName ? '変更を反映' : '追加'}</button>
-            <button type="button" className="text-button" onClick={() => {
-              setClassification({ ...emptyClassification, category: classification.category });
-              setEditingClassificationName(null);
-              setAddingClassification(null);
-            }}>キャンセル</button>
-          </div>
-        </div>}
         <p className="settings-note">照合はアプリIDとDomainの完全一致です。ブラウザーのサイトはDomainが必要です。ルールは作業開始時に固定します。既存のID未設定項目はU（不明）になります。設定はこのMacに保存されます。</p>
       </section>
       <section className="card settings-section">
