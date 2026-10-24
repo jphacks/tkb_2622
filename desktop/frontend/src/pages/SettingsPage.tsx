@@ -60,6 +60,11 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
         (classificationIsBrowser ? validDomain(classificationDomain) : !classificationDomain))),
   );
   const sessionActive = Boolean(state.session && ['RUNNING', 'PAUSED'].includes(state.session.status));
+  const classificationStatusMessage = candidateMessage || (candidateLoadState === 'loading'
+    ? '候補を読み込んでいます…'
+    : candidateLoadState === 'idle' && state.mode === 'local-monitor'
+      ? '読み取りボタンを押した後、5秒以内に登録したいアプリまたはサイトへ切り替えてください。作業計測は開始しません。'
+      : '');
   const mergeClassificationCandidate = (candidate: ClassificationCandidate) => {
     setClassificationCandidates(current => {
       const index = current.findIndex(item => item.appId.toLowerCase() === candidate.appId.toLowerCase() &&
@@ -98,7 +103,7 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
     } catch {
       setCandidateLoadState('error');
       setCandidateMessage(state.mode === 'local-monitor'
-        ? '読み取れませんでした。5秒後に対象アプリを前面にし、ブラウザーでは対象サイトを表示して再試行してください。'
+        ? '対象を読み取れませんでした。ボタンを押した後、5秒以内に対象アプリまたはサイトへ切り替えて再試行してください。'
         : 'デモ候補を取得できませんでした。');
     }
   };
@@ -219,12 +224,9 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
             </button>
           </div>
         </div>
-        {state.mode === 'local-monitor' && <p className="settings-note">読み取り開始後、5秒以内に登録したいアプリまたはサイトへ切り替えてください。作業計測は開始しません。</p>}
+        {classificationStatusMessage && <p className={`settings-note classification-status ${candidateLoadState === 'error' ? 'is-error' : ''}`} role={candidateLoadState === 'error' ? 'alert' : 'status'}>{classificationStatusMessage}</p>}
         {sessionActive && <p className="settings-note">作業中は現在のアプリを読み取れません。実測ログの候補は読み込めます。</p>}
         {candidatePanelOpen && <div className="classification-candidate-panel" aria-live="polite">
-          {candidateLoadState === 'loading' && <p className="settings-note" role="status">{candidateMessage || '実測ログを読み込んでいます…'}</p>}
-          {candidateLoadState === 'error' && <p className="settings-note" role="alert">{candidateMessage}</p>}
-          {candidateLoadState === 'loaded' && candidateMessage && <p className="settings-note" role="status">{candidateMessage}</p>}
           {candidateLoadState === 'loaded' && classificationCandidates.length === 0 && <p className="settings-note">候補はまだありません。現在のアプリを読み取るか、作業を実測してからログを読み込んでください。</p>}
           {(candidateLoadState === 'loaded' || candidateLoadState === 'error') && classificationCandidates.map(candidate => {
             const existing = findExistingClassification(candidate);

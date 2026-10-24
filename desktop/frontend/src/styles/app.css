@@ -272,6 +272,7 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .compact-settings h2 { margin: 14px 0 6px; }
 .classification-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .classification-toolbar .button { min-height: 38px; padding: 0 12px; }
+.classification-status.is-error { color: #B4421F; }
 .classification-group { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: start; gap: 14px; padding: 14px 0; border-top: 1px solid #F2F0FA; color: var(--muted); font-size: 13px; }
 .classification-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 66px; }
 .classification-group-heading > span { color: var(--ink); font-size: 13px; font-weight: 600; }
@@ -289,8 +290,8 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .classification-edit:hover { color: var(--accent-dark); background: rgba(255, 255, 255, .55); }
 .classification-add { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 66px; padding: 8px 14px; border: 1px dashed #B9B3CC; border-radius: 12px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 600; }
 .classification-add:hover { border-color: var(--accent); color: var(--accent-dark); background: #FBFAFF; }
-.classification-form { display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: #FBFAFF; }
-.classification-form-fields { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.3fr) minmax(200px, 1fr) minmax(160px, .8fr); align-items: start; gap: 12px; }
+.classification-form { display: flex; flex-direction: column; align-items: stretch; gap: 14px; margin-top: 12px; padding: 16px 0 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
+.classification-form-fields { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .8fr); align-items: start; gap: 12px; }
 .classification-form label { display: grid; grid-template-rows: minmax(20px, auto) 42px; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .classification-form input, .classification-form select { box-sizing: border-box; width: 100%; min-width: 0; height: 42px; }
 .classification-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -305,6 +306,6 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .candidate-copy small { overflow-wrap: anywhere; }
 .candidate-count, .candidate-category { flex: 0 0 auto; white-space: nowrap; }
 .classification-candidate .text-button { flex: 0 0 auto; }
-@media (max-width: 1000px) { .classification-group { grid-template-columns: 1fr; gap: 8px; } .classification-group-heading { min-height: 24px; } .classification-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1200px) { .classification-group { grid-template-columns: 1fr; gap: 8px; } .classification-group-heading { min-height: 24px; } .classification-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .settings-task-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .settings-task-form label:first-child, .settings-task-form button { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .app-shell { grid-template-columns: 1fr; } .sidebar { padding: 16px; } .sidebar-balance { display: none; } .main-navigation { flex-direction: row; flex-wrap: wrap; } .nav-item { width: auto; } .page-content { padding: 20px 16px; } .compact-window { align-items: flex-start; padding: 0; } .startup-panel { width: 100%; max-width: 440px; } .settings-section-heading { align-items: flex-start; flex-direction: column; } .classification-toolbar { width: 100%; flex-direction: column; } .classification-toolbar .button { width: 100%; } .classification-form-fields { grid-template-columns: 1fr; } .classification-form-actions { flex-direction: column-reverse; align-items: stretch; } .classification-form-actions .button, .classification-form-actions .text-button { width: 100%; } .classification-candidate { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 8px; } .candidate-copy { grid-column: 2 / 4; grid-row: 1; } .candidate-count { grid-column: 1 / 2; grid-row: 2; margin: 0; } .candidate-category { grid-column: 2 / 3; grid-row: 2; } .classification-candidate .text-button { grid-column: 3 / 4; grid-row: 2; margin: 0; } }
