@@ -21,6 +21,28 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   useEffect(() => { void store.connect(); return () => store.disconnect(); }, [store]);
   useEffect(() => {
+    if (!isNative()) return;
+    let cancelled = false;
+    let unsubscribe = () => {};
+    void import('../wailsjs/runtime/runtime').then(runtime => {
+      if (cancelled) return;
+      const offPage = runtime.EventsOn('desktop:open-page', (target: string) => {
+        if (target !== 'session' && target !== 'history' && target !== 'settings') return;
+        setPage(target);
+        setShowStartup(false);
+        setSelectedResult(null);
+      });
+      const offFeedback = runtime.EventsOn('desktop:show-feedback', (result: Result) => {
+        if (!result || typeof result.sessionId !== 'string') return;
+        setSelectedResult(result);
+        setShowStartup(false);
+        setPage('feedback');
+      });
+      unsubscribe = () => { offPage(); offFeedback(); };
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
+  useEffect(() => {
     const snapshot = view.snapshot;
     if (!snapshot || !isNative()) return;
     const active = snapshot.session && ['RUNNING', 'PAUSED'].includes(snapshot.session.status);

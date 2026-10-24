@@ -3,19 +3,24 @@
 #import <AppKit/AppKit.h>
 
 #include "platform_darwin_tray.h"
+#include "platform_darwin_popover.h"
 
-extern void FocusLinkShowWindow(void);
+extern void FocusLinkShowPopover(void);
+extern void FocusLinkOpenPage(char *page);
 extern void FocusLinkQuit(void);
 
 @interface FocusLinkStatusController : NSObject {
     NSStatusItem *_statusItem;
     NSMenu *_menu;
+    NSPopover *_popover;
 }
 
 - (void)installStatusItem;
 - (void)removeStatusItem;
 - (void)statusItemPressed:(id)sender;
 - (void)showWindow:(id)sender;
+- (void)presentPopover;
+- (void)closePopover;
 - (void)quitApplication:(id)sender;
 
 @end
@@ -45,17 +50,20 @@ static FocusLinkStatusController *focusLinkStatusController;
     } else {
         button.title = @"FL";
     }
-    button.toolTip = @"Focus Link（クリックで表示、右クリックでメニュー）";
+    button.toolTip = @"Focus Link（クリックで作業を開始・操作）";
     button.target = self;
     button.action = @selector(statusItemPressed:);
     [button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
 
     _menu = [[NSMenu alloc] initWithTitle:@"Focus Link"];
-    NSMenuItem *showItem = [_menu addItemWithTitle:@"表示" action:@selector(showWindow:) keyEquivalent:@""];
+    NSMenuItem *showItem = [_menu addItemWithTitle:@"ダッシュボードを開く" action:@selector(showWindow:) keyEquivalent:@""];
     showItem.target = self;
     [_menu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *quitItem = [_menu addItemWithTitle:@"終了" action:@selector(quitApplication:) keyEquivalent:@""];
     quitItem.target = self;
+
+    _popover = [[NSPopover alloc] init];
+    FocusLinkConfigurePopover(_popover);
 }
 
 - (void)removeStatusItem {
@@ -64,6 +72,9 @@ static FocusLinkStatusController *focusLinkStatusController;
         [_statusItem release];
         _statusItem = nil;
     }
+    [_popover close];
+    [_popover release];
+    _popover = nil;
 }
 
 - (void)statusItemPressed:(id)sender {
@@ -72,11 +83,27 @@ static FocusLinkStatusController *focusLinkStatusController;
         [NSMenu popUpContextMenu:_menu withEvent:event forView:_statusItem.button];
         return;
     }
-    FocusLinkShowWindow();
+    FocusLinkShowPopover();
 }
 
 - (void)showWindow:(id)sender {
-    FocusLinkShowWindow();
+    [self closePopover];
+    FocusLinkOpenPage("session");
+}
+
+- (void)presentPopover {
+    if (_statusItem == nil || _statusItem.button == nil || _popover == nil) {
+        return;
+    }
+    if (_popover.isShown) {
+        [_popover close];
+        return;
+    }
+    [_popover showRelativeToRect:_statusItem.button.bounds ofView:_statusItem.button preferredEdge:NSMinYEdge];
+}
+
+- (void)closePopover {
+    [_popover close];
 }
 
 - (void)quitApplication:(id)sender {
@@ -96,6 +123,18 @@ void FocusLinkInstallStatusItem(void) {
         if (focusLinkStatusController == nil) {
             focusLinkStatusController = [[FocusLinkStatusController alloc] init];
         }
-        [focusLinkStatusController performSelectorOnMainThread:@selector(installStatusItem) withObject:nil waitUntilDone:NO];
+        [focusLinkStatusController performSelectorOnMainThread:@selector(installStatusItem) withObject:nil waitUntilDone:YES];
+    }
+}
+
+void FocusLinkPresentPopover(void) {
+    @autoreleasepool {
+        [focusLinkStatusController performSelectorOnMainThread:@selector(presentPopover) withObject:nil waitUntilDone:NO];
+    }
+}
+
+void FocusLinkClosePopover(void) {
+    @autoreleasepool {
+        [focusLinkStatusController performSelectorOnMainThread:@selector(closePopover) withObject:nil waitUntilDone:NO];
     }
 }
