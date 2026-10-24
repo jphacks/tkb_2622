@@ -11,3 +11,6 @@ backend/bin/
 desktop/frontend/node_modules/
 desktop/frontend/dist/
 desktop/build/bin/
+
+# macOS Finder metadata
+.DS_Store
