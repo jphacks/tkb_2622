@@ -277,9 +277,20 @@ struct AuthenticationSettingsSection: View {
                 email = sessionEmail
                 lastEmail = sessionEmail
             }
+        } catch {
+            setMessage(
+                "保存済みのSupabaseログインを確認できませんでした: \(AuthenticationErrorMessage.describe(error))",
+                error: true
+            )
+            return
+        }
+        do {
             try await loadBusinessIdentity(using: service)
         } catch {
-            setMessage("保存済みのログインはありますが、backendへ同期できませんでした。接続設定を確認して再同期してください。", error: true)
+            setMessage(
+                "Supabaseログインは保存されていますが、backendのEnsureUser／GetMeに失敗しました: \(AuthenticationErrorMessage.describe(error))",
+                error: true
+            )
         }
     }
 
