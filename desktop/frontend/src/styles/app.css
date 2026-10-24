@@ -233,6 +233,8 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .settings-page .page-heading { margin-bottom: 0; }
 .settings-stack { display: flex; flex-direction: column; gap: 20px; }
 .settings-section { display: flex; flex-direction: column; gap: 14px; }
+.settings-save { display: flex; justify-content: center; }
+.settings-save .button { min-height: 48px; padding: 0 28px; border-radius: 12px; font-size: 15px; font-weight: 700; }
 .settings-stack > .settings-section:first-of-type { gap: 13px; }
 .settings-section h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .settings-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

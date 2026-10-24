@@ -52,6 +52,7 @@ export namespace session {
 	    scenarioId: string;
 	    task: Task;
 	    classification: Classification;
+	    settings: Settings;
 
 	    static createFrom(source: any = {}) {
 	        return new Command(source);
@@ -64,6 +65,7 @@ export namespace session {
 	        this.scenarioId = source["scenarioId"];
 	        this.task = this.convertValues(source["task"], Task);
 	        this.classification = this.convertValues(source["classification"], Classification);
+	        this.settings = this.convertValues(source["settings"], Settings);
 	    }
 
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

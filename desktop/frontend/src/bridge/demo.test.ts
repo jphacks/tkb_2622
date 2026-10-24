@@ -22,6 +22,23 @@ describe('DemoBridge', () => {
     vi.useRealTimers();
   });
 
+  it('設定画面の下書きを一括保存し、無効な設定は反映しない', async () => {
+    const bridge = new DemoBridge('macos');
+    const settings = {
+      tasks: [{ id: 'writing', name: '論文執筆', plannedSeconds: 7200, minimumSeconds: 3600 }],
+      selectedTaskId: 'writing',
+      classifications: [{ name: 'Notion', category: 'work' as const }],
+    };
+    let state = await bridge.execute({ action: 'saveSettings', settings });
+    expect(state.settings).toEqual(settings);
+    expect(state.failure).toBeNull();
+
+    state = await bridge.execute({ action: 'saveSettings', settings: { ...settings, tasks: [...settings.tasks, settings.tasks[0]] } });
+    expect(state.settings).toEqual(settings);
+    expect(state.failure?.code).toBe('invalid_input');
+    bridge.dispose();
+  });
+
   it('最小時間に達する前は終了できず、到達後は結果を確定する', async () => {
     const bridge = new DemoBridge('macos');
     await bridge.execute({ action: 'scenario', scenarioId: 'running' });

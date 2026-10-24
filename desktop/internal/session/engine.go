@@ -59,6 +59,45 @@ func (e *Engine) Tick(now time.Time) bool {
 	return true
 }
 
+func normalizeSettings(input Settings) (Settings, bool) {
+	settings := Settings{
+		SelectedTaskID:  strings.TrimSpace(input.SelectedTaskID),
+		Tasks:           make([]Task, len(input.Tasks)),
+		Classifications: make([]Classification, len(input.Classifications)),
+	}
+	taskIDs := make(map[string]struct{}, len(input.Tasks))
+	selectedTaskExists := false
+	for index, task := range input.Tasks {
+		task.ID = strings.TrimSpace(task.ID)
+		task.Name = strings.TrimSpace(task.Name)
+		if task.ID == "" || task.Name == "" || len([]rune(task.Name)) > 80 || task.MinimumSeconds < 1 || task.MinimumSeconds > 86400 || task.PlannedSeconds < task.MinimumSeconds || task.PlannedSeconds > 86400 {
+			return Settings{}, false
+		}
+		if _, exists := taskIDs[task.ID]; exists {
+			return Settings{}, false
+		}
+		taskIDs[task.ID] = struct{}{}
+		selectedTaskExists = selectedTaskExists || task.ID == settings.SelectedTaskID
+		settings.Tasks[index] = task
+	}
+	if len(settings.Tasks) == 0 || !selectedTaskExists {
+		return Settings{}, false
+	}
+	classificationNames := make(map[string]struct{}, len(input.Classifications))
+	for index, classification := range input.Classifications {
+		classification.Name = strings.TrimSpace(classification.Name)
+		if classification.Name == "" || len([]rune(classification.Name)) > 200 || (classification.Category != "work" && classification.Category != "distraction" && classification.Category != "uncertain") {
+			return Settings{}, false
+		}
+		if _, exists := classificationNames[classification.Name]; exists {
+			return Settings{}, false
+		}
+		classificationNames[classification.Name] = struct{}{}
+		settings.Classifications[index] = classification
+	}
+	return settings, true
+}
+
 func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 	e.Tick(now)
 	e.state.Failure = nil
@@ -134,6 +173,13 @@ func (e *Engine) Execute(command Command, now time.Time) Snapshot {
 		}
 	case "connection":
 		e.state.Online = !e.state.Online
+	case "saveSettings":
+		settings, valid := normalizeSettings(command.Settings)
+		if !valid {
+			e.fail("invalid_input", "設定内容を確認してください。", false)
+			break
+		}
+		e.state.Settings = settings
 	case "saveTask":
 		task := command.Task
 		task.Name = strings.TrimSpace(task.Name)

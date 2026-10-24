@@ -21,7 +21,8 @@ export type Command =
   | { action: 'scenario'; scenarioId: string }
   | { action: 'connection' }
   | { action: 'saveTask'; task: Task }
-  | { action: 'classification'; classification: Classification };
+  | { action: 'classification'; classification: Classification }
+  | { action: 'saveSettings'; settings: Settings };
 export interface DesktopBridge {
   getStartupState(): Promise<Snapshot>;
   execute(command: Command): Promise<Snapshot>;

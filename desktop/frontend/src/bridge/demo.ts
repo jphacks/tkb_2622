@@ -1,9 +1,29 @@
 import { defaultClassifications, defaultTask, defaultTasks, scenarios } from '../fixtures';
-import type { Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result } from './types';
+import type { Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result, Settings } from './types';
 
 const storageKey = 'focus-link.demo.v2';
 const terminal = (status: string) => status === 'FINALIZED' || status === 'ABORTED';
 const copy = <T,>(value: T): T => structuredClone(value);
+
+function normalizeSettings(input: Settings): Settings | null {
+  const settings = copy(input);
+  const taskIDs = new Set<string>();
+  for (const task of settings.tasks) {
+    task.id = task.id.trim();
+    task.name = task.name.trim();
+    if (!task.id || !task.name || [...task.name].length > 80 || !Number.isInteger(task.minimumSeconds) || task.minimumSeconds < 1 || task.minimumSeconds > 86400 || !Number.isInteger(task.plannedSeconds) || task.plannedSeconds < task.minimumSeconds || task.plannedSeconds > 86400 || taskIDs.has(task.id)) return null;
+    taskIDs.add(task.id);
+  }
+  if (settings.tasks.length === 0 || !taskIDs.has(settings.selectedTaskId.trim())) return null;
+  settings.selectedTaskId = settings.selectedTaskId.trim();
+  const classificationNames = new Set<string>();
+  for (const classification of settings.classifications) {
+    classification.name = classification.name.trim();
+    if (!classification.name || [...classification.name].length > 200 || !['work', 'distraction', 'uncertain'].includes(classification.category) || classificationNames.has(classification.name)) return null;
+    classificationNames.add(classification.name);
+  }
+  return settings;
+}
 
 // ブラウザ専用シミュレーター．実機ではGoの応答を使い，この判定を参照しない．
 export class DemoBridge implements DesktopBridge {
@@ -129,6 +149,12 @@ export class DemoBridge implements DesktopBridge {
         else if (session) session.evaluation = 'complete'; break;
       }
       case 'connection': this.state.online = !this.state.online; break;
+      case 'saveSettings': {
+        const settings = normalizeSettings(command.settings);
+        if (!settings) { this.fail('invalid_input', '設定内容を確認してください。'); break; }
+        this.state.settings = settings;
+        break;
+      }
       case 'saveTask': {
         const task = copy(command.task); task.name = task.name.trim();
         if (!task.name || [...task.name].length > 80 || !Number.isInteger(task.minimumSeconds) || task.minimumSeconds < 1 || task.minimumSeconds > 86400 || !Number.isInteger(task.plannedSeconds) || task.plannedSeconds < task.minimumSeconds || task.plannedSeconds > 86400) { this.fail('invalid_input', 'タスク名は1〜80文字、最小時間は1〜86400秒、予定時間は最小時間以上・86400秒以下で入力してください。'); break; }

@@ -95,4 +95,5 @@ type Command struct {
 	ScenarioID     string         `json:"scenarioId"`
 	Task           Task           `json:"task"`
 	Classification Classification `json:"classification"`
+	Settings       Settings       `json:"settings"`
 }
