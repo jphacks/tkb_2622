@@ -10,7 +10,7 @@
 | [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
 | [mobile/](mobile/) | スマホの使用を制限するアプリ用 |
 | [infra/](infra/) | インフラ構成の管理用 |
-| [poc/](poc/) | 必要な機能の PoC 用 |
+| [poc/](poc/) | 必要な機能の PoC 用。[iOS報酬時間PoC](poc/ios-reward-time/) と手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
 ## 戦略資料
