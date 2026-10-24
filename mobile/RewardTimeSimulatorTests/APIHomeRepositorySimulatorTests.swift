@@ -39,25 +39,36 @@ final class APIHomeRepositorySimulatorTests: XCTestCase {
         XCTAssertFalse(snapshot.isSampleData)
     }
 
-    func testOneFailedHomeAPIPropagatesConnectErrorWithoutPartialSnapshot() async {
-        APIHomeURLProtocol.handler = { request in
-            let method = request.url?.lastPathComponent ?? ""
-            if method == "GetBalance" {
-                return (500, #"{"code":"internal","message":"request failed"}"#)
-            }
-            if method == "GetCurrentSession" {
-                return (200, #"{"session":null}"#)
-            }
-            return (200, #"{"state":{"sessionId":"","deviceId":"","controlRevision":"0","desiredMode":"DESIRED_MODE_UNRESTRICTED","appliedRevision":"0","shieldStatus":"SHIELD_STATUS_UNSHIELDED","permissionStatus":"PERMISSION_STATUS_GRANTED"}}"#)
-        }
+    func testEachFailedHomeAPIIncludesItsOperationAndNeverReturnsPartialSnapshot() async {
+        let operations = [
+            (method: "GetCurrentSession", path: "focus.v1.FocusService/GetCurrentSession"),
+            (method: "GetBalance", path: "reward.v1.RewardService/GetBalance"),
+            (method: "GetRestrictionState", path: "restriction.v1.RestrictionService/GetRestrictionState"),
+        ]
 
-        do {
-            _ = try await repository().fetchCurrentSnapshot()
-            XCTFail("A partial Home response must not be returned")
-        } catch ConnectJSONClient.ClientError.connect(let code) {
-            XCTAssertEqual(code, "internal")
-        } catch {
-            XCTFail("Expected the Connect error, got \(error)")
+        for failedOperation in operations {
+            APIHomeURLProtocol.handler = { request in
+                let method = request.url?.lastPathComponent ?? ""
+                if method == failedOperation.method {
+                    return (500, #"{"code":"internal","message":"request failed"}"#)
+                }
+                switch method {
+                case "GetCurrentSession":
+                    return (200, #"{"session":null}"#)
+                case "GetBalance":
+                    return (200, #"{"balance":{"sessionId":"","balanceSeconds":"0"}}"#)
+                default:
+                    return (200, #"{"state":{"sessionId":"","deviceId":"","controlRevision":"0","desiredMode":"DESIRED_MODE_UNRESTRICTED","appliedRevision":"0","shieldStatus":"SHIELD_STATUS_UNSHIELDED","permissionStatus":"PERMISSION_STATUS_GRANTED"}}"#)
+                }
+            }
+
+            do {
+                _ = try await repository().fetchCurrentSnapshot()
+                XCTFail("A partial Home response must not be returned for \(failedOperation.method)")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+                XCTAssertTrue(error.localizedDescription.contains(failedOperation.path))
+            }
         }
     }
 
