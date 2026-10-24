@@ -76,3 +76,9 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+
+variable "origin_auth_token_version" {
+  description = "迂回防止用シークレットの版．値を上げると新しいシークレットを生成して入れ替える"
+  type        = number
+  default     = 1
+}

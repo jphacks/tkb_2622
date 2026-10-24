@@ -1,10 +1,6 @@
 output "api_url" {
   description = "クライアントが接続する API の URL"
-  value = (
-    local.use_custom_domain
-    ? "https://${var.hostname}"
-    : "https://${cloudflare_workers_script.proxy.script_name}.${var.workers_dev_subdomain}.workers.dev"
-  )
+  value       = "https://${cloudflare_workers_script_subdomain.proxy.script_name}.${var.workers_dev_subdomain}.workers.dev"
 }
 
 output "worker_name" {

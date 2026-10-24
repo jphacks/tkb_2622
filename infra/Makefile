@@ -7,7 +7,7 @@ TF = terraform -chdir="$(INFRA_DIR)$(STACK)"
 # bootstrap はローカル state，それ以外は envs/backend.hcl の GCS バケットを使う
 BACKEND_ARGS = $(if $(filter bootstrap,$(STACK)),,-backend-config="$(INFRA_DIR)envs/backend.hcl")
 
-.PHONY: setup init plan apply output fmt validate lock check-stack check-vars
+.PHONY: setup init plan apply output fmt validate test lock check-stack check-vars
 
 # terraform.tfvars・backend.hcl は .gitignore 済み．*.example から作成し，既存のファイルは上書きしない
 setup:
@@ -48,6 +48,10 @@ validate:
 		terraform -chdir="$(INFRA_DIR)$$s" init -backend=false -input=false >/dev/null && \
 		terraform -chdir="$(INFRA_DIR)$$s" validate -no-color || exit 1; \
 	done
+
+# Worker（WAF 相当の検査と転送）のユニットテスト．Node.js 22 以降の標準テストランナーを使う
+test:
+	node --test "$(INFRA_DIR)modules/cloudflare/api-endpoint/worker/proxy.test.js"
 
 # macOS / Linux の開発者が同じロックファイルを使えるようにする
 lock:

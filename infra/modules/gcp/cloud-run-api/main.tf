@@ -62,6 +62,37 @@ resource "google_secret_manager_secret_iam_member" "migrate_database_url" {
   member    = google_service_account.migrate.member
 }
 
+# ---------- 迂回防止用の共有シークレット ----------
+# Cloudflare Worker が X-Origin-Auth ヘッダーで付与し，API はこれがないリクエストを拒否する．
+# 値は ephemeral で生成して書き込み専用属性で投入するため，この state には残らない．
+# origin_auth_token_version を上げると新しい値を生成する（入れ替え）．
+
+ephemeral "random_password" "origin_auth_token" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret" "origin_auth_token" {
+  secret_id = "${local.name_prefix}-origin-auth-token"
+  labels    = local.labels
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "origin_auth_token" {
+  secret                 = google_secret_manager_secret.origin_auth_token.id
+  secret_data_wo         = ephemeral.random_password.origin_auth_token.result
+  secret_data_wo_version = var.origin_auth_token_version
+}
+
+resource "google_secret_manager_secret_iam_member" "api_origin_auth_token" {
+  secret_id = google_secret_manager_secret.origin_auth_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.api.member
+}
+
 # ---------- Cloud Run: API ----------
 
 resource "google_cloud_run_v2_service" "api" {
@@ -69,7 +100,8 @@ resource "google_cloud_run_v2_service" "api" {
   location = var.region
   labels   = local.labels
 
-  # Cloudflare Workers から run.app URL へ転送するため公開する．認証は API が JWT で行う．
+  # Cloudflare Workers から run.app URL へ転送するため公開する．認証は API が JWT で行い，
+  # Worker を経由しない直接アクセスは ORIGIN_AUTH_TOKEN の検証で拒否する．
   ingress              = "INGRESS_TRAFFIC_ALL"
   invoker_iam_disabled = true
   deletion_protection  = var.deletion_protection
@@ -115,6 +147,16 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+      env {
+        name = "ORIGIN_AUTH_TOKEN"
+        value_source {
+          secret_key_ref {
+            secret = google_secret_manager_secret.origin_auth_token.secret_id
+            # 版を固定し，入れ替え時に新しいリビジョンを作らせる
+            version = google_secret_manager_secret_version.origin_auth_token.version
+          }
+        }
+      }
     }
   }
 
@@ -127,7 +169,10 @@ resource "google_cloud_run_v2_service" "api" {
     ]
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.api_database_url]
+  depends_on = [
+    google_secret_manager_secret_iam_member.api_database_url,
+    google_secret_manager_secret_iam_member.api_origin_auth_token,
+  ]
 }
 
 # ---------- Cloud Run: マイグレーション Job ----------

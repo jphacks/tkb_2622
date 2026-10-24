@@ -27,3 +27,13 @@ output "secret_ids" {
   description = "値を投入する Secret の ID"
   value       = { for k, s in google_secret_manager_secret.this : k => s.secret_id }
 }
+
+output "origin_auth_token_secret_id" {
+  description = "迂回防止用シークレットの Secret ID（値は含まない）"
+  value       = google_secret_manager_secret.origin_auth_token.secret_id
+}
+
+output "origin_auth_token_secret_version" {
+  description = "Cloud Run が参照している迂回防止用シークレットの版番号"
+  value       = google_secret_manager_secret_version.origin_auth_token.version
+}

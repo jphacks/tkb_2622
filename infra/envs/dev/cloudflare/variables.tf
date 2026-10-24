@@ -4,24 +4,23 @@ variable "account_id" {
 }
 
 variable "workers_dev_subdomain" {
-  description = "アカウントの workers.dev サブドメイン名．hostname を指定しない場合に workers.dev で公開する"
+  description = "アカウントの workers.dev サブドメイン名（<name>.workers.dev の <name>）"
   type        = string
-  default     = null
-}
-
-variable "hostname" {
-  description = "カスタムドメインで公開する場合の API ホスト名．null なら workers.dev で公開する"
-  type        = string
-  default     = null
-}
-
-variable "zone_id" {
-  description = "hostname を置く Cloudflare ゾーン ID．hostname を指定する場合に必須"
-  type        = string
-  default     = null
 }
 
 variable "state_bucket" {
   description = "tfstate 用 GCS バケット名（envs/<env>/gcp の出力を読む）"
   type        = string
+}
+
+variable "rate_limit_requests" {
+  description = "1つの IP から rate_limit_period 秒の間に許可するリクエスト数"
+  type        = number
+  default     = 120
+}
+
+variable "rate_limit_period" {
+  description = "レート制限の集計期間（秒）．10 か 60"
+  type        = number
+  default     = 60
 }
