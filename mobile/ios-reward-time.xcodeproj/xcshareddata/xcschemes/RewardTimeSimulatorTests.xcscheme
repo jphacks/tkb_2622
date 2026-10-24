@@ -8,12 +8,18 @@
       <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B10000000000000000000035" BuildableName="RewardTimeSimulatorTests.xctest" BlueprintName="RewardTimeSimulatorTests" ReferencedContainer="container:ios-reward-time.xcodeproj" />
       </BuildActionEntry>
+      <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B10000000000000000000050" BuildableName="RewardTimeUITests.xctest" BlueprintName="RewardTimeUITests" ReferencedContainer="container:ios-reward-time.xcodeproj" />
+      </BuildActionEntry>
     </BuildActionEntries>
   </BuildAction>
   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES" shouldAutocreateTestPlan="YES">
     <Testables>
       <TestableReference skipped="NO" parallelizable="NO">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B10000000000000000000035" BuildableName="RewardTimeSimulatorTests.xctest" BlueprintName="RewardTimeSimulatorTests" ReferencedContainer="container:ios-reward-time.xcodeproj" />
+      </TestableReference>
+      <TestableReference skipped="NO" parallelizable="NO">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B10000000000000000000050" BuildableName="RewardTimeUITests.xctest" BlueprintName="RewardTimeUITests" ReferencedContainer="container:ios-reward-time.xcodeproj" />
       </TestableReference>
     </Testables>
   </TestAction>

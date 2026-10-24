@@ -56,6 +56,7 @@ struct AuthenticationSettingsSection: View {
           }
           .textFieldStyle(.roundedBorder)
           .font(.footnote)
+          .accessibilityIdentifier("developerConnectionSettings")
         }
       #else
         if hasConnectionConfiguration {
@@ -108,6 +109,7 @@ struct AuthenticationSettingsSection: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(AppTheme.primary)
+        .accessibilityIdentifier("sendEmailOTP")
         .disabled(
           isWorking
             || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
