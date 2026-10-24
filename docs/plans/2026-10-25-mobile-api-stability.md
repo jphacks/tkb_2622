@@ -6,9 +6,24 @@
 
 作業ブランチは`fix/mobile-api-stability`。作業単位でローカルコミットし、pushしない。
 
+## 初回調査で確認した現状
+
+- `RootTabView`は保存済みSupabase sessionを復元し、有効なら起動時のログイン画面を省略する。sessionがなく、ログインを後回しにした記録もなければ歓迎／ログイン画面を出す。
+- Mobile／DesktopともメールOTPを使い、Mobileは新規Auth user作成を許可する。OTP成功後、Mobileは`EnsureUser`と`GetMe`を呼び、Desktopも認証後に業務Userの確認を行う。同じSupabase project・backend環境・アカウントであれば同じsubjectから同じ業務Userへ対応する設計で、端末ペアリングコードはない。
+- Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plist／Build Settingsから公開設定値を読み、利用者の手入力を要求しない構造。Desktopは起動時の`FOCUS_LINK_*`環境変数を読む。Release値の実際の配布設定・環境一致は未確認。
+- 認証と業務User同期が分離している。起動時の`RootTabView`はSupabase sessionがあれば業務APIの`EnsureUser`／`GetMe`成功前でもauthenticated tabへ入れる。一方、業務User同期はアカウント画面で行われる。この場合、保存済みログインに見えてもGroup／History等でAPIエラーとなり得るため、起動時同期・再試行・状態表示のテスト対象にする。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できるが、現状XCTest target／shared schemeはない。通知画面のrefreshは画面表示、APNs token受信、認証変更、foreground復帰、手動再同期から別々に開始される。重複通信が実際にAPI失敗を起こすかは未検証で、テストなしに単一flight化などの変更はしない。
+
 ## 優先順位
 
 ### P0 — エラーを再現して直す
+
+0. **起動・認証・Desktop連携の導線を受け入れる**
+   - 初回起動で未ログインなら歓迎／ログイン画面が表示され、ログインを後回しにした場合は明示的なローカル利用になることを確認する。
+   - 新規メールと既存メールのOTPでSupabase Authへ入り、同じ環境のDesktopと同一の業務Userへ対応づくことを確認する。
+   - 保存済みAuth sessionの再起動後復元、refresh、失効・ログアウト、EnsureUser／GetMe失敗後の再試行を確認する。
+   - 利用者がSupabaseのkeyやAPI URLを手入力しなくてよいRelease設定経路と、Debug開発設定を分けて確認する。値自体は記録しない。
+   - DesktopとiPhoneのどちらもアカウント情報を入力する方式か、同一メールOTPで直接認証する方式かをコード／仕様で照合し、環境を揃える手順を記録する。
 
 1. **API経路の棚卸し**
    - Auth／EnsureUser／GetMe
@@ -22,7 +37,8 @@
 
 2. **再現・テスト基盤**
    - mobileにXCTestのtarget／schemeがあるか確認し、なければ最小のSimulator向けテストtargetを追加する。
-   - 候補seamはConnect JSON clientの`URLProtocol`差し替え、およびViewModelが依存するRepository protocol。実装を読んで最小の公開境界を選び、個別テストを始める前に本資料へ記録する。
+   - Connect JSON clientは`URLSession`を注入でき、transport test seamとして利用可能。初回test targetはAPI request／response境界に置く。
+   - 認証起動導線は`RootTabView`がSession有無だけで選択している。Supabase session復元と業務User同期は現在別画面に分かれており、起動時の失敗表示・再試行の一貫性を追加調査してから、必要ならstate/repository境界へ分ける。
    - 1つの失敗シナリオごとに、テストを先に追加して失敗を確認し、修正後に通す。
    - test用stubは通信応答を決定的に再現する目的だけに使い、アプリ機能でモックデータへ切り替える経路は作らない。
 
@@ -41,6 +57,11 @@
    - Group／Home／History／Restriction／UsageのRepository呼び出しを画面単位で追い、一覧・詳細・作成・retryの成功／失敗／empty stateを確認する。
    - エラー後に古い成功状態やモック値を成功として表示しない。
    - 失敗が見つかったら、再現テスト→最小修正→Simulator buildの順に縦切りで進める。
+
+6. **Desktopとの同一アカウント接続・設定配布**
+   - MobileとDesktopがメールOTPと同じSupabase project／backend環境を使い、検証済みSupabase subjectから同じ業務Userを引く経路を確認する。
+   - Releaseは公開可能なProject URL・publishable key・HTTPS API URLをアプリ設定へ組み込み、利用者にkey入力を要求しない。local DebugではMobileが開発設定を保存し、Desktopは起動環境変数を読むため、開発者向け手順は別記する。
+   - 新規／既存メール、環境不一致、片方だけログイン、片方ログアウト、Auth成功後のEnsureUser/GetMe失敗を確認する。
 
 ### P1 — 結合確認とドキュメント
 
@@ -78,6 +99,9 @@
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | 最小の公開境界をコード調査後に提案し、そこで決定的なSimulator testを書く | 調査前 |
-| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 画面別にログと実装から棚卸しし、特定できない場合は再現手順と必要情報を記録 | 調査前 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`に注入可能なURLSessionを使うAPI境界から始め、必要に応じて認証状態の公開境界を追加 | 決定 |
+| ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、API依存機能に成功済みと誤認させない。既存のローカル利用は維持 | 調査中 |
+| 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
+| Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
+| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 画面別にログと実装から棚卸しし、特定できない場合は再現手順と必要情報を記録 | 調査中 |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
