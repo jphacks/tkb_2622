@@ -2,51 +2,66 @@ import Foundation
 
 struct MobileHomeSnapshot {
     let sessionStatus: SessionStatus
-    let elapsedWorkMinutes: Int?
-    let minimumWorkMinutes: Int?
+    let elapsedMinutes: Int?
+    let minimumMinutes: Int?
     let rewardBalanceMinutes: Int
+    let desiredRestriction: DesiredRestrictionMode
     let restrictionStatus: RestrictionStatus
     let restrictedApps: [String]
+    let restrictedApplicationCount: Int?
     let lastSyncedAt: Date
+    let isSampleData: Bool
 
     static let workingSample = MobileHomeSnapshot(
         sessionStatus: .working,
-        elapsedWorkMinutes: 48,
-        minimumWorkMinutes: 60,
+        elapsedMinutes: 48,
+        minimumMinutes: 60,
         rewardBalanceMinutes: 32,
+        desiredRestriction: .shielded,
         restrictionStatus: .restricted,
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
-        lastSyncedAt: .now
+        restrictedApplicationCount: nil,
+        lastSyncedAt: .now,
+        isSampleData: true
     )
 
     static let pausedSample = MobileHomeSnapshot(
         sessionStatus: .paused,
-        elapsedWorkMinutes: 48,
-        minimumWorkMinutes: 60,
+        elapsedMinutes: 48,
+        minimumMinutes: 60,
         rewardBalanceMinutes: 42,
+        desiredRestriction: .shielded,
         restrictionStatus: .restricted,
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
-        lastSyncedAt: .now
+        restrictedApplicationCount: nil,
+        lastSyncedAt: .now,
+        isSampleData: true
     )
 
     static let releasedSample = MobileHomeSnapshot(
         sessionStatus: .paused,
-        elapsedWorkMinutes: 48,
-        minimumWorkMinutes: 60,
+        elapsedMinutes: 48,
+        minimumMinutes: 60,
         rewardBalanceMinutes: 32,
+        desiredRestriction: .timedUnlock,
         restrictionStatus: .temporarilyReleased(endsAt: .now.addingTimeInterval(10 * 60)),
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
-        lastSyncedAt: .now
+        restrictedApplicationCount: nil,
+        lastSyncedAt: .now,
+        isSampleData: true
     )
 
     static let noSessionSample = MobileHomeSnapshot(
         sessionStatus: .noSession,
-        elapsedWorkMinutes: nil,
-        minimumWorkMinutes: nil,
+        elapsedMinutes: nil,
+        minimumMinutes: nil,
         rewardBalanceMinutes: 0,
+        desiredRestriction: .unrestricted,
         restrictionStatus: .unrestricted,
         restrictedApps: [],
-        lastSyncedAt: .now
+        restrictedApplicationCount: nil,
+        lastSyncedAt: .now,
+        isSampleData: true
     )
 }
 
@@ -56,9 +71,18 @@ enum SessionStatus: Equatable {
     case paused
 }
 
+enum DesiredRestrictionMode {
+    case unrestricted
+    case shielded
+    case timedUnlock
+    case sessionEnded
+    case unknown
+}
+
 enum RestrictionStatus {
     case unrestricted
     case restricted
-    case temporarilyReleased(endsAt: Date)
+    case temporarilyReleased(endsAt: Date?)
     case notConfirmed
+    case failed
 }

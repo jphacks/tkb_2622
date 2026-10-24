@@ -1,0 +1,255 @@
+import FamilyControls
+import Foundation
+
+struct APIHomeRepository: HomeRepository {
+    private struct EmptyRequest: Encodable {}
+
+    private struct CurrentSessionResponse: Decodable {
+        let session: SessionDTO?
+    }
+
+    private struct SessionDTO: Decodable {
+        let id: String
+        let status: String
+        let taskSnapshot: TaskSettingsDTO?
+        let durations: DurationsDTO?
+    }
+
+    private struct TaskSettingsDTO: Decodable {
+        let minimumSeconds: ProtoJSONInt64?
+    }
+
+    private struct DurationsDTO: Decodable {
+        let activeMillis: ProtoJSONInt64?
+    }
+
+    private struct BalanceResponse: Decodable {
+        let balance: BalanceDTO
+    }
+
+    private struct BalanceDTO: Decodable {
+        let sessionId: String
+        let balanceSeconds: ProtoJSONInt64
+
+        private enum CodingKeys: String, CodingKey { case sessionId, balanceSeconds }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId) ?? ""
+            balanceSeconds = try container.decodeIfPresent(ProtoJSONInt64.self, forKey: .balanceSeconds)
+                ?? ProtoJSONInt64(value: 0)
+        }
+    }
+
+    private struct RestrictionStateResponse: Decodable {
+        let state: RestrictionStateDTO
+    }
+
+    private struct RestrictionStateDTO: Decodable {
+        let sessionId: String
+        let controlRevision: ProtoJSONInt64
+        let desiredMode: String
+        let appliedRevision: ProtoJSONInt64
+        let shieldStatus: String
+
+        private enum CodingKeys: String, CodingKey {
+            case sessionId, controlRevision, desiredMode, appliedRevision, shieldStatus
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId) ?? ""
+            controlRevision = try container.decodeIfPresent(ProtoJSONInt64.self, forKey: .controlRevision)
+                ?? ProtoJSONInt64(value: 0)
+            desiredMode = try container.decodeIfPresent(String.self, forKey: .desiredMode)
+                ?? "DESIRED_MODE_UNSPECIFIED"
+            appliedRevision = try container.decodeIfPresent(ProtoJSONInt64.self, forKey: .appliedRevision)
+                ?? ProtoJSONInt64(value: 0)
+            shieldStatus = try container.decodeIfPresent(String.self, forKey: .shieldStatus)
+                ?? "SHIELD_STATUS_UNSPECIFIED"
+        }
+    }
+
+    private let client: ConnectJSONClient
+    private let selectedApplicationCount: Int
+
+    init(baseURL: URL, auth: any AccessTokenProviding, selectedApplicationCount: Int) {
+        client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
+        self.selectedApplicationCount = selectedApplicationCount
+    }
+
+    func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
+        async let sessionResponse: CurrentSessionResponse = client.call(
+            service: "focus.v1.FocusService",
+            method: "GetCurrentSession",
+            requestBody: EmptyRequest(),
+            responseType: CurrentSessionResponse.self
+        )
+        async let balanceResponse: BalanceResponse = client.call(
+            service: "reward.v1.RewardService",
+            method: "GetBalance",
+            requestBody: EmptyRequest(),
+            responseType: BalanceResponse.self
+        )
+        async let restrictionResponse: RestrictionStateResponse = client.call(
+            service: "restriction.v1.RestrictionService",
+            method: "GetRestrictionState",
+            requestBody: EmptyRequest(),
+            responseType: RestrictionStateResponse.self
+        )
+
+        let (session, balance, restriction) = try await (
+            sessionResponse.session,
+            balanceResponse.balance,
+            restrictionResponse.state
+        )
+
+        try validateSessionIDs(
+            currentSessionID: session?.id,
+            balanceSessionID: balance.sessionId,
+            restrictionSessionID: restriction.sessionId
+        )
+
+        return MobileHomeSnapshot(
+            sessionStatus: try sessionStatus(session?.status),
+            elapsedMinutes: session.map {
+                Int(max(0, ($0.durations?.activeMillis?.value ?? 0) / 60_000))
+            },
+            minimumMinutes: session?.taskSnapshot?.minimumSeconds.map {
+                Int(max(0, $0.value / 60))
+            },
+            rewardBalanceMinutes: Int(max(0, balance.balanceSeconds.value / 60)),
+            desiredRestriction: desiredRestrictionMode(restriction.desiredMode),
+            restrictionStatus: appliedRestrictionStatus(restriction),
+            restrictedApps: [],
+            restrictedApplicationCount: selectedApplicationCount,
+            lastSyncedAt: .now,
+            isSampleData: false
+        )
+    }
+
+    private func sessionStatus(_ status: String?) throws -> SessionStatus {
+        guard let status else { return .noSession }
+        switch status {
+        case "SESSION_STATUS_RUNNING": return .working
+        case "SESSION_STATUS_PAUSED": return .paused
+        default: throw APIHomeRepositoryError.unexpectedSessionStatus
+        }
+    }
+
+    private func desiredRestrictionMode(_ mode: String) -> DesiredRestrictionMode {
+        switch mode {
+        case "DESIRED_MODE_UNRESTRICTED": .unrestricted
+        case "DESIRED_MODE_SHIELDED": .shielded
+        case "DESIRED_MODE_TIMED_UNLOCK": .timedUnlock
+        case "DESIRED_MODE_SESSION_ENDED": .sessionEnded
+        default: .unknown
+        }
+    }
+
+    private func appliedRestrictionStatus(_ state: RestrictionStateDTO) -> RestrictionStatus {
+        guard state.appliedRevision.value >= state.controlRevision.value else {
+            return .notConfirmed
+        }
+        if state.shieldStatus == "SHIELD_STATUS_ERROR" { return .failed }
+
+        switch state.desiredMode {
+        case "DESIRED_MODE_SHIELDED":
+            return state.shieldStatus == "SHIELD_STATUS_SHIELDED" ? .restricted : .notConfirmed
+        case "DESIRED_MODE_TIMED_UNLOCK":
+            return state.shieldStatus == "SHIELD_STATUS_UNSHIELDED"
+                ? .temporarilyReleased(endsAt: nil)
+                : .notConfirmed
+        case "DESIRED_MODE_UNRESTRICTED", "DESIRED_MODE_SESSION_ENDED":
+            return state.shieldStatus == "SHIELD_STATUS_UNSHIELDED" ? .unrestricted : .notConfirmed
+        default:
+            return .notConfirmed
+        }
+    }
+
+    private func validateSessionIDs(
+        currentSessionID: String?,
+        balanceSessionID: String,
+        restrictionSessionID: String
+    ) throws {
+        let ids = [currentSessionID, balanceSessionID, restrictionSessionID]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        guard Set(ids).count <= 1 else {
+            throw APIHomeRepositoryError.inconsistentSessionIDs
+        }
+    }
+}
+
+private struct ProtoJSONInt64: Decodable {
+    let value: Int64
+
+    init(value: Int64) {
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let string = try? container.decode(String.self), let value = Int64(string) {
+            self.value = value
+        } else if let value = try? container.decode(Int64.self) {
+            self.value = value
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected a protobuf JSON int64")
+        }
+    }
+}
+
+private enum APIHomeRepositoryError: Error {
+    case inconsistentSessionIDs
+    case unexpectedSessionStatus
+}
+
+struct ConfiguredHomeRepository: HomeRepository {
+    func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
+        let defaults = UserDefaults.standard
+        let projectURLText = defaults.string(forKey: "mobile.supabase.projectURL") ?? ""
+        let publishableKey = defaults.string(forKey: "mobile.supabase.publishableKey") ?? ""
+        let apiBaseURLText = defaults.string(forKey: "mobile.api.baseURL") ?? "http://127.0.0.1:8080"
+
+        if projectURLText.isEmpty && publishableKey.isEmpty {
+#if DEBUG
+            return try await MockHomeRepository().fetchCurrentSnapshot()
+#else
+            throw HomeRepositoryConfigurationError.missingConfiguration
+#endif
+        }
+
+        guard let projectURL = Self.validatedURL(projectURLText),
+              !publishableKey.isEmpty,
+              !publishableKey.localizedCaseInsensitiveContains("service_role"),
+              !publishableKey.localizedCaseInsensitiveContains("secret"),
+              let apiBaseURL = Self.validatedURL(apiBaseURLText) else {
+            throw HomeRepositoryConfigurationError.invalidConfiguration
+        }
+
+        let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
+        let selectionData = defaults.data(forKey: "mobile.screenTime.selection")
+        let selectedApplicationCount = selectionData
+            .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
+            .map { $0.applicationTokens.count } ?? 0
+
+        return try await APIHomeRepository(
+            baseURL: apiBaseURL,
+            auth: auth,
+            selectedApplicationCount: selectedApplicationCount
+        ).fetchCurrentSnapshot()
+    }
+
+    private static func validatedURL(_ text: String) -> URL? {
+        guard let url = URL(string: text),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              url.host != nil else { return nil }
+        return url
+    }
+}
+
+private enum HomeRepositoryConfigurationError: Error {
+    case missingConfiguration
+    case invalidConfiguration
+}

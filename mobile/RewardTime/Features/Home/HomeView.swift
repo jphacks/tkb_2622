@@ -3,13 +3,15 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel: HomeViewModel
 
-    init(repository: any HomeRepository = MockHomeRepository()) {
+    init(repository: any HomeRepository = ConfiguredHomeRepository()) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
     }
 
     var body: some View {
         ScreenContainer {
-            SampleNotice(title: "サンプルデータ・API未接続")
+            if case .loaded(let snapshot) = viewModel.state, snapshot.isSampleData {
+                SampleNotice(title: "サンプルデータ・API未接続")
+            }
 
 #if DEBUG
             previewControls
@@ -34,7 +36,7 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Label("サンプル \(viewModel.lastUpdatedTime)", systemImage: "clock")
+                Label(viewModel.lastUpdatedLabel, systemImage: "clock")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
                     .labelStyle(.titleAndIcon)
@@ -102,15 +104,15 @@ struct HomeView: View {
                 Text("計測時間")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(AppTheme.secondaryInk)
-                Text(formattedWorkTime(snapshot.elapsedWorkMinutes))
+                Text(formattedWorkTime(snapshot.elapsedMinutes))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(AppTheme.ink)
                     .accessibilityIdentifier("elapsedWorkTime")
             }
 
-            if let elapsed = snapshot.elapsedWorkMinutes,
-               let minimum = snapshot.minimumWorkMinutes {
+            if let elapsed = snapshot.elapsedMinutes,
+               let minimum = snapshot.minimumMinutes {
                 let remaining = max(minimum - elapsed, 0)
                 Text(remaining > 0
                      ? "最小作業時間 \(minimum)分 まで あと \(remaining)分"
@@ -163,7 +165,7 @@ struct HomeView: View {
                 Text("制限中のアプリ")
                     .font(.subheadline.weight(.bold))
                 Spacer()
-                Text("\(snapshot.restrictedApps.count)個")
+                Text("\(snapshot.restrictedApplicationCount ?? snapshot.restrictedApps.count)個")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppTheme.primary)
                     .padding(.horizontal, 10)
@@ -172,9 +174,17 @@ struct HomeView: View {
             }
 
             if snapshot.restrictedApps.isEmpty {
-                Text("制限対象のアプリはありません。")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.secondaryInk)
+                if let count = snapshot.restrictedApplicationCount, count > 0 {
+                    Text("選択したアプリ名はAppleのプライバシー保護により表示できません。")
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                } else {
+                    Text(snapshot.restrictedApplicationCount == nil
+                         ? "制限対象のアプリはありません。"
+                         : "この端末では制限するアプリが選ばれていません。")
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
                     ForEach(snapshot.restrictedApps, id: \.self) { app in
@@ -197,8 +207,15 @@ struct HomeView: View {
 
     private func restrictionStateCard(_ snapshot: MobileHomeSnapshot) -> some View {
         SurfaceCard {
-            Label("iPhoneの適用状態", systemImage: "lock.iphone")
+            Label("サーバーが要求する制限", systemImage: "server.rack")
                 .font(.subheadline.weight(.bold))
+
+            Text(desiredRestrictionLabel(snapshot.desiredRestriction))
+                .font(.footnote.weight(.medium))
+
+            Label("iPhoneでの適用状態", systemImage: "lock.iphone")
+                .font(.subheadline.weight(.bold))
+                .padding(.top, 4)
 
             switch snapshot.restrictionStatus {
             case .unrestricted:
@@ -208,16 +225,34 @@ struct HomeView: View {
                 Text("制限中")
                     .foregroundStyle(AppTheme.teal)
             case .temporarilyReleased(let endsAt):
-                Text("一時解除中・終了予定 \(endsAt.formatted(date: .omitted, time: .shortened))")
-                    .foregroundStyle(AppTheme.teal)
+                if let endsAt {
+                    Text("一時解除中・終了予定 \(endsAt.formatted(date: .omitted, time: .shortened))")
+                        .foregroundStyle(AppTheme.teal)
+                } else {
+                    Text("一時解除中")
+                        .foregroundStyle(AppTheme.teal)
+                }
             case .notConfirmed:
                 Text("iPhoneでの適用を確認できていません")
                     .foregroundStyle(AppTheme.secondaryInk)
+            case .failed:
+                Text("iPhoneでの適用に失敗しました。設定を確認してください。")
+                    .foregroundStyle(.red)
             }
 
-            Text("サーバーの希望状態とiPhoneでの適用確認は分けて表示します。")
+            Text("サーバーの要求とiPhoneから報告された適用状態を分けて表示します。")
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondaryInk)
+        }
+    }
+
+    private func desiredRestrictionLabel(_ mode: DesiredRestrictionMode) -> String {
+        switch mode {
+        case .unrestricted: "制限解除を要求"
+        case .shielded: "制限を要求"
+        case .timedUnlock: "利用枠の間、一時解除を要求"
+        case .sessionEnded: "作業終了後の制限解除を要求"
+        case .unknown: "サーバーの要求状態を確認できません"
         }
     }
 

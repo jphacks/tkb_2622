@@ -18,6 +18,11 @@ final class HomeViewModel: ObservableObject {
         return snapshot.lastSyncedAt.formatted(date: .omitted, time: .shortened)
     }
 
+    var lastUpdatedLabel: String {
+        guard case .loaded(let snapshot) = state else { return "未同期" }
+        return "\(snapshot.isSampleData ? "サンプル" : "同期") \(lastUpdatedTime)"
+    }
+
     init(repository: any HomeRepository) {
         self.repository = repository
     }

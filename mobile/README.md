@@ -15,9 +15,9 @@
 1. **モック・仕様の対応を確認する**：対象画面、対応要件、状態ごとの表示、未決事項を [`docs/UI/README.md`](../docs/UI/README.md) で確認する。
 2. **アプリの土台を作る**：SwiftUIの起動・画面遷移と、画面が依存する状態・データの境界を用意する。
 3. **ホーム画面を仮データで表示する**：セッション状態、残高、制限状態を読み取り専用で表示する。仮データはリポジトリ経由で渡し、後から通信実装に置き換えられるようにする。
-4. **API契約が確定した範囲を接続する**：APIクライアントとリポジトリを実装し、通信中・失敗・未同期を画面で区別する。認証方式など未決の契約をアプリ内で決めない。
+4. **API契約が確定した範囲を接続する**：`APIHomeRepository` は現行proto案の読み取りAPIを呼び、session IDの食い違いを検出する。Connect DTOとstagingの実データ確認、版の整合規則は引き続き確認する。
 5. **小休憩の利用フローを接続する**：PAUSED中の利用枠確保、利用状態表示、実利用の報告をAPI契約に沿って扱う。終了・中止時は未使用残高を破棄する。
-6. **制限機能を独立して検証・接続する**：制限の要求状態とiPhoneでの適用確認を区別する。FamilyControls / ManagedSettings の実装・権限追加は、必要なPoCと配布条件を確認し、対象作業として合意してから行う。
+6. **制限機能を独立して検証・接続する**：制限の要求状態とiPhoneでの適用確認を区別する。設定画面で本人認可・対象アプリ選択を行い、DebugではManagedSettingsのShieldを手動適用・解除できる。セッション状態に応じた自動適用と利用時間計測は、実機検証・配布条件・DeviceActivityのPoCを確認してから接続する。
 
 ## 依存の境界
 
@@ -39,21 +39,21 @@ HomeRepository（ホーム情報取得の境界）
 
 ## 現在の実装
 
-`ios-reward-time.xcodeproj` にSwiftUIアプリを作成し、モック08〜14に対応する画面を配置した。値は仮データで、画面にはサンプルであることを表示する。
+`ios-reward-time.xcodeproj` にSwiftUIアプリを作成し、モック08〜14に対応する画面を配置した。ホームはAPI設定がある場合に読み取りAPIへ接続し、Debugで未設定なら仮データを表示する。
 
 | モック | 実装場所・現在の動作 |
 | --- | --- |
-| 08 作業中ホーム | `Features/Home/HomeView.swift`。計測時間、最小時間までの残り、報酬残高、制限対象アプリ、適用状態を表示。小休憩へ進めるのは一時停止中だけ |
-| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビューのみ。OSのShield表示・アプリ制限は行わない。Debugビルドのホームから開ける |
+| 08 作業中ホーム | `Features/Home/HomeView.swift`, `Data/APIHomeRepository.swift`。`GetCurrentSession`、`GetBalance`、`GetRestrictionState`から計測時間、残高、制限要求と適用状態を取得。Debugで接続設定がない場合は仮データ表示。小休憩へ進めるのは一時停止中だけ |
+| 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`。見た目の静的プレビュー。設定画面からFamilyControlsで認可・アプリ選択を行い、Debugでは選択したアプリにOSのShieldを手動適用・解除できる。セッション状態に応じた自動制御は未接続 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。時間を選べるが、確保API未接続のため残高は変更しない |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。モック値の表示のみ。残り時間の計測・再制限は行わない |
-| 12 設定 | `Features/Settings/SettingsView.swift`。許可・制限モード・アプリ選択・端末情報を表示。端末設定を変える操作は未接続 |
+| 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択を実装し、選択tokenは端末内に保存。モード・端末同期は未接続 |
 | 13 グループ | `Features/Groups/GroupView.swift`。サンプルメンバーと作業開始履歴を表示。招待・退出は未接続 |
 | 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く通知例。通知送信はしない |
 
-08モックの「作業を終了した後も残高を使える」ように読める箇所は、API仕様に合わせて「一時停止中のみ利用枠を確保できる」表示にしている。終了・中止時は未使用残高を破棄する。09の実ShieldはiOSが表示するOS画面であり、FamilyControls未接続の現状ではアプリから適用できない。Debugビルドから開けるのは静的な見た目のプレビューだけ。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進め、10から11のサンプル表示を開ける。同じ選択メニューの「通信エラー」で失敗表示と再読み込み導線を確認できるが、実際の通信は発生しない。履歴タブは08モック内にタブ表示があるため置いているが、専用モックと履歴APIがないため説明用の空状態にしている。
+08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可とアプリ選択、Debugでの手動Shield確認は本番アプリ側にも追加した。自動適用・解除と利用時間計測は、API同期とDeviceActivityの実機検証後に実装する。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進め、10から11のサンプル表示を開ける。同じ選択メニューの「通信エラー」で失敗表示と再読み込み導線を確認できるが、実際の通信は発生しない。履歴タブは08モック内にタブ表示があるため置いているが、専用モックと履歴APIがないため説明用の空状態にしている。
 
-backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。Debug設定画面にSupabase Project URL、publishable/anon key、Connect API URLを入力すると、OTP認証後に`EnsureUser`と`GetMe`を呼び出せる。Supabase URL・キー・OTPメール設定、staging JWT検証は利用者のプロジェクト設定が必要で、まだ接続確認していない。Swift DTOのproto JSON対応・更新責任も未決（詳細は[開発フロー](../docs/spec/6.iOSクライアント開発フロー.md)）。そのためホームを含む業務データは引き続き`MockHomeRepository`から表示し、残高消費、OS制限、通知配信、グループ更新、履歴取得は実APIへ接続していない。
+backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。Debug設定画面にSupabase Project URL、publishable/anon key、Connect API URLを入力すると、OTP認証後に`EnsureUser`と`GetMe`を呼び出せる。Supabase URL・キー・OTPメール設定、staging JWT検証は利用者のプロジェクト設定が必要で、まだ接続確認していない。Swift DTOのproto JSON対応・更新責任も未決（詳細は[開発フロー](../docs/spec/6.iOSクライアント開発フロー.md)）。`MockHomeRepository`はPreview・Debugの未設定時表示として残し、実APIへの切り替えはSupabase接続設定と有効なAuth sessionがある場合に行う。残高消費、OS制限の自動適用、通知配信、グループ更新、履歴取得は実APIへ接続していない。
 
 認証の確認はSimulatorまたは実機でアプリの「設定」タブを開き、「アカウント接続」にProject URL、公開用キー、Connect API URLを入力する。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可する。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。実機でMac上のAPIに接続する場合は、API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
 

@@ -1,7 +1,10 @@
 import SwiftUI
+import FamilyControls
 
 struct SettingsView: View {
-    private let appNames = MobileHomeSnapshot.workingSample.restrictedApps
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var screenTime = MobileScreenTimeController()
+    @State private var isFamilyActivityPickerPresented = false
 
     var body: some View {
         ScreenContainer {
@@ -16,14 +19,63 @@ struct SettingsView: View {
                 HStack {
                     Text("本人の許可")
                     Spacer()
-                    Text("未接続")
+                    Text(screenTime.authorizationStatusLabel)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.secondaryInk)
+                        .foregroundStyle(screenTime.isAuthorized ? AppTheme.teal : AppTheme.secondaryInk)
                 }
-                Button("許可状態を設定") { }
-                    .buttonStyle(.bordered)
-                    .disabled(true)
-                Text("端末の制限設定はScreen Time連携の検証後に実装します。")
+
+                if screenTime.isAuthorized {
+                    Text("許可後は下の「アプリ」から制限対象を選べます。")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+
+                    if screenTime.hasUnsupportedTargets {
+                        Text("現在はアプリだけを制限できます。選択画面でカテゴリとWebサイトを外してください。")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                } else {
+                    Button {
+                        Task { await screenTime.requestAuthorization() }
+                    } label: {
+                        Label(
+                            screenTime.isRequestingAuthorization ? "許可を確認中…" : "本人利用の許可を求める",
+                            systemImage: "hand.raised")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.primary)
+                    .disabled(screenTime.isRequestingAuthorization)
+                }
+
+#if DEBUG
+                Divider()
+                Text("実機確認用")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.secondaryInk)
+                Button("選択したアプリを制限") {
+                    screenTime.applySelectedAppsForDebug()
+                }
+                .disabled(!screenTime.canApplySelectedApps)
+                Button("このアプリの制限を解除", role: .destructive) {
+                    screenTime.clearShieldForDebug()
+                }
+                .disabled(!screenTime.isAuthorized)
+#endif
+
+                if let statusMessage = screenTime.statusMessage {
+                    Label(statusMessage, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let errorMessage = screenTime.errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text("アプリの選択はこの端末内に保存します。Shieldの自動適用はセッション状態APIとの接続後に有効になります。")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
             }
@@ -57,19 +109,21 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("制限するアプリ")
                             .font(.subheadline.weight(.semibold))
-                        Text(appNames.joined(separator: "・"))
+                        Text(screenTime.isAuthorized ? "FamilyActivityPickerで選択したアプリ" : "スクリーンタイムの許可後に選べます")
                             .font(.caption)
                             .foregroundStyle(AppTheme.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    Text("\(appNames.count)個")
+                    Text("\(screenTime.selectedApplicationCount)個")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppTheme.primary)
                 }
-                Button("アプリを選ぶ") { }
+                Button("アプリを選ぶ") {
+                    isFamilyActivityPickerPresented = true
+                }
                     .buttonStyle(.bordered)
-                    .disabled(true)
+                    .disabled(!screenTime.isAuthorized)
                 Divider()
                 VStack(alignment: .leading, spacing: 5) {
                     Text("いつでも使えるアプリ")
@@ -115,6 +169,14 @@ struct SettingsView: View {
         }
         .navigationTitle("設定")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { screenTime.refreshAuthorizationStatus() }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { screenTime.refreshAuthorizationStatus() }
+        }
+        .familyActivityPicker(
+            isPresented: $isFamilyActivityPickerPresented,
+            selection: $screenTime.selection
+        )
     }
 
     private func sectionTitle(_ title: String, icon: String) -> some View {
