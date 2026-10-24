@@ -23,10 +23,6 @@ struct HomeView: View {
   var body: some View {
     ScreenContainer {
       if isAuthenticated {
-        if case .loaded(let snapshot) = viewModel.state, snapshot.isSampleData {
-          SampleNotice(title: "サンプルデータ・API未接続")
-        }
-
         switch viewModel.state {
         case .loading:
           ProgressView("状態を読み込み中…")
@@ -51,14 +47,6 @@ struct HomeView: View {
     }
     .navigationTitle("Focus Link")
     .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .navigationBarTrailing) {
-        Label(viewModel.lastUpdatedLabel, systemImage: "clock")
-          .font(.caption)
-          .foregroundStyle(AppTheme.secondaryInk)
-          .labelStyle(.titleAndIcon)
-      }
-    }
     .task {
       if isAuthenticated, case .loading = viewModel.state {
         await loadAndReconcile()

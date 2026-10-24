@@ -52,6 +52,7 @@ struct RootTabView: View {
       NavigationStack {
         HomeView(
           screenTime: screenTime, isAuthenticated: isAuthenticated, requestSignIn: showWelcome)
+          .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("ホーム", systemImage: "house") }
       .tag(0)
@@ -62,18 +63,21 @@ struct RootTabView: View {
           isAuthenticated: isAuthenticated,
           requestSignIn: showWelcome
         )
+        .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("グループ", systemImage: "person.2") }
       .tag(1)
 
       NavigationStack {
         HistoryView(isAuthenticated: isAuthenticated, requestSignIn: showWelcome)
+          .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("履歴", systemImage: "chart.bar") }
       .tag(2)
 
       NavigationStack {
         SettingsView(screenTime: screenTime)
+          .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("設定", systemImage: "gearshape") }
       .tag(3)

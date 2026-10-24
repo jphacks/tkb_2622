@@ -2,6 +2,8 @@ import Supabase
 import SwiftUI
 
 struct AuthenticationSettingsSection: View {
+  var showsHeading = true
+  var showsDeveloperConfiguration = false
   var onAuthenticationChanged: () -> Void = {}
   @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
   @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
@@ -23,22 +25,21 @@ struct AuthenticationSettingsSection: View {
 
   var body: some View {
     SurfaceCard {
-      Label("アカウント接続", systemImage: "person.crop.circle.badge.checkmark")
-        .font(.subheadline.weight(.bold))
-
-      Text("メールに届く確認コードでログインします。ログイン後はアカウント状態をbackendと同期します。")
-        .font(.caption)
-        .foregroundStyle(AppTheme.secondaryInk)
+      if showsHeading {
+        Label("アカウント", systemImage: "person.crop.circle")
+          .font(.subheadline.weight(.bold))
+      }
 
       #if DEBUG
-        Group {
+        if showsDeveloperConfiguration {
+          DisclosureGroup("開発者向け接続設定") {
           TextField("Supabase Project URL", text: $projectURLText)
             .keyboardType(.URL)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("supabaseProjectURL")
 
-          TextField("Supabase publishable key", text: $publishableKey)
+          TextField("Supabase公開キー", text: $publishableKey)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("supabasePublishableKey")
@@ -48,28 +49,19 @@ struct AuthenticationSettingsSection: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("connectAPIBaseURL")
+          }
+          .textFieldStyle(.roundedBorder)
+          .font(.footnote)
         }
-        .textFieldStyle(.roundedBorder)
-        .font(.footnote)
-
-        Text(
-          "公開用キーだけを入力してください。service_role / secret keyは入力しないでください。実機でMac上のbackendを使う場合、API URLにはMacのLAN IPを指定します（127.0.0.1はiPhone自身です）。"
-        )
-        .font(.caption2)
-        .foregroundStyle(AppTheme.secondaryInk)
       #else
         if hasConnectionConfiguration {
-          Label("アプリの接続設定を使用します", systemImage: "checkmark.circle.fill")
+          Label("接続済み", systemImage: "checkmark.circle.fill")
             .font(.caption)
             .foregroundStyle(AppTheme.teal)
         } else {
-          Label(
-            "アプリの接続設定がありません。SUPABASE_PROJECT_URL、SUPABASE_PUBLISHABLE_KEY、CONNECT_API_BASE_URLをReleaseのBuild Settingsに設定してください。",
-            systemImage: "exclamationmark.triangle.fill"
-          )
-          .font(.caption)
+          Label("接続設定がありません", systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
           .foregroundStyle(.red)
-          .fixedSize(horizontal: false, vertical: true)
         }
       #endif
 
@@ -119,13 +111,8 @@ struct AuthenticationSettingsSection: View {
           Button {
             Task { await verifyOTP() }
           } label: {
-            #if DEBUG
-              Label("ログインして業務Userを確認", systemImage: "checkmark.shield")
-                .frame(maxWidth: .infinity, minHeight: 42)
-            #else
-              Label("ログイン", systemImage: "checkmark.shield")
-                .frame(maxWidth: .infinity, minHeight: 42)
-            #endif
+            Label("ログイン", systemImage: "checkmark.shield")
+              .frame(maxWidth: .infinity, minHeight: 42)
           }
           .buttonStyle(.bordered)
           .disabled(isWorking || !EmailOTPInput.isPlausibleCode(EmailOTPInput.normalizedCode(otp)))
@@ -157,18 +144,9 @@ struct AuthenticationSettingsSection: View {
   @ViewBuilder
   private func identityView(_ identity: MobileIdentity) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      #if DEBUG
-        Label("認証済み・業務User取得済み", systemImage: "checkmark.circle.fill")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(AppTheme.teal)
-        Text("User ID: \(identity.id)")
-        Text("状態: \(identity.status)")
-        Text("作成日時: \(identity.createdAt)")
-      #else
-        Label("ログイン済み", systemImage: "checkmark.circle.fill")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(AppTheme.teal)
-      #endif
+      Label("ログイン済み", systemImage: "checkmark.circle.fill")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(AppTheme.teal)
       Text("グループに表示する名前")
         .font(.caption.weight(.semibold))
       TextField("1〜30文字", text: $displayNameDraft)
@@ -185,14 +163,6 @@ struct AuthenticationSettingsSection: View {
           || displayNameDraft == identity.displayName)
 
       HStack {
-        #if DEBUG
-          Button("業務Userを再取得") {
-            Task { await loadBusinessIdentity() }
-          }
-          .buttonStyle(.bordered)
-          .disabled(isWorking)
-        #endif
-
         Button("この端末からログアウト") {
           Task { await signOut() }
         }
@@ -209,7 +179,7 @@ struct AuthenticationSettingsSection: View {
 
   private func authenticatedSessionView(email: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Label("ログイン済み・アカウント情報の同期が必要です", systemImage: "person.crop.circle.badge.exclamationmark")
+      Label("ログイン済み・同期を再試行してください", systemImage: "person.crop.circle.badge.exclamationmark")
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.orange)
       Text(email)

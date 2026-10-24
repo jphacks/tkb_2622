@@ -17,11 +17,7 @@ struct AuthenticationWelcomeView: View {
             .font(.largeTitle.weight(.bold))
             .foregroundStyle(AppTheme.ink)
 
-          Text("作業と休憩を、あなたのペースで。")
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(AppTheme.ink)
-
-          Text("ログインすると、作業履歴やグループ情報を同期できます。")
+          Text("作業履歴やグループを同期")
             .font(.subheadline)
             .foregroundStyle(AppTheme.secondaryInk)
             .multilineTextAlignment(.center)
@@ -29,7 +25,7 @@ struct AuthenticationWelcomeView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 32)
 
-        AuthenticationSettingsSection {
+        AuthenticationSettingsSection(showsHeading: false, showsDeveloperConfiguration: true) {
           NotificationCenter.default.post(name: .mobileAuthenticationChanged, object: nil)
         }
 

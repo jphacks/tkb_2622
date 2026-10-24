@@ -47,10 +47,10 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 | 09 Shield | `Features/Restriction/RestrictionShieldPreview.swift`は画面案の静的プレビュー。実際のShieldはFamilyControlsの選択をManagedSettingsへ適用するとiOSが対象アプリ上に表示する。セッション状態との同期コードも実装済みだが、実機での表示確認は未完了 |
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |
-| 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによる制限対象・常時許可アプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。常時許可アプリは両モードのShield・利用時間計測対象から除外する。Safariを選ばないよう案内するが、opaque tokenのため選択内容の名前はアプリ側で検証できない。実機動作は未確認 |
+| 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。制限モードは「標準アプリ以外を制限」「指定したアプリのみ制限」の2つ。FamilyControlsの本人認可とFamilyActivityPickerによる制限対象・常時許可アプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。Safariを常時許可に含めない案内があり、opaque tokenのため選択内容の名前はアプリ側で検証できない。実機動作は未確認。Debug接続設定は折りたたみ表示 |
 | 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`／`CreateGroup`／`CreateInvitation`／`AcceptInvitation`／`LeaveGroup`に接続。メンバー全員が7日・1回限りの招待リンクを共有でき、最終メンバー退出時はグループを削除する。招待は`rewardtime://invite?token=...`のアプリリンク。複数グループを切替表示し、本人の公開表示名を表示。作業開始の事実・時刻をグループ画面で30秒ごとに取得。PC表示・APNs配信は未接続 |
 | 履歴 | `Features/History/HistoryView.swift`, `Data/HistoryRepository.swift`。`ListSessions`で終了・中止済み作業と報酬要約を、`ListTransactions`で獲得・利用・破棄の台帳をページング表示 |
-| 14 通知設定 | `Features/Notifications/NotificationSettingsView.swift`。iOS通知許可の実状態を取得し、未決定時の許可要求・拒否後の設定画面への誘導を行う。APNs登録・配信は未接続 |
+| 14 通知 | `Features/Notifications/NotificationSettingsView.swift`。各タブのヘッダー右上のベルから開く。iOS通知許可の実状態を取得し、未決定時の許可要求・拒否後の設定画面への誘導を行う。アプリ通知のAPNs登録・配信は未接続 |
 
 08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可・アプリ選択・Shield、iPhone登録、制限ポリシー同期、利用枠API、DeviceActivity monitor extensionを本番アプリ側に追加した。OSの監視イベントによる計測は1分単位。backendへは利用中画面を表示中に1分おき、アプリがforegroundへ戻った際にも同期する。設定タブへ戻った際は権限状態を更新し、端末設定をbackendへ再同期する。設定同期中に選択が変わった場合は最新設定も後続同期し、policy revision競合時は再取得して最大3回試行する。背景中の計測と期限後Shieldはextensionが行う。iOS Simulator向けDebugビルドは確認済み。App Groups共有、監視イベント、期限後の自動Shieldは未検証であり、実機受け入れが必要。履歴タブは作業と報酬のAPI履歴へ接続した。
 
