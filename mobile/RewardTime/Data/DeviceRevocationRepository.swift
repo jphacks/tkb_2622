@@ -122,6 +122,7 @@ struct ConfiguredDeviceRevocationRepository {
                 return
             }
             guard let nextPageToken = response.nextPageToken, !nextPageToken.isEmpty else {
+                try await deleteNotificationEndpoint(client: client)
                 clearRegistration()
                 return
             }

@@ -138,6 +138,50 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertNil(defaults.string(forKey: "mobile.device.registrationID"))
     }
 
+    func testMissingDeviceStillDeletesEndpointAndRetainsStateUntilCleanupSucceeds() async throws {
+        defaults.set("stale-device-id", forKey: "mobile.device.id")
+        defaults.set("registration-123", forKey: "mobile.device.registrationID")
+        var methods: [String] = []
+        var failEndpointCleanupOnce = true
+        DeviceRevocationURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            methods.append(method)
+            if method == "DeleteNotificationEndpoint", failEndpointCleanupOnce {
+                failEndpointCleanupOnce = false
+                return (Self.response(for: request, status: 500), Data(#"{"code":"internal"}"#.utf8))
+            }
+            let body = method == "ListDevices"
+                ? #"{"devices":[]}"#
+                : #"{"deleted":true}"#
+            return (Self.response(for: request, status: 200), Data(body.utf8))
+        }
+        var didSignOutLocally = false
+
+        do {
+            try await DeviceSignOutFlow.perform(
+                revokeDevice: { try await repository().revokeRegisteredDevice(client: client()) },
+                signOutLocally: { didSignOutLocally = true }
+            )
+            XCTFail("Expected endpoint cleanup to fail once")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/DeleteNotificationEndpoint"))
+            XCTAssertFalse(didSignOutLocally)
+            XCTAssertEqual(defaults.string(forKey: "mobile.device.id"), "stale-device-id")
+            XCTAssertEqual(defaults.string(forKey: "mobile.device.registrationID"), "registration-123")
+        }
+
+        try await DeviceSignOutFlow.perform(
+            revokeDevice: { try await repository().revokeRegisteredDevice(client: client()) },
+            signOutLocally: { didSignOutLocally = true }
+        )
+
+        XCTAssertEqual(methods, ["ListDevices", "DeleteNotificationEndpoint", "ListDevices", "DeleteNotificationEndpoint"])
+        XCTAssertTrue(didSignOutLocally)
+        XCTAssertNil(defaults.string(forKey: "mobile.device.id"))
+        XCTAssertNil(defaults.string(forKey: "mobile.device.registrationID"))
+    }
+
     func testListDevicesFailureIncludesFailingOperation() async {
         defaults.set("device-123", forKey: "mobile.device.id")
         defaults.set("registration-123", forKey: "mobile.device.registrationID")
