@@ -10,6 +10,7 @@
 		B10000000000000000000010 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000011 /* Supabase */; };
 		B10000000000000000000013 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift */; };
 		B10000000000000000000015 /* DeviceActivityMonitorExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B10000000000000000000031 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,6 +20,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B10000000000000000000021;
 			remoteInfo = DeviceActivityMonitorExtension;
+		};
+		B10000000000000000000033 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B10000000000000000000009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B10000000000000000000006;
+			remoteInfo = RewardTime;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -42,10 +50,13 @@
 		B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DeviceActivityMonitorExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000017 /* DeviceActivityMonitorExtension/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = DeviceActivityMonitorExtension/Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000018 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements; sourceTree = "<group>"; };
+		B10000000000000000000030 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		B10000000000000000000032 /* RewardTimeSimulatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RewardTimeSimulatorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B10000000000000000000002 /* RewardTime */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = RewardTime; sourceTree = "<group>"; };
+		B10000000000000000000042 /* RewardTimeSimulatorTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = RewardTimeSimulatorTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,17 +75,35 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000000000000000000037 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000031 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A1A0DEC8308D3A2F0087B72F /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000030 /* XCTest.framework */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		B10000000000000000000004 = {
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000002 /* RewardTime */,
+				B10000000000000000000042 /* RewardTimeSimulatorTests */,
 				B10000000000000000000014 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift */,
 				B10000000000000000000017 /* DeviceActivityMonitorExtension/Info.plist */,
 				B10000000000000000000018 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements */,
 				B10000000000000000000005 /* Products */,
+				A1A0DEC8308D3A2F0087B72F /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -83,6 +112,7 @@
 			children = (
 				B10000000000000000000001 /* RewardTime.app */,
 				B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */,
+				B10000000000000000000032 /* RewardTimeSimulatorTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -132,6 +162,27 @@
 			productReference = B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		B10000000000000000000035 /* RewardTimeSimulatorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000000000000000000039 /* Build configuration list for PBXNativeTarget "RewardTimeSimulatorTests" */;
+			buildPhases = (
+				B10000000000000000000036 /* Sources */,
+				B10000000000000000000037 /* Frameworks */,
+				B10000000000000000000038 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B10000000000000000000034 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B10000000000000000000042 /* RewardTimeSimulatorTests */,
+			);
+			name = RewardTimeSimulatorTests;
+			productName = RewardTimeSimulatorTests;
+			productReference = B10000000000000000000032 /* RewardTimeSimulatorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -148,6 +199,10 @@
 								enabled = 1;
 							};
 						};
+					};
+					B10000000000000000000035 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = B10000000000000000000006;
 					};
 				};
 			};
@@ -170,6 +225,7 @@
 			targets = (
 				B10000000000000000000006 /* RewardTime */,
 				B10000000000000000000021 /* DeviceActivityMonitorExtension */,
+				B10000000000000000000035 /* RewardTimeSimulatorTests */,
 			);
 		};
 /* End PBXProject section */
@@ -183,6 +239,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B10000000000000000000025 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000000000000000000038 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -207,6 +270,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000000000000000000036 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -214,6 +284,11 @@
 			isa = PBXTargetDependency;
 			target = B10000000000000000000021 /* DeviceActivityMonitorExtension */;
 			targetProxy = B10000000000000000000028 /* PBXContainerItemProxy */;
+		};
+		B10000000000000000000034 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B10000000000000000000006 /* RewardTime */;
+			targetProxy = B10000000000000000000033 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -394,6 +469,36 @@
 			};
 			name = Release;
 		};
+		B10000000000000000000040 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.mobile.RewardTimeSimulatorTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RewardTime.app/RewardTime";
+			};
+			name = Debug;
+		};
+		B10000000000000000000041 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.mobile.RewardTimeSimulatorTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RewardTime.app/RewardTime";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -420,6 +525,15 @@
 			buildConfigurations = (
 				B10000000000000000000026 /* Debug */,
 				B10000000000000000000027 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000000000000000000039 /* Build configuration list for PBXNativeTarget "RewardTimeSimulatorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000040 /* Debug */,
+				B10000000000000000000041 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

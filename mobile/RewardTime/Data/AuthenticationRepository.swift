@@ -102,7 +102,20 @@ struct SupabaseAuthService: AccessTokenProviding {
   }
 
   func signOutFromThisDevice() async throws {
-    try await client.auth.signOut(scope: .local)
+    try await DeviceSignOutFlow.perform(
+      revokeDevice: {
+        guard UserDefaults.standard.string(forKey: "mobile.device.id") != nil else { return }
+        guard let apiURLText = MobileAppConfiguration.connectAPIBaseURL,
+              let apiURL = URL(string: apiURLText), apiURL.host != nil else {
+          throw DeviceSettingsRepositoryError.missingConfiguration
+        }
+        let api = ConnectJSONClient(baseURL: apiURL, tokenProvider: self)
+        try await ConfiguredDeviceRevocationRepository().revokeRegisteredDevice(client: api)
+      },
+      signOutLocally: {
+        try await client.auth.signOut(scope: .local)
+      }
+    )
   }
 }
 

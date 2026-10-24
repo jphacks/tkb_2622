@@ -54,13 +54,25 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 
 08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可・アプリ選択・Shield、iPhone登録、制限ポリシー同期、利用枠API、DeviceActivity monitor extensionを本番アプリ側に追加した。OSの監視イベントによる計測は1分単位。backendへは利用中画面を表示中に1分おき、アプリがforegroundへ戻った際にも同期する。設定タブへ戻った際は権限状態を更新し、端末設定をbackendへ再同期する。設定同期中に選択が変わった場合は最新設定も後続同期し、policy revision競合時は再取得して最大3回試行する。背景中の計測と期限後Shieldはextensionが行う。iOS Simulator向けDebugビルドは確認済み。App Groups共有、監視イベント、期限後の自動Shieldは未検証であり、実機受け入れが必要。履歴タブは作業と報酬のAPI履歴へ接続した。
 
-backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。初回未認証時はログイン画面を表示し、ログインを後回しにした場合も端末内設定を利用できる。起動時に保存済みAuth sessionがあれば`EnsureUser`／`GetMe`でbackend上の業務Userを確認し、成功するまでログイン済みAPI画面へ進まない。同期失敗時はエラー・再試行・端末内利用・別アカウントでのログインを表示する。ホーム・グループ・履歴では必要に応じてログインへ案内する。Debugではログイン画面・設定画面からSupabase Project URL、publishable/anon key、Connect API URLを入力する。Releaseではログイン／ログアウトを使い、接続先は`Info-Release.plist`が参照する`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`のBuild Settings値から読む設計だが、現在のXcode projectにはこれらのRelease値を注入する`.xcconfig`／CI設定がないため、配布設定が必要。通常利用者にURLやキーを入力させる画面はReleaseに表示しない。値はアプリへ組み込まれるため、publishable/anon keyと公開可能なHTTPS API URLだけを設定する。secret keyやservice_role keyは設定しない。Desktop・iPhoneは同じSupabase project／メールアカウント／backend環境で同じ業務Userへ対応する設計で、ペアリングコードは不要。実環境の新規・既存アカウントE2E、Release値注入・接続は未確認。`MockHomeRepository`はSwiftUI Preview専用。APNs token登録・解除、作業開始通知のOutbox・配信コードは実装済み。PC表示連携、Apple Push署名設定を伴う実機配信、本番の永続workerは未確認。
+backendには業務RPCのprotoとGo handlerがある。mobileは`URLSession + Codable`でConnect JSONを扱い、Supabase公式Swift SDKでメールOTPとKeychain管理のAuthセッションを扱う。初回未認証時はログイン画面を表示し、ログインを後回しにした場合も端末内設定を利用できる。起動時に保存済みAuth sessionがあれば`EnsureUser`／`GetMe`でbackend上の業務Userを確認し、成功するまでログイン済みAPI画面へ進まない。同期失敗時はエラー・再試行・端末内利用・別アカウントでのログインを表示する。ホーム・グループ・履歴では必要に応じてログインへ案内する。Debugではログイン画面・設定画面からSupabase Project URL、publishable/anon key、Connect API URLを入力する。Releaseではログイン／ログアウトを使い、接続先は`Info-Release.plist`が参照する`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`のBuild Settings値から読む設計だが、現在のXcode projectにはこれらのRelease値を注入する`.xcconfig`／CI設定がないため、配布設定が必要。通常利用者にURLやキーを入力させる画面はReleaseに表示しない。値はアプリへ組み込まれるため、publishable/anon keyと公開可能なHTTPS API URLだけを設定する。secret keyやservice_role keyは設定しない。Desktop・iPhoneは同じSupabase project／メールアカウント／backend環境で同じ業務Userへ対応する設計で、ペアリングコードは不要。iPhoneにbackend端末IDが保存されている場合、ログアウト時は`ListDevices`／`RevokeDevice`で端末を失効し、`DeleteNotificationEndpoint`で通知先を解除してregistration IDを破棄した後にAuthセッションを消す。通信失敗時はoperation ID・端末ID・versionを保存し、同一操作を再試行できる状態を保つため、ログアウトは中断する。実環境の新規・既存アカウントE2E、端末失効付きログアウト、Release値注入・接続は未確認。`MockHomeRepository`はSwiftUI Preview専用。APNs token登録・解除、作業開始通知のOutbox・配信コードは実装済み。PC表示連携、Apple Push署名設定を伴う実機配信、本番の永続workerは未確認。
 
 認証の確認は初回起動時のログイン画面、または設定タブの「アカウント接続」から行う。DebugではProject URL、公開用キー、Connect API URLを入力する。ReleaseではXcodeのRewardTime targetのRelease Build Settingsへ`SUPABASE_PROJECT_URL`、`SUPABASE_PUBLISHABLE_KEY`、`CONNECT_API_BASE_URL`をUser-Defined設定として追加し、アプリをビルドする。Supabase URLとAPI URLにはHTTPSを指定する（ReleaseはHTTP接続を拒否）。メールアドレスへ届いた数字コードを入力すると、Authセッション取得後に業務User登録・取得を試みる。iOS段階1では未登録メールからのAuthユーザー新規登録も許可する。Supabaseのメールテンプレートは数字OTP（`{{ .Token }}`）を送信する設定が必要。セッションはSupabase SDKのApple向け既定保存先で管理する。起動時にAuth sessionがある場合も`EnsureUser`／`GetMe`が成功するまでAPI利用画面へ進まず、失敗時は再試行・端末内利用・別アカウントでのログインを選べる。ログインを後回しにした後は、グループ・履歴・ホームのログイン案内から再開できる。実機でMac上のAPIに接続する場合は、Debug API URLへMacのLAN IPを指定し、backend側もLANから到達可能な設定で起動する必要がある。サービスロールキーやsecret keyは入力しない。
 
 未ログイン時はメールコードを送る前に、同梱の10種類からプロフィールアイコンを選べる。コード認証後に選択IDを本人のUserへ保存し、設定タブから変更できる。画像本体は`RewardTime/Avatars.xcassets`へ同梱し、DBにはカタログIDだけを保存する。
 
 Debugビルドのホームから「backendヘルスチェック」を開くと、指定URLの`GET /healthz`を確認できる。SimulatorからMac上のローカルbackendを確認する場合は既定値`http://127.0.0.1:8080`を使用する。iPhone実機からは、backend READMEの手順でComposeの公開先をMacのLAN IPv4に設定し、アプリのConnect API URLへ`http://<MacのLAN IPv4>:8080`を入力する。Debug構成だけローカルネットワーク接続を許可し、Release構成のATS設定は変更していない。ヘルスチェックは認証や業務データの読み書きを行わず、実API疎通を完了したことにはならない。
+
+API回帰テストは`swift test --package-path mobile/RewardTimeTests`でmacOS host上にて実行する。iOS Simulatorで端末失効APIとログアウト順序を確認する場合は、`RewardTimeSimulatorTests` schemeを使う。
+
+```sh
+xcodebuild test \
+  -project mobile/ios-reward-time.xcodeproj \
+  -scheme RewardTimeSimulatorTests \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+Simulator testは`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。現在はDevice失効、通知先削除、operation IDを保持した応答喪失後の再試行を検証する。
 
 ## ソース構成
 

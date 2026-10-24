@@ -23,6 +23,21 @@ struct ConfiguredDeviceSettingsRepository {
         let name: String
     }
 
+    private struct ProtoJSONInt64: Decodable {
+        let value: Int64
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let string = try? container.decode(String.self), let value = Int64(string) {
+                self.value = value
+            } else if let value = try? container.decode(Int64.self) {
+                self.value = value
+            } else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected a protobuf JSON int64")
+            }
+        }
+    }
+
     private struct RegisterDeviceResponse: Decodable {
         let device: DeviceDTO
     }
@@ -152,6 +167,11 @@ struct ConfiguredDeviceSettingsRepository {
         return device.id
     }
 
+    func revokeRegisteredDevice(client: ConnectJSONClient) async throws {
+        try await ConfiguredDeviceRevocationRepository(defaults: defaults)
+            .revokeRegisteredDevice(client: client)
+    }
+
     private func registerDevice(
         client: ConnectJSONClient,
         registrationID: String,
@@ -209,42 +229,5 @@ struct ConfiguredDeviceSettingsRepository {
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               url.host != nil else { return nil }
         return url
-    }
-}
-
-private struct ProtoJSONInt64: Decodable {
-    let value: Int64
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let string = try? container.decode(String.self), let value = Int64(string) {
-            self.value = value
-        } else if let value = try? container.decode(Int64.self) {
-            self.value = value
-        } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected a protobuf JSON int64")
-        }
-    }
-}
-
-enum DeviceSettingsRepositoryError: Error {
-    case missingConfiguration
-    case invalidConfiguration
-    case deviceNotActive
-    case policyConflict
-}
-
-extension DeviceSettingsRepositoryError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .missingConfiguration:
-            "設定タブでSupabaseとAPIの接続情報を設定してください。"
-        case .invalidConfiguration:
-            "Supabase URL・公開用キー・API URLを確認してください。"
-        case .deviceNotActive:
-            "この端末の登録が無効です。端末管理で状態を確認してください。"
-        case .policyConflict:
-            "制限設定が続けて更新されました。少し待ってからもう一度同期してください。"
-        }
     }
 }

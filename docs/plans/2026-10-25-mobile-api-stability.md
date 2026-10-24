@@ -13,7 +13,7 @@
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。監査で、設定画面からの認証状態変更通知がsessionの有無だけでauthenticatedへ切り替える経路を発見したため、通知後もRoot側で同期を再実行するよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のresolver testはあるが、SwiftUI rootの通知連携と実backend復旧はSimulator受け入れ待ち。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート／順序・Home更新失敗の10件が通過した。これはSimulator内でのXCTest実行ではない。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート／順序・Home更新失敗・Device失効の16件が通過した。さらにXcodeの`RewardTimeSimulatorTests` targetを追加し、iPhone 17 Simulator (iOS 27.0) 上でもDevice失効の4件が通過した。端末失効のAPI応答を含むアプリ本体のSimulator buildも成功。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -22,7 +22,7 @@
 | Home | Focus `GetCurrentSession`、Reward `GetBalance`、Restriction `GetRestrictionState` | refresh失敗時に古いsnapshotを残しつつ警告を表示し、古いrestriction状態をOSへ再適用しないよう修正。回帰XCTestを追加。3 API間のsession ID／version整合・部分失敗時の実API表示は未確認 |
 | Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | RPC名とproto JSON DTO、REST response項目をGo handlerと静的照合し一致。過去の`internal`／`not_found`は現在再現せず、画面・認証付き実API成功は未確認 |
 | History | Focus `ListSessions`、Reward `ListTransactions` | response DTO（entries/session/reward, transactions）・ProtoJSON int64・timestamp・page tokenをproto／Go handlerと照合し一致。ViewModelは両方の初回取得が成功してから更新し、失敗時は前回値とstale表示を保つ。片方だけの失敗・実API pagingは未確認 |
-| 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
+| 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認。ログアウト時はIdentity `ListDevices`・`RevokeDevice`・`DeleteNotificationEndpoint`で端末と通知先を解除し、registration IDを破棄して次回登録用に更新 |
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | RPC名、ProtoJSON int64 string、request／response fieldsをprotoと照合し一致。Reserve operation IDとpending usage reportはlocal保存し、transport失敗後の同一要求再送を行う。OS monitor・応答喪失・プロセス再起動を含む実機E2Eは未確認 |
 | 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | 重複登録抑止に加え、endpoint要求の前に同じregistration IDで`RegisterDevice`を実行する順序を追加。旧SQLSTATE 2201B制約障害とは別に、Device未登録時はbackendがnot_foundを返す経路を確認。認証付き実API往復は未確認 |
 
@@ -62,7 +62,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    - 各呼び出しについて、利用画面、request/response DTO、認証、エラー表示、retry、空状態を一覧化する。
 
 2. **再現・テスト基盤**
-   - Swift PackageのXCTestを追加した。現状の7件はmacOS hostで実行し、iOS Simulator向けアプリbuildは別に行う。
+   - Swift PackageのXCTestはmacOS host上で16件実行する。Xcodeの`RewardTimeSimulatorTests` targetでDevice失効APIの4件をiOS Simulator上で実行する。
    - `ConnectJSONClient`は`URLSession`を注入でき、transport seamでBearer header／Connect error／session欠落の3件を確認する。
    - 認証起動状態を`AuthenticationEntryState`へ分け、業務User同期成功の要件と新規未認証・ローカル利用への分岐を2件テストした。RootView／Supabase／Connect APIの結合状態遷移は別途確認する。
    - 1つの失敗シナリオごとに、テストを先に追加して失敗を確認し、修正後に通す。
@@ -78,6 +78,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    - access token欠落・期限切れ・401／403、HTTP status、Connect code、通信断、timeout、JSON decode failureを個別に再現する。
    - ProtoJSON enum、`int64`、camelCase field、timestamp等の変換をAPI契約・生成物と照合する。
    - session更新後の端末registration ID、User同期、ログアウト・再ログインを確認する。
+   - ログアウト時に登録済みiPhoneをbackendから先に失効するようにし、API失敗時はローカルAuth sessionを残して再試行可能にした。順序と失敗時の保護はmacOS host／Simulator testsで確認。実API接続は未確認。
 
 5. **機能別APIエラー**
    - Group／Home／History／Restriction／UsageのRepository呼び出しを画面単位で追い、一覧・詳細・作成・retryの成功／失敗／empty stateを確認する。
@@ -125,11 +126,11 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`をテストするSwift Packageを追加。現行の`swift test`はmacOS host実行であり、iOS Simulator XCTest targetは未整備。iOS Simulator向けRewardTime app buildは別途実行 | 初期分を実装、Simulator test target未整備 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`をテストするSwift Package、およびiOS SimulatorでDevice失効Repositoryを実行する`RewardTimeSimulatorTests` targetを追加 | host 16件・Simulator 4件通過。画面全体・認証付き実backend連携は未検証 |
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
-| iPhone再ログイン後の端末登録 | Auth sessionを作り直したときに旧Deviceをどう無効化するか。作業中にlogoutできるか | backendはDeviceをAuth sessionへ結び付け、active iPhone 1台を制約する。一方、mobileはlogout時にDeviceをrevokeせず、registration IDも再利用する。新しいAuth sessionでは`RegisterDevice`が競合／preconditionで失敗し得る。backendと合意するまで再ログイン成功を保証しない | 未解決。revoke API／logoutの作業中挙動を決める |
+| iPhone再ログイン後の端末登録 | Auth sessionを作り直したときに旧Deviceをどう無効化するか。作業中にlogoutできるか | backendの`RevokeDevice`と`DeleteNotificationEndpoint`で端末／通知先を解除し、registration IDを破棄する。失効operation ID・device ID・versionは後片付け完了まで保存して応答喪失後も同一要求を再送。API失敗時はサインアウトを中断する | 順序・失敗・応答喪失をhost／Simulatorでテスト済み。実APIでのログアウト→再ログインE2Eと、作業中logoutの製品挙動は未確認 |
 | 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 通知登録重複を抑止し、Device未登録でendpoint登録が先行する順序欠落を修正。旧regex障害migrationも適用済み。過去の`not_found`とDevice未登録経路が同一原因かは未確認 | 一部修正、実APIで再発確認待ち |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
 
@@ -140,3 +141,15 @@ API transport／起動状態のユニットテストは`mobile/RewardTimeTests/P
 ```sh
 swift test --package-path mobile/RewardTimeTests
 ```
+
+Simulatorで端末失効APIとログアウト順序を確認する（iPhone 17 / iOS 27.0の例）：
+
+```sh
+xcodebuild test \
+  -project mobile/ios-reward-time.xcodeproj \
+  -scheme RewardTimeSimulatorTests \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=27.0' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+このSimulator testは`URLProtocol`でbackend応答を制御するAPI契約・エラー処理テストであり、実backendやSupabaseへの接続試験ではない。
