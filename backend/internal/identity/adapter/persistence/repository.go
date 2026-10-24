@@ -275,7 +275,7 @@ func (r *Repository) RegisterNotificationEndpoint(ctx context.Context, p applica
 		}
 		var deviceID uuid.UUID
 		var platform, status string
-		if err := tx.QueryRowContext(ctx, `SELECT id, platform, status FROM app.devices WHERE auth_session_id = $1 AND user_id = $2`, uid(p.SessionID), u.ID).Scan(&deviceID, &platform, &status); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT id, platform, status FROM app.devices WHERE registration_id = $1 AND user_id = $2`, uid(in.RegistrationID), u.ID).Scan(&deviceID, &platform, &status); err != nil {
 			return translate(err)
 		}
 		if platform != "IOS" || status != "ACTIVE" {
@@ -293,19 +293,13 @@ func (r *Repository) RegisterNotificationEndpoint(ctx context.Context, p applica
 	})
 }
 
-func (r *Repository) DeleteNotificationEndpoint(ctx context.Context, p application.Principal) error {
+func (r *Repository) DeleteNotificationEndpoint(ctx context.Context, p application.Principal, registrationID string) error {
 	return r.transaction(ctx, p, false, func(tx *sql.Tx, queries *q.Queries, u q.AppUser) error {
-		if err := checkSession(ctx, queries, p, u.ID); err != nil {
-			return err
-		}
-		var platform, status string
-		if err := tx.QueryRowContext(ctx, `SELECT platform, status FROM app.devices WHERE auth_session_id = $1 AND user_id = $2`, uid(p.SessionID), u.ID).Scan(&platform, &status); err != nil {
-			return translate(err)
-		}
-		if platform != "IOS" || status != "ACTIVE" {
-			return application.ErrForbidden
-		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM app.notification_endpoints WHERE device_id = (SELECT id FROM app.devices WHERE auth_session_id = $1 AND user_id = $2)`, uid(p.SessionID), u.ID)
+		_, err := tx.ExecContext(ctx, `
+			DELETE FROM app.notification_endpoints AS endpoint
+			USING app.devices AS device
+			WHERE endpoint.device_id = device.id AND device.user_id = $1
+			  AND device.registration_id = $2 AND device.platform = 'IOS'`, u.ID, uid(registrationID))
 		return err
 	})
 }

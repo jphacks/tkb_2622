@@ -949,6 +949,10 @@ components:
         - AP_NS_ENVIRONMENT_PRODUCTION
     identity.v1.DeleteNotificationEndpointRequest:
       type: object
+      properties:
+        registrationId:
+          type: string
+          title: registration_id
       title: DeleteNotificationEndpointRequest
       additionalProperties: false
     identity.v1.DeleteNotificationEndpointResponse:
@@ -1084,6 +1088,9 @@ components:
           allOf:
             - $ref: '#/components/schemas/identity.v1.APNsEnvironment'
           title: environment
+        registrationId:
+          type: string
+          title: registration_id
       title: RegisterNotificationEndpointRequest
       additionalProperties: false
     identity.v1.RegisterNotificationEndpointResponse:

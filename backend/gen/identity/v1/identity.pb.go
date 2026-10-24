@@ -947,11 +947,12 @@ func (x *RevokeDeviceResponse) GetDevice() *Device {
 }
 
 type RegisterNotificationEndpointRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ApnsToken     string                 `protobuf:"bytes,1,opt,name=apns_token,json=apnsToken,proto3" json:"apns_token,omitempty"`
-	Environment   APNsEnvironment        `protobuf:"varint,2,opt,name=environment,proto3,enum=identity.v1.APNsEnvironment" json:"environment,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ApnsToken      string                 `protobuf:"bytes,1,opt,name=apns_token,json=apnsToken,proto3" json:"apns_token,omitempty"`
+	Environment    APNsEnvironment        `protobuf:"varint,2,opt,name=environment,proto3,enum=identity.v1.APNsEnvironment" json:"environment,omitempty"`
+	RegistrationId string                 `protobuf:"bytes,3,opt,name=registration_id,json=registrationId,proto3" json:"registration_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RegisterNotificationEndpointRequest) Reset() {
@@ -996,6 +997,13 @@ func (x *RegisterNotificationEndpointRequest) GetEnvironment() APNsEnvironment {
 		return x.Environment
 	}
 	return APNsEnvironment_AP_NS_ENVIRONMENT_UNSPECIFIED
+}
+
+func (x *RegisterNotificationEndpointRequest) GetRegistrationId() string {
+	if x != nil {
+		return x.RegistrationId
+	}
+	return ""
 }
 
 type RegisterNotificationEndpointResponse struct {
@@ -1043,9 +1051,10 @@ func (x *RegisterNotificationEndpointResponse) GetRegistered() bool {
 }
 
 type DeleteNotificationEndpointRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RegistrationId string                 `protobuf:"bytes,1,opt,name=registration_id,json=registrationId,proto3" json:"registration_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DeleteNotificationEndpointRequest) Reset() {
@@ -1076,6 +1085,13 @@ func (x *DeleteNotificationEndpointRequest) ProtoReflect() protoreflect.Message 
 // Deprecated: Use DeleteNotificationEndpointRequest.ProtoReflect.Descriptor instead.
 func (*DeleteNotificationEndpointRequest) Descriptor() ([]byte, []int) {
 	return file_identity_v1_identity_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DeleteNotificationEndpointRequest) GetRegistrationId() string {
+	if x != nil {
+		return x.RegistrationId
+	}
+	return ""
 }
 
 type DeleteNotificationEndpointResponse struct {
@@ -1176,16 +1192,18 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12)\n" +
 	"\x10expected_version\x18\x03 \x01(\x03R\x0fexpectedVersion\"C\n" +
 	"\x14RevokeDeviceResponse\x12+\n" +
-	"\x06device\x18\x01 \x01(\v2\x13.identity.v1.DeviceR\x06device\"\x84\x01\n" +
+	"\x06device\x18\x01 \x01(\v2\x13.identity.v1.DeviceR\x06device\"\xad\x01\n" +
 	"#RegisterNotificationEndpointRequest\x12\x1d\n" +
 	"\n" +
 	"apns_token\x18\x01 \x01(\tR\tapnsToken\x12>\n" +
-	"\venvironment\x18\x02 \x01(\x0e2\x1c.identity.v1.APNsEnvironmentR\venvironment\"F\n" +
+	"\venvironment\x18\x02 \x01(\x0e2\x1c.identity.v1.APNsEnvironmentR\venvironment\x12'\n" +
+	"\x0fregistration_id\x18\x03 \x01(\tR\x0eregistrationId\"F\n" +
 	"$RegisterNotificationEndpointResponse\x12\x1e\n" +
 	"\n" +
 	"registered\x18\x01 \x01(\bR\n" +
-	"registered\"#\n" +
-	"!DeleteNotificationEndpointRequest\">\n" +
+	"registered\"L\n" +
+	"!DeleteNotificationEndpointRequest\x12'\n" +
+	"\x0fregistration_id\x18\x01 \x01(\tR\x0eregistrationId\">\n" +
 	"\"DeleteNotificationEndpointResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted*`\n" +
 	"\bPlatform\x12\x18\n" +

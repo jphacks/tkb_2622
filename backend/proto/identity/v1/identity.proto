@@ -71,7 +71,8 @@ enum APNsEnvironment {
 message RegisterNotificationEndpointRequest {
   string apns_token = 1;
   APNsEnvironment environment = 2;
+  string registration_id = 3;
 }
 message RegisterNotificationEndpointResponse { bool registered = 1; }
-message DeleteNotificationEndpointRequest {}
+message DeleteNotificationEndpointRequest { string registration_id = 1; }
 message DeleteNotificationEndpointResponse { bool deleted = 1; }

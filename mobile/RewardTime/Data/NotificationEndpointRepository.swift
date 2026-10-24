@@ -5,6 +5,7 @@ struct ConfiguredNotificationEndpointRepository {
     private struct RegisterRequest: Encodable {
         let apnsToken: String
         let environment: String
+        let registrationId: String
     }
 
     private struct RegisterResponse: Decodable {
@@ -15,13 +16,18 @@ struct ConfiguredNotificationEndpointRepository {
         let deleted: Bool
     }
 
+    private struct DeleteRequest: Encodable {
+        let registrationId: String
+    }
+
     func register(token: String, environment: String) async throws {
         let client = try makeClient()
         let apnsEnvironment = environment == "development" ? "AP_NS_ENVIRONMENT_DEVELOPMENT" : "AP_NS_ENVIRONMENT_PRODUCTION"
+        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
         let response: RegisterResponse = try await client.call(
             service: "identity.v1.IdentityService",
             method: "RegisterNotificationEndpoint",
-            requestBody: RegisterRequest(apnsToken: token, environment: apnsEnvironment),
+            requestBody: RegisterRequest(apnsToken: token, environment: apnsEnvironment, registrationId: registrationID),
             responseType: RegisterResponse.self
         )
         guard response.registered else { throw NotificationEndpointError.registrationRejected }
@@ -29,10 +35,11 @@ struct ConfiguredNotificationEndpointRepository {
 
     func delete() async throws {
         let client = try makeClient()
+        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
         let response: DeleteResponse = try await client.call(
             service: "identity.v1.IdentityService",
             method: "DeleteNotificationEndpoint",
-            requestBody: EmptyRequest(),
+            requestBody: DeleteRequest(registrationId: registrationID),
             responseType: DeleteResponse.self
         )
         guard response.deleted else { throw NotificationEndpointError.deletionRejected }
@@ -53,7 +60,6 @@ struct ConfiguredNotificationEndpointRepository {
         return ConnectJSONClient(baseURL: apiURL, tokenProvider: auth)
     }
 
-    private struct EmptyRequest: Encodable {}
 }
 
 private enum NotificationEndpointError: LocalizedError {

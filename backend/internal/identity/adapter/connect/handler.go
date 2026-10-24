@@ -153,14 +153,14 @@ func (h *Handler) RegisterNotificationEndpoint(ctx context.Context, req *connect
 	if environment == "" {
 		return nil, rpcError(application.ErrInvalid)
 	}
-	if err := h.service.RegisterNotificationEndpoint(ctx, principal(ctx), application.NotificationEndpointInput{APNsToken: req.Msg.ApnsToken, Environment: environment}); err != nil {
+	if err := h.service.RegisterNotificationEndpoint(ctx, principal(ctx), application.NotificationEndpointInput{APNsToken: req.Msg.ApnsToken, Environment: environment, RegistrationID: req.Msg.RegistrationId}); err != nil {
 		return nil, rpcError(err)
 	}
 	return connect.NewResponse(&v1.RegisterNotificationEndpointResponse{Registered: true}), nil
 }
 
-func (h *Handler) DeleteNotificationEndpoint(ctx context.Context, _ *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
-	if err := h.service.DeleteNotificationEndpoint(ctx, principal(ctx)); err != nil {
+func (h *Handler) DeleteNotificationEndpoint(ctx context.Context, req *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
+	if err := h.service.DeleteNotificationEndpoint(ctx, principal(ctx), req.Msg.RegistrationId); err != nil {
 		return nil, rpcError(err)
 	}
 	return connect.NewResponse(&v1.DeleteNotificationEndpointResponse{Deleted: true}), nil

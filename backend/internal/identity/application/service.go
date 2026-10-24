@@ -27,7 +27,7 @@ type RevokeInput struct {
 	OperationID, DeviceID string
 	ExpectedVersion       int64
 }
-type NotificationEndpointInput struct{ APNsToken, Environment string }
+type NotificationEndpointInput struct{ APNsToken, Environment, RegistrationID string }
 
 // Actor is the business user behind a principal and the device registered for its auth session.
 // DeviceID is empty when the auth session has no registered device.
@@ -46,7 +46,7 @@ type Repository interface {
 	ListDevices(context.Context, Principal, string, int) (DevicePage, error)
 	RevokeDevice(context.Context, Principal, RevokeInput) (domain.Device, error)
 	RegisterNotificationEndpoint(context.Context, Principal, NotificationEndpointInput) error
-	DeleteNotificationEndpoint(context.Context, Principal) error
+	DeleteNotificationEndpoint(context.Context, Principal, string) error
 	Actor(context.Context, Principal) (Actor, error)
 	ActiveIPhone(ctx context.Context, userID string) (string, error)
 }
@@ -131,7 +131,7 @@ func (s *Service) RegisterNotificationEndpoint(ctx context.Context, p Principal,
 	if !validPrincipal(p) {
 		return ErrUnauthenticated
 	}
-	if len(in.APNsToken) < 64 || len(in.APNsToken) > 512 || len(in.APNsToken)%2 != 0 || (in.Environment != "development" && in.Environment != "production") {
+	if !ValidID(in.RegistrationID) || len(in.APNsToken) < 64 || len(in.APNsToken) > 512 || len(in.APNsToken)%2 != 0 || (in.Environment != "development" && in.Environment != "production") {
 		return ErrInvalid
 	}
 	if _, err := hex.DecodeString(in.APNsToken); err != nil {
@@ -140,11 +140,14 @@ func (s *Service) RegisterNotificationEndpoint(ctx context.Context, p Principal,
 	return s.repo.RegisterNotificationEndpoint(ctx, p, in)
 }
 
-func (s *Service) DeleteNotificationEndpoint(ctx context.Context, p Principal) error {
+func (s *Service) DeleteNotificationEndpoint(ctx context.Context, p Principal, registrationID string) error {
 	if !validPrincipal(p) {
 		return ErrUnauthenticated
 	}
-	return s.repo.DeleteNotificationEndpoint(ctx, p)
+	if !ValidID(registrationID) {
+		return ErrInvalid
+	}
+	return s.repo.DeleteNotificationEndpoint(ctx, p, registrationID)
 }
 
 // ResolveActor is the public operation other modules use to identify the caller.
