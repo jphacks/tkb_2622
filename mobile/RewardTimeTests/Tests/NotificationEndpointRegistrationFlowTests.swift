@@ -2,6 +2,48 @@ import XCTest
 @testable import ConnectJSONClient
 
 final class NotificationEndpointRegistrationFlowTests: XCTestCase {
+    func testUnauthenticatedRefreshDoesNotRegisterOrRemoveEndpoint() {
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: false,
+                isAllowed: true,
+                isDenied: false,
+                token: "apns-token"
+            ),
+            .signInRequired
+        )
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: false,
+                isAllowed: false,
+                isDenied: true,
+                token: nil
+            ),
+            .signInRequired
+        )
+    }
+
+    func testAuthenticatedRefreshChoosesRegistrationOrRemoval() {
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: true,
+                isAllowed: true,
+                isDenied: false,
+                token: "apns-token"
+            ),
+            .register(token: "apns-token")
+        )
+        XCTAssertEqual(
+            NotificationEndpointSyncPolicy.resolve(
+                isAuthenticated: true,
+                isAllowed: false,
+                isDenied: true,
+                token: nil
+            ),
+            .remove
+        )
+    }
+
     func testDeviceIsRegisteredBeforeNotificationEndpoint() async throws {
         let steps = RegistrationSteps()
 

@@ -14,14 +14,21 @@ private final class NotificationSettingsViewModel: ObservableObject {
     func refresh(forceRegistration: Bool = false) async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         authorizationStatus = settings.authorizationStatus
-        if isAllowed {
-            if let token = UserDefaults.standard.string(forKey: "mobile.apns.token"), !token.isEmpty {
-                await register(token: token, force: forceRegistration)
-            } else {
-                UIApplication.shared.registerForRemoteNotifications()
-                apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
-            }
-        } else if authorizationStatus == .denied {
+        let action = NotificationEndpointSyncPolicy.resolve(
+            isAuthenticated: MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil,
+            isAllowed: isAllowed,
+            isDenied: authorizationStatus == .denied,
+            token: UserDefaults.standard.string(forKey: "mobile.apns.token")
+        )
+        switch action {
+        case .signInRequired:
+            apiStatusMessage = "通知先をサーバーと同期するにはログインしてください。"
+        case .register(let token):
+            await register(token: token, force: forceRegistration)
+        case .requestAppleRegistration:
+            UIApplication.shared.registerForRemoteNotifications()
+            apiStatusMessage = "iPhoneの通知先をAppleへ登録しています。"
+        case .remove:
             do {
                 try await ConfiguredNotificationEndpointRepository().delete()
                 invalidateRegistrationCache()
@@ -29,7 +36,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
             } catch {
                 apiStatusMessage = "通知先の解除に失敗しました: \(error.localizedDescription)"
             }
-        } else {
+        case .permissionRequired:
             apiStatusMessage = "通知を許可すると、iPhoneの通知先をサーバーへ登録します。"
         }
     }
