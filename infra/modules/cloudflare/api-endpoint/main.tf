@@ -1,8 +1,9 @@
 locals {
-  script_name = "tkb-${var.env}-api-proxy"
+  script_name       = "tkb-${var.env}-api-proxy"
+  use_custom_domain = var.hostname != null
 }
 
-# API ホスト名へのリクエストを Cloud Run の run.app URL へ転送する Worker
+# API へのリクエストを Cloud Run の run.app URL へ転送する Worker
 resource "cloudflare_workers_script" "proxy" {
   account_id         = var.account_id
   script_name        = local.script_name
@@ -19,8 +20,18 @@ resource "cloudflare_workers_script" "proxy" {
   ]
 }
 
-# ホスト名を Worker に割り当てる．DNS レコードと証明書は Cloudflare が自動で作成する．
+# workers.dev での公開．カスタムドメインを使う場合は無効にし，公開経路を1つにする．
+resource "cloudflare_workers_script_subdomain" "proxy" {
+  account_id       = var.account_id
+  script_name      = cloudflare_workers_script.proxy.script_name
+  enabled          = !local.use_custom_domain
+  previews_enabled = false
+}
+
+# カスタムドメインでの公開．DNS レコードと証明書は Cloudflare が自動で作成する．
 resource "cloudflare_workers_custom_domain" "api" {
+  count = local.use_custom_domain ? 1 : 0
+
   account_id = var.account_id
   zone_id    = var.zone_id
   hostname   = var.hostname

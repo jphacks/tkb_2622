@@ -2,13 +2,13 @@
 
 Cloudflare と Google Cloud（GCP）のリソースを Terraform で管理する．目標とするクラウド構成・接続・秘密情報の方針は[インフラ構成](../docs/spec/2.インフラ構成.md)を正本とし，本書は Terraform のディレクトリ構成・管理範囲・運用手順を定める．
 
-**Terraform コードは実装済みで，全ルートモジュールの `terraform validate` が通ることを確認済み．クラウドへの apply は未実施．** GCP プロジェクト・Cloudflare ゾーン・Supabase プロジェクトの用意後に「3. 初期設定」から進める．
+**Terraform コードは実装済みで，全ルートモジュールの `terraform validate` が通ることを確認済み．クラウドへの apply は未実施．** GCP プロジェクト・Cloudflare アカウント（workers.dev サブドメイン）・Supabase プロジェクトの用意後に「3. 初期設定」から進める．
 
 ## 1. 構成と管理範囲
 
 ```mermaid
 flowchart LR
-    client["デスクトップ / iPhone"] -->|"https://api.&lt;domain&gt;"| worker["Cloudflare Worker<br/>tkb-&lt;env&gt;-api-proxy"]
+    client["デスクトップ / iPhone"] -->|"https://tkb-&lt;env&gt;-api-proxy.&lt;subdomain&gt;.workers.dev"| worker["Cloudflare Worker<br/>tkb-&lt;env&gt;-api-proxy"]
     worker -->|"https://...run.app"| run["Cloud Run<br/>tkb-&lt;env&gt;-api"]
     run --> sm["Secret Manager<br/>DATABASE_URL"]
     run --> db[("Supabase PostgreSQL")]
@@ -17,12 +17,21 @@ flowchart LR
     ci -->|"イメージ更新"| run
 ```
 
-Cloudflare から Cloud Run への接続は **Cloudflare Workers による転送**を採用した．Worker のカスタムドメインが API ホスト名を受け，ゾーンのセキュリティ設定を通過したリクエストを Cloud Run のデフォルト URL（`run.app`）へ転送する．無料枠で動き，LB の固定費がかからない．`run.app` URL へ直接アクセスすると Cloudflare を迂回できる点は残る（[5. 未決事項](#5-未決事項)）．
+Cloudflare から Cloud Run への接続は **Cloudflare Workers による転送**を採用した．Worker が API へのリクエストを受け，Cloud Run のデフォルト URL（`run.app`）へ転送する．
+
+API の公開 URL は2通りあり，`envs/<env>/cloudflare/terraform.tfvars` で切り替える．ドメインを取得するまでは workers.dev で公開する．
+
+| 公開方法 | 設定 | URL | ゾーン設定（SSL/TLS・WAF 等） |
+| --- | --- | --- | --- |
+| **workers.dev（現在）** | `workers_dev_subdomain` | `https://tkb-<env>-api-proxy.<subdomain>.workers.dev` | 使えない（自分のゾーンがない） |
+| カスタムドメイン | `hostname`・`zone_id` | `https://api-dev.<domain>` 等 | 使える．workers.dev 側の URL は無効にする |
+
+無料枠で動き，LB の固定費がかからない．`run.app` URL へ直接アクセスすると Cloudflare を迂回できる点は残る（[5. 未決事項](#5-未決事項)）．
 
 | 対象 | Terraform で管理するもの | Terraform で管理しないもの |
 | --- | --- | --- |
 | GCP | API 有効化，tfstate 用 GCS バケット，Artifact Registry，Cloud Run サービス・マイグレーション Job の設定，Secret Manager の Secret（器），サービスアカウントと IAM，GitHub Actions 用 Workload Identity 連携 | コンテナイメージのビルド・公開，Cloud Run のイメージ更新，Secret の値 |
-| Cloudflare | ゾーンの SSL/TLS 設定，転送用 Worker，API ホスト名（Worker カスタムドメイン．DNS レコード・証明書は Cloudflare が自動作成） | ドメイン取得・ゾーン作成，アカウント・API トークンの発行 |
+| Cloudflare | 転送用 Worker，workers.dev での公開，カスタムドメイン（ドメイン取得後．DNS レコード・証明書は Cloudflare が自動作成），ゾーンの SSL/TLS 設定（ドメイン取得後） | アカウントの workers.dev サブドメイン登録，ドメイン取得・ゾーン作成，API トークンの発行 |
 | Supabase | 対象外 | プロジェクト作成・Auth 設定・DB ロール作成・接続情報の取得（Dashboard で手動） |
 | DB スキーマ | 対象外 | backend の goose が正本．`auth` スキーマは Supabase 管理 |
 
@@ -87,8 +96,8 @@ infra/
 | | `tkb-<env>-migrate`（Cloud Run Job） | `/app/migrate up` を実行．`MIGRATION_DATABASE_URL` を Secret から渡す |
 | | `tkb-<env>-api` / `tkb-<env>-migrate`（SA） | それぞれ自分用の Secret だけを読める |
 | | `tkb-<env>-database-url` / `tkb-<env>-migration-database-url`（Secret） | 値は手動投入 |
-| `envs/shared/cloudflare` | ゾーン設定 | SSL `strict`，Always Use HTTPS，最小 TLS 1.2，TLS 1.3 |
-| `envs/<env>/cloudflare` | `tkb-<env>-api-proxy`（Worker）とカスタムドメイン | API ホスト名を Cloud Run へ転送 |
+| `envs/shared/cloudflare` | ゾーン設定 | SSL `strict`，Always Use HTTPS，最小 TLS 1.2，TLS 1.3．ドメイン取得まで適用しない |
+| `envs/<env>/cloudflare` | `tkb-<env>-api-proxy`（Worker）と公開設定 | workers.dev またはカスタムドメインで受けたリクエストを Cloud Run へ転送 |
 
 ## 3. 初期設定
 
@@ -96,7 +105,7 @@ infra/
 
 - Terraform 1.14 以上（`~> 1.14`），`gcloud` CLI，make
 - 課金を有効にした GCP プロジェクトと，そのオーナー相当の権限
-- Cloudflare アカウントと，API ホスト名に使うドメインのゾーン（Cloudflare へのネームサーバー移管済み）
+- Cloudflare アカウントと，その workers.dev サブドメイン（Workers & Pages の Account details で登録）．カスタムドメインを使う場合は，ドメインのゾーン（Cloudflare へのネームサーバー移管済み）
 - dev / prod の Supabase プロジェクト
 
 ### プレースホルダーの置き換え
@@ -114,8 +123,9 @@ make -C infra setup
 | GCP プロジェクト ID（`your-gcp-project-id`） | `bootstrap`，`envs/shared/gcp`，`envs/<env>/gcp` の `terraform.tfvars` |
 | tfstate バケット名（`your-gcp-project-id-tfstate`．グローバルに一意） | `bootstrap/terraform.tfvars`，`envs/backend.hcl`，`envs/<env>/*/terraform.tfvars` の `state_bucket` |
 | Supabase Auth の issuer | `envs/<env>/gcp/terraform.tfvars` |
-| Cloudflare アカウント ID・ゾーン ID | `envs/shared/cloudflare`，`envs/<env>/cloudflare` の `terraform.tfvars` |
-| API ホスト名（`api.example.com`，`api-dev.example.com`） | `envs/<env>/cloudflare/terraform.tfvars` |
+| Cloudflare アカウント ID（Dashboard の URL `dash.cloudflare.com/<ID>/...` の32桁） | `envs/<env>/cloudflare/terraform.tfvars` |
+| workers.dev サブドメイン名（`<name>.workers.dev` の `<name>`） | `envs/<env>/cloudflare/terraform.tfvars` の `workers_dev_subdomain` |
+| カスタムドメインを使う場合のみ：ゾーン ID・API ホスト名 | `envs/shared/cloudflare`，`envs/<env>/cloudflare` の `terraform.tfvars`（`zone_id`・`hostname`） |
 
 ### 認証
 
@@ -124,14 +134,15 @@ gcloud auth application-default login           # GCP（Cloudflare スタック�
 export CLOUDFLARE_API_TOKEN=...                   # Cloudflare スタックのみ
 ```
 
-Cloudflare の API トークンには，対象ゾーンの「Zone Settings: Edit」「DNS: Edit」「Workers Routes: Edit」と，アカウントの「Workers Scripts: Edit」を付与する．
+Cloudflare の API トークンには，アカウントの「Workers Scripts: Edit」を付与する．カスタムドメインを使う場合は，対象ゾーンの「Zone Settings: Edit」「DNS: Edit」「Workers Routes: Edit」も付与する．トークンは `terraform.tfvars` や `TF_VAR_*` で渡さない（Terraform の変数にすると plan ファイルに平文で残るため）．
 
 ## 4. 適用手順
 
 `make -C infra <init|plan|apply|output> STACK=<スタック>` で実行する．`plan` は `tfplan` を保存し，`apply` はその plan だけを適用する．prod は plan の内容をレビューしてから apply する．
 
 ```text
-bootstrap → envs/shared/gcp → envs/shared/cloudflare → envs/<env>/gcp → (Secret 投入・初回デプロイ) → envs/<env>/cloudflare
+bootstrap → envs/shared/gcp → envs/<env>/gcp → (Secret 投入・初回デプロイ) → envs/<env>/cloudflare
+（カスタムドメインを使う場合は envs/<env>/cloudflare の前に envs/shared/cloudflare）
 ```
 
 1. **bootstrap**（最初に1回）．state はローカルの `infra/bootstrap/terraform.tfstate` に残る．コミットせず，失った場合は `terraform import` で復元する．
@@ -145,6 +156,7 @@ bootstrap → envs/shared/gcp → envs/shared/cloudflare → envs/<env>/gcp → 
 
    ```bash
    make -C infra init plan STACK=envs/shared/gcp && make -C infra apply STACK=envs/shared/gcp
+   # カスタムドメインを使う場合のみ（ゾーンが必要）
    make -C infra init plan STACK=envs/shared/cloudflare && make -C infra apply STACK=envs/shared/cloudflare
    ```
 
@@ -169,7 +181,7 @@ bootstrap → envs/shared/gcp → envs/shared/cloudflare → envs/<env>/gcp → 
 
    ```bash
    make -C infra init plan STACK=envs/dev/cloudflare && make -C infra apply STACK=envs/dev/cloudflare
-   curl --fail https://api-dev.example.com/healthz
+   curl --fail "$(terraform -chdir=infra/envs/dev/cloudflare output -raw api_url)/healthz"
    ```
 
 ### 検証
@@ -187,7 +199,7 @@ make -C infra lock       # provider 更新後にロックファイルを再生�
 | `run.app` URL からの迂回 | Cloud Run は公開されており，`run.app` へ直接アクセスすると Cloudflare を通らない．Worker が共有シークレットのヘッダーを付け，API で検証する案がある（backend の対応が必要） |
 | レート制限・WAF ルール | 未設定．Cloudflare の料金プランで使える条件・ルール数が異なるため，プラン確定後に `envs/shared/cloudflare` へ追加する |
 | CI のワークフロー | Workload Identity 連携と CI 用 SA は作成するが，GitHub Actions のワークフローは未作成．prod へのデプロイを main ブランチに限定するかも未決 |
-| ドメイン | 未取得．取得後に Cloudflare ゾーンを作成し，tfvars を置き換える |
+| ドメイン | 未取得のため workers.dev で公開している．取得後に Cloudflare ゾーンを作成し，`envs/shared/cloudflare` を適用してから `hostname`・`zone_id` を設定して切り替える |
 | Supabase の Terraform 管理 | 当面は手動．設定項目が増えたら Supabase provider の導入を検討 |
 | 監視・アラート | 未設定 |
 

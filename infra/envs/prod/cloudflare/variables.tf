@@ -3,14 +3,22 @@ variable "account_id" {
   type        = string
 }
 
-variable "zone_id" {
-  description = "Cloudflare ゾーン ID"
+variable "workers_dev_subdomain" {
+  description = "アカウントの workers.dev サブドメイン名．hostname を指定しない場合に workers.dev で公開する"
   type        = string
+  default     = null
 }
 
 variable "hostname" {
-  description = "この環境の API ホスト名"
+  description = "カスタムドメインで公開する場合の API ホスト名．null なら workers.dev で公開する"
   type        = string
+  default     = null
+}
+
+variable "zone_id" {
+  description = "hostname を置く Cloudflare ゾーン ID．hostname を指定する場合に必須"
+  type        = string
+  default     = null
 }
 
 variable "state_bucket" {

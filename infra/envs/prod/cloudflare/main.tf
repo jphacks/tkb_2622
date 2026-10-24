@@ -11,8 +11,11 @@ module "api_endpoint" {
   source = "../../../modules/cloudflare/api-endpoint"
 
   account_id = var.account_id
-  zone_id    = var.zone_id
   env        = "prod"
-  hostname   = var.hostname
   origin_url = data.terraform_remote_state.gcp.outputs.service_uri
+
+  # hostname を指定しなければ workers.dev で公開する
+  workers_dev_subdomain = var.workers_dev_subdomain
+  hostname              = var.hostname
+  zone_id               = var.zone_id
 }

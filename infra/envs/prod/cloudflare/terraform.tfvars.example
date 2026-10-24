@@ -1,4 +1,9 @@
 account_id   = "your-cloudflare-account-id"
-zone_id      = "your-cloudflare-zone-id"
-hostname     = "api.example.com"
 state_bucket = "your-gcp-project-id-tfstate"
+
+# workers.dev で公開する（https://tkb-prod-api-proxy.<subdomain>.workers.dev）
+workers_dev_subdomain = "your-workers-subdomain"
+
+# ドメイン取得後にカスタムドメインへ切り替える場合は，次の2行を設定する
+# hostname = "api.example.com"
+# zone_id  = "your-cloudflare-zone-id"
