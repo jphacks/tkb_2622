@@ -2,7 +2,7 @@
 
 ## 目的
 
-時間が限られているため、mobileのAPIエラーを優先して再現・修正する。変更ごとにSimulatorで実行可能なテストを追加し、仕様・調査結果・未決事項をこの資料と関連資料へ反映する。
+時間が限られているため、mobileのAPIエラーを優先して再現・修正する。ユニットテストを追加し、Simulator向けアプリbuildと分けて実行する。Simulator内でのXCTest実行targetは今後整備し、仕様・調査結果・未決事項をこの資料と関連資料へ反映する。
 
 作業ブランチは`fix/mobile-api-stability`。作業単位でローカルコミットし、pushしない。
 
@@ -10,9 +10,10 @@
 
 - `RootTabView`は保存済みSupabase sessionを復元し、有効なら起動時のログイン画面を省略する。sessionがなく、ログインを後回しにした記録もなければ歓迎／ログイン画面を出す。
 - Mobile／DesktopともメールOTPを使い、Mobileは新規Auth user作成を許可する。OTP成功後、Mobileは`EnsureUser`と`GetMe`を呼び、Desktopも認証後に業務Userの確認を行う。同じSupabase project・backend環境・アカウントであれば同じsubjectから同じ業務Userへ対応する設計で、端末ペアリングコードはない。
-- Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plist／Build Settingsから公開設定値を読み、利用者の手入力を要求しない構造。Desktopは起動時の`FOCUS_LINK_*`環境変数を読む。Release値の実際の配布設定・環境一致は未確認。
-- 認証と業務User同期が分離していた。起動時の`RootTabView`はSupabase sessionだけでauthenticated tabへ進めていたため、今回`EnsureUser`／`GetMe`成功を起動条件に追加した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のテストを追加し、同期失敗後の実backend復旧は今後Simulatorで確認する。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、SimulatorでAPI通信・起動状態・通知登録ゲートテスト7件が通過した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
+- Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
+- Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
+- 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。監査で、設定画面からの認証状態変更通知がsessionの有無だけでauthenticatedへ切り替える経路を発見したため、通知後もRoot側で同期を再実行するよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のresolver testはあるが、SwiftUI rootの通知連携と実backend復旧はSimulator受け入れ待ち。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲートの7件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -44,7 +45,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 ### P0 — エラーを再現して直す
 
 0. **起動・認証・Desktop連携の導線を受け入れる**
-   - 初回起動で未ログインなら歓迎／ログイン画面が表示され、ログインを後回しにした場合は明示的なローカル利用になることを確認する。
+   - 初回起動で未ログインなら歓迎／ログイン画面が表示され、ログインを後回しにした場合は明示的なローカル利用になることを確認する。Release一般利用者へProject URL・publishable key・API URLの入力欄が表示されないことも確認する。
    - 新規メールと既存メールのOTPでSupabase Authへ入り、同じ環境のDesktopと同一の業務Userへ対応づくことを確認する。
    - 保存済みAuth sessionの再起動後復元、refresh、失効・ログアウト、EnsureUser／GetMe失敗後の再試行を確認する。
    - 利用者がSupabaseのkeyやAPI URLを手入力しなくてよいRelease設定経路と、Debug開発設定を分けて確認する。値自体は記録しない。
@@ -61,7 +62,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    - 各呼び出しについて、利用画面、request/response DTO、認証、エラー表示、retry、空状態を一覧化する。
 
 2. **再現・テスト基盤**
-   - iOS Simulator向けXCTest packageと`ConnectJSONClient` schemeを追加した。
+   - Swift PackageのXCTestを追加した。現状の7件はmacOS hostで実行し、iOS Simulator向けアプリbuildは別に行う。
    - `ConnectJSONClient`は`URLSession`を注入でき、transport seamでBearer header／Connect error／session欠落の3件を確認する。
    - 認証起動状態を`AuthenticationEntryState`へ分け、業務User同期成功の要件と新規未認証・ローカル利用への分岐を2件テストした。RootView／Supabase／Connect APIの結合状態遷移は別途確認する。
    - 1つの失敗シナリオごとに、テストを先に追加して失敗を確認し、修正後に通す。
@@ -70,7 +71,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 3. **現在報告されている通知画面の再読込エラー**
    - `.task`、scene復帰、認証変更、APNs token callbackによる重複refresh／重複登録をテストで確認する。
    - 同じtokenの並行／成功後の重複登録、明示的な再試行、未ログイン・設定不足、許可拒否時の解除を確認する。
-   - 同じtokenのin-flightと成功済み再読込はgateとSimulator testで対応。未ログイン／設定不足と許可拒否はAPI結合で引き続き確認する。
+   - 同じtokenのin-flightと成功済み再読込はgateとXCTestで対応。未ログイン／設定不足と許可拒否はAPI結合で引き続き確認する。
    - エラーコードは画面と診断ログで特定でき、token・access token等は表示／記録しない。
 
 4. **認証・Connect transport**
@@ -124,7 +125,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`を独立Simulator testに使用。必要ならRepository fakeを追加 | 初期分を実装 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`をテストするSwift Packageを追加。現行の`swift test`はmacOS host実行であり、iOS Simulator XCTest targetは未整備。iOS Simulator向けRewardTime app buildは別途実行 | 初期分を実装、Simulator test target未整備 |
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
@@ -133,12 +134,8 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 ## テスト実行
 
-API transport／起動状態XCTestは`mobile/RewardTimeTests/Package.swift`でアプリ本体の`Data/ConnectJSONClient.swift`と`Data/AuthenticationEntryState.swift`を直接コンパイルする。Simulator UDIDは`xcrun simctl list devices available`で確認する。
+API transport／起動状態のユニットテストは`mobile/RewardTimeTests/Package.swift`でアプリ本体の`Data/ConnectJSONClient.swift`と`Data/AuthenticationEntryState.swift`を直接コンパイルする。これはmacOS host上で動作し、iOS Simulator XCTest実行ではない。
 
 ```sh
-cd mobile/RewardTimeTests
-xcodebuild -scheme ConnectJSONClient \
-  -destination 'platform=iOS Simulator,id=<Simulator UDID>' \
-  -derivedDataPath /private/tmp/tkb2622-connect-tests-derived \
-  CODE_SIGNING_ALLOWED=NO test
+swift test --package-path mobile/RewardTimeTests
 ```

@@ -151,15 +151,10 @@ struct RootTabView: View {
 
   @MainActor
   private func refreshAuthenticationAfterChange() async {
-    let hasSession = await hasAuthenticatedSession()
-
-    if hasSession {
-      loginDeferred = false
-      entryState = .authenticated
-    } else {
-      loginDeferred = false
-      entryState = .welcome
-    }
+    loginDeferred = false
+    identitySyncError = nil
+    entryState = .checking
+    await restoreAuthentication()
   }
 
   @MainActor
