@@ -10,8 +10,10 @@ const colors = {
   softBorder: '#F2F0FA',
   purple: '#5B4BDB',
   work: '#6D5DF0',
+  related: '#9B86F5',
   distraction: '#FF7A59',
   uncertain: '#9A91AE',
+  inactive: '#64748B',
 };
 
 const cardStyle: CSSProperties = {
@@ -53,11 +55,22 @@ const categories = [
 ] as const;
 
 export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'demo' | 'local-monitor' }) {
-  const categorySeconds = [
-    result?.workSeconds ?? 0,
-    result?.distractedSeconds ?? 0,
-    result?.uncertainSeconds ?? 0,
+  const hasLocalEvaluation = mode === 'local-monitor' && Boolean(result?.evaluatorVersion);
+  const categories = hasLocalEvaluation ? [
+    { key: 'task', label: '作業（T）', color: colors.work, background: '#ECE9FF', foreground: '#4336B8' },
+    { key: 'related', label: '関連作業（R）', color: colors.related, background: '#F0EBFF', foreground: '#553DAD' },
+    { key: 'distraction', label: '脱線（D）', color: colors.distraction, background: '#FFF0E9', foreground: '#A64A32' },
+    { key: 'uncertain', label: '不明（U）', color: colors.uncertain, background: '#F2EFF7', foreground: '#655B79' },
+    { key: 'inactive', label: '非活動（I）', color: colors.inactive, background: '#EEF2F6', foreground: '#475569' },
+  ] : [
+    { key: 'work', label: '作業', color: colors.work, background: '#ECE9FF', foreground: '#4336B8' },
+    { key: 'distraction', label: '脱線', color: colors.distraction, background: '#FFF0E9', foreground: '#A64A32' },
+    { key: 'uncertain', label: '保留', color: colors.uncertain, background: '#F2EFF7', foreground: '#655B79' },
   ];
+  const categorySeconds = hasLocalEvaluation ? [
+    result?.taskSeconds ?? 0, result?.relatedSeconds ?? 0, result?.distractedSeconds ?? 0,
+    result?.uncertainSeconds ?? 0, result?.inactiveSeconds ?? 0,
+  ] : [result?.workSeconds ?? 0, result?.distractedSeconds ?? 0, result?.uncertainSeconds ?? 0];
   const classifiedSeconds = categorySeconds.reduce((total, seconds) => total + Math.max(0, seconds), 0);
   const timeFor = (seconds: number | undefined) => result && seconds !== undefined ? duration(seconds) : '—';
 
@@ -72,7 +85,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
           {result ? statusLabels[result.status] ?? '状態未取得' : '結果はありません'}
         </span>
         <span style={{ fontSize: 13, padding: '4px 12px', borderRadius: 99, background: '#F2EFF7', color: '#655B79', fontWeight: 700 }}>
-          {mode === 'local-monitor' ? 'ローカル計測を保存・活動評価と報酬は未接続' : '同期・評価状態 未取得'}
+          {mode === 'local-monitor' ? (hasLocalEvaluation ? 'ローカル5分類評価済み' : 'ローカル評価未完了') : '同期・評価状態 未取得'}
         </span>
       </div>
     </header>
@@ -83,7 +96,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
         <div style={{ fontWeight: 700, fontSize: 44, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
           {mode === 'local-monitor' ? '—' : result ? `+${duration(result.earnedSeconds)}` : '—'}
         </div>
-        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '活動の分類・報酬APIは未接続です' : '算定根拠・受取前後の残高：未取得'}</div>
+        <div style={{ fontSize: 13, color: '#E4E0FF' }}>{mode === 'local-monitor' ? '報酬換算式・報酬APIは未接続です' : '算定根拠・受取前後の残高：未取得'}</div>
       </div>
       <div style={{ flex: '1 1 200px', boxSizing: 'border-box', background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ fontSize: 13, color: colors.muted }}>集中スコア</div>
@@ -95,9 +108,9 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
     <section style={cardStyle}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
         <h2 style={headingStyle}>計測時間 {timeFor(result?.elapsedSeconds)} の内訳</h2>
-        <span style={metaStyle}>一時停止時間は未取得</span>
+        <span style={metaStyle}>{hasLocalEvaluation ? '一時停止区間は集計から除外済み' : '一時停止時間は未取得'}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {categories.map((category, index) => {
           const seconds = categorySeconds[index];
           return <div key={category.key} style={{ borderRadius: 12, background: category.background, padding: '14px 16px', minWidth: 0 }}>
@@ -106,11 +119,11 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
               {category.label}
             </div>
             <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{timeFor(result ? seconds : undefined)}</div>
-            <div style={{ fontSize: 12, color: colors.muted }}>分類根拠は未取得</div>
+            <div style={{ fontSize: 12, color: colors.muted }}>{hasLocalEvaluation ? result?.evaluatorVersion : '分類根拠は未取得'}</div>
           </div>;
         })}
       </div>
-      <div role="img" aria-label="作業、脱線、保留の時間内訳" style={{ display: 'flex', height: 30, borderRadius: 6, overflow: 'hidden', background: '#EFEDF7' }}>
+      <div role="img" aria-label={hasLocalEvaluation ? '5分類の時間内訳' : '作業、脱線、保留の時間内訳'} style={{ display: 'flex', height: 30, borderRadius: 6, overflow: 'hidden', background: '#EFEDF7' }}>
         {categories.map((category, index) => {
           const seconds = Math.max(0, categorySeconds[index]);
           const width = classifiedSeconds === 0 ? 0 : seconds / classifiedSeconds * 100;
@@ -127,13 +140,13 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
         </span>
         <span>終了時刻 —</span>
       </div>
-      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{mode === 'local-monitor' ? '観測データはこのMacに保存しました。アプリ・ドメインの分類と報酬評価は未接続です。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
+      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{hasLocalEvaluation ? '5分類はこのMacで集計しました。非活動（I）は確定した画面ロック・スリープ情報がある場合だけ加算します。報酬時間は未確定です。' : mode === 'local-monitor' ? '観測データはこのMacに保存しました。ローカル評価を完了できませんでした。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
     </section>
 
     <section style={{ ...cardStyle, gap: 12 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
-        <h2 style={headingStyle}>判定の根拠（アプリ・サイト別）</h2>
-        <span style={metaStyle}>分類根拠は未取得です</span>
+        <h2 style={headingStyle}>アプリ・サイト別の区間</h2>
+        <span style={metaStyle}>区間一覧の画面表示は未接続</span>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', fontSize: 14, fontVariantNumeric: 'tabular-nums', textAlign: 'left', whiteSpace: 'nowrap' }}>
@@ -149,7 +162,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
           <tbody>
             <tr>
               <td colSpan={5} style={{ ...tableCellStyle, padding: '18px 6px', textAlign: 'center', color: colors.muted, whiteSpace: 'normal' }}>
-                アプリ・サイト別の判定データは未取得です。
+                {hasLocalEvaluation ? '5分類の時間合計を上に表示しています。アプリ・サイト別の区間明細は未表示です。' : 'アプリ・サイト別の判定データは未取得です。'}
               </td>
             </tr>
           </tbody>

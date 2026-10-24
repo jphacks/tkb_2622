@@ -23,7 +23,7 @@ export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
   if (!task) return <section className="session-panel start-panel"><h1>タスクがありません</h1><p>設定から最初のタスクを作成してください。</p><button className="button primary" onClick={() => onNavigate?.('settings')}>設定を開く</button></section>;
   const elapsed = session?.elapsedSeconds ?? 0;
   const canFinish = state.actions.finish.allowed;
-  const monitor = state.monitor ?? { state: 'unavailable', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
+  const monitor = state.monitor ?? { state: 'unavailable', appId: '', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
   const observedContext = [monitor.appName, monitor.domain].filter(Boolean).join(' ・ ');
   const monitorLine = state.mode === 'local-monitor'
     ? monitor.message || (observedContext ? `観測中：${observedContext}（${monitor.sampleCount}件）` : `観測状態：${monitor.state}（${monitor.sampleCount}件）`)

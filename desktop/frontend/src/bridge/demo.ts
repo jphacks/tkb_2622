@@ -19,7 +19,7 @@ function normalizeSettings(input: Settings): Settings | null {
   const classificationNames = new Set<string>();
   for (const classification of settings.classifications) {
     classification.name = classification.name.trim();
-    if (!classification.name || [...classification.name].length > 200 || !['work', 'distraction', 'uncertain'].includes(classification.category) || classificationNames.has(classification.name)) return null;
+    if (!classification.name || [...classification.name].length > 200 || !['work', 'related', 'distraction', 'uncertain'].includes(classification.category) || classificationNames.has(classification.name)) return null;
     classificationNames.add(classification.name);
   }
   return settings;
@@ -36,7 +36,7 @@ export class DemoBridge implements DesktopBridge {
     this.state = {
       revision: 0, platform, mode: 'demo', updatedAt: new Date().toISOString(), session: null,
       balanceSeconds: null, sync: 'synced', permission: 'unknown', online: true,
-      monitor: { state: 'demo', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' },
+      monitor: { state: 'demo', appId: '', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' },
       restrictionDesired: 'unknown', restrictionConfirmed: false,
       settings: { tasks: copy(defaultTasks), selectedTaskId: defaultTask.id, classifications: copy(defaultClassifications) },
       history: [], result: null, actions: {} as Snapshot['actions'], failure: null,
@@ -184,7 +184,7 @@ export class DemoBridge implements DesktopBridge {
       }
       case 'classification': {
         const item = { ...command.classification, name: command.classification.name.trim() };
-        if (!item.name || [...item.name].length > 200 || !['work', 'distraction', 'uncertain'].includes(item.category)) { this.fail('invalid_input', '分類の名前と種別を確認してください。'); break; }
+        if (!item.name || [...item.name].length > 200 || !['work', 'related', 'distraction', 'uncertain'].includes(item.category)) { this.fail('invalid_input', '分類の名前と種別を確認してください。'); break; }
         const index = this.state.settings.classifications.findIndex(value => value.name === item.name);
         if (index >= 0) this.state.settings.classifications[index] = item; else this.state.settings.classifications.push(item); break;
       }
