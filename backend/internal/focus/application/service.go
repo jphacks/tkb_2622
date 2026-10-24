@@ -11,18 +11,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/focus/domain"
 )
 
 var (
-	ErrUnauthenticated = errors.New("authentication required")
-	ErrForbidden       = errors.New("access denied")
-	ErrNotFound        = errors.New("resource not found")
-	ErrInvalid         = errors.New("invalid request")
-	ErrConflict        = errors.New("state or operation conflicts")
-	ErrPrecondition    = errors.New("operation precondition not met")
-	// ErrMissing is retryable with the same operation ID once the earlier batches are accepted.
-	ErrMissing = errors.New("earlier activity batches have not been accepted yet")
+	ErrUnauthenticated = apperr.ErrUnauthenticated
+	ErrForbidden       = apperr.ErrForbidden
+	ErrNotFound        = apperr.ErrNotFound
+	ErrInvalid         = apperr.ErrInvalid
+	ErrConflict        = apperr.ErrConflict
+	ErrPrecondition    = apperr.ErrPrecondition
+	ErrMissing         = apperr.ErrMissing
 )
 
 type (

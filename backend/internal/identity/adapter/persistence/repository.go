@@ -254,3 +254,10 @@ func (r *Repository) Actor(ctx context.Context, p application.Principal) (applic
 	out.DeviceID, out.DevicePlatform = d.ID.String(), d.Platform
 	return out, nil
 }
+func (r *Repository) ActiveIPhone(ctx context.Context, userID string) (string, error) {
+	d, err := q.New(r.db).ActiveIPhone(ctx, uid(userID))
+	if err != nil {
+		return "", translate(err)
+	}
+	return d.ID.String(), nil
+}

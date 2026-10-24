@@ -4,13 +4,14 @@ package focusconnect
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"strings"
 
 	"connectrpc.com/connect"
 	v1 "github.com/jphacks/tkb_2622/backend/gen/focus/v1"
 	rewardv1 "github.com/jphacks/tkb_2622/backend/gen/reward/v1"
+	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/focus/application"
+	restrictionconnect "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/connect"
 	reward "github.com/jphacks/tkb_2622/backend/internal/reward/application"
 	workflow "github.com/jphacks/tkb_2622/backend/internal/workflow/application"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -29,33 +30,7 @@ func New(resolve ResolveActor, service *application.Service, sessions *workflow.
 	return &Handler{resolve: resolve, service: service, sessions: sessions}
 }
 
-// Error converts focus application errors to connect errors for handlers that share the actor resolution.
-func Error(err error) error { return rpcError(err) }
-
-func rpcError(err error) error {
-	code := connect.CodeInternal
-	message := "operation failed"
-	detail := strings.ReplaceAll(err.Error(), "\n", ": ")
-	switch {
-	case errors.Is(err, application.ErrUnauthenticated):
-		code, message = connect.CodeUnauthenticated, detail
-	case errors.Is(err, application.ErrForbidden):
-		code, message = connect.CodePermissionDenied, detail
-	case errors.Is(err, application.ErrNotFound):
-		code, message = connect.CodeNotFound, detail
-	case errors.Is(err, application.ErrInvalid):
-		code, message = connect.CodeInvalidArgument, detail
-	case errors.Is(err, application.ErrConflict):
-		code, message = connect.CodeAborted, detail
-	case errors.Is(err, application.ErrMissing), errors.Is(err, application.ErrPrecondition):
-		code, message = connect.CodeFailedPrecondition, detail
-	case errors.Is(err, context.Canceled):
-		code, message = connect.CodeCanceled, "request canceled"
-	case errors.Is(err, context.DeadlineExceeded):
-		code, message = connect.CodeDeadlineExceeded, "request timed out"
-	}
-	return connect.NewError(code, errors.New(message))
-}
+func rpcError(err error) error { return apperr.Connect(err) }
 
 var (
 	categoryOut = map[string]v1.TaskCategory{"PROGRAMMING": v1.TaskCategory_TASK_CATEGORY_PROGRAMMING, "DOCUMENT_WRITING": v1.TaskCategory_TASK_CATEGORY_DOCUMENT_WRITING, "READING": v1.TaskCategory_TASK_CATEGORY_READING, "DESIGN": v1.TaskCategory_TASK_CATEGORY_DESIGN, "STUDY": v1.TaskCategory_TASK_CATEGORY_STUDY, "OTHER": v1.TaskCategory_TASK_CATEGORY_OTHER}
@@ -178,7 +153,7 @@ func (h *Handler) StartSession(ctx context.Context, req *connect.Request[v1.Star
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.StartSessionResponse{Session: session(r.Session), Balance: balance(r.Balance)}), nil
+	return connect.NewResponse(&v1.StartSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
 }
 func (h *Handler) UploadActivityBatch(ctx context.Context, req *connect.Request[v1.UploadActivityBatchRequest]) (*connect.Response[v1.UploadActivityBatchResponse], error) {
 	a, err := h.resolve(ctx)
@@ -222,7 +197,7 @@ func (h *Handler) ResumeSession(ctx context.Context, req *connect.Request[v1.Res
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.ResumeSessionResponse{Session: session(r.Session), Balance: balance(r.Balance)}), nil
+	return connect.NewResponse(&v1.ResumeSessionResponse{Session: session(r.Session), Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
 }
 func (h *Handler) endInput(msg interface {
 	GetOperationId() string
@@ -254,7 +229,7 @@ func (h *Handler) FinishSession(ctx context.Context, req *connect.Request[v1.Fin
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.FinishSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance)}), nil
+	return connect.NewResponse(&v1.FinishSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
 }
 func (h *Handler) AbortSession(ctx context.Context, req *connect.Request[v1.AbortSessionRequest]) (*connect.Response[v1.AbortSessionResponse], error) {
 	a, err := h.resolve(ctx)
@@ -269,7 +244,7 @@ func (h *Handler) AbortSession(ctx context.Context, req *connect.Request[v1.Abor
 	if err != nil {
 		return nil, rpcError(err)
 	}
-	return connect.NewResponse(&v1.AbortSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance)}), nil
+	return connect.NewResponse(&v1.AbortSessionResponse{Session: session(r.Session), DiscardedSeconds: r.Discarded, Balance: balance(r.Balance), Restriction: restrictionconnect.StateMessage(r.Restriction)}), nil
 }
 func (h *Handler) GetCurrentSession(ctx context.Context, req *connect.Request[v1.GetCurrentSessionRequest]) (*connect.Response[v1.GetCurrentSessionResponse], error) {
 	a, err := h.resolve(ctx)

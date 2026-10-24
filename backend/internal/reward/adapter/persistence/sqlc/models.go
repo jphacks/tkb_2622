@@ -53,6 +53,44 @@ type AppIdentityOperation struct {
 	Response    json.RawMessage
 }
 
+type AppRestrictionOperation struct {
+	UserID      uuid.UUID
+	Kind        string
+	OperationID uuid.UUID
+	RequestHash string
+	ResourceID  uuid.UUID
+	Response    json.RawMessage
+}
+
+type AppRestrictionPolicy struct {
+	DeviceID            uuid.UUID
+	UserID              uuid.UUID
+	Enabled             bool
+	TargetMode          string
+	UsageTimeMode       string
+	AllowedAppsPolicy   string
+	DeviceConfigVersion int64
+	Configured          bool
+	Version             int64
+	UpdatedAt           time.Time
+}
+
+type AppRestrictionState struct {
+	UserID           uuid.UUID
+	DeviceID         uuid.NullUUID
+	SessionID        uuid.NullUUID
+	ControlRevision  int64
+	DesiredMode      string
+	ActiveGrantID    uuid.NullUUID
+	AppliedRevision  int64
+	ShieldStatus     string
+	PermissionStatus string
+	LastAppliedAt    sql.NullTime
+	LastReportedAt   sql.NullTime
+	FailureReason    string
+	Version          int64
+}
+
 type AppRewardGrant struct {
 	ID            uuid.UUID
 	SessionID     uuid.UUID
@@ -96,6 +134,28 @@ type AppTask struct {
 	Version        int64
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type AppUsageGrant struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	DeviceID           uuid.UUID
+	SessionID          uuid.UUID
+	RequestedSeconds   int64
+	ReservedSeconds    int64
+	Status             string
+	ControlRevision    int64
+	IssuedAt           time.Time
+	ActivatedAt        sql.NullTime
+	ReportSeq          int64
+	ReportedSeconds    int64
+	LastObservedAt     sql.NullTime
+	ConsumedSeconds    sql.NullInt64
+	DiscardedSeconds   sql.NullInt64
+	EndReason          sql.NullString
+	EndedByOperationID string
+	CompletedAt        sql.NullTime
+	Version            int64
 }
 
 type AppUser struct {

@@ -1,0 +1,207 @@
+syntax = "proto3";
+package restriction.v1;
+option go_package = "github.com/jphacks/tkb_2622/backend/gen/restriction/v1;restrictionv1";
+
+import "google/protobuf/timestamp.proto";
+import "reward/v1/reward.proto";
+
+// Apple selection tokens stay on the iPhone; this API only handles metadata, grants and reports.
+service RestrictionService {
+  // Called by the iPhone for itself. Rejected while a usage grant is open.
+  rpc UpdateRestrictionPolicy(UpdateRestrictionPolicyRequest) returns (UpdateRestrictionPolicyResponse);
+  rpc GetRestrictionPolicy(GetRestrictionPolicyRequest) returns (GetRestrictionPolicyResponse);
+  // Spends balance and issues a timed unlock. Only while the session is PAUSED with all records evaluated.
+  rpc ReserveUsageGrant(ReserveUsageGrantRequest) returns (ReserveUsageGrantResponse);
+  rpc GetUsageGrant(GetUsageGrantRequest) returns (GetUsageGrantResponse);
+  rpc GetRestrictionState(GetRestrictionStateRequest) returns (GetRestrictionStateResponse);
+  rpc ReportRestrictionState(ReportRestrictionStateRequest) returns (ReportRestrictionStateResponse);
+  rpc ReportUsage(ReportUsageRequest) returns (ReportUsageResponse);
+  rpc GetRestrictionOperation(GetRestrictionOperationRequest) returns (GetRestrictionOperationResponse);
+}
+
+enum PolicyStatus {
+  POLICY_STATUS_UNSPECIFIED = 0;
+  POLICY_STATUS_ENABLED = 1;
+  POLICY_STATUS_DISABLED = 2;
+  // Set by the server while the latest report says Screen Time permission is not granted.
+  POLICY_STATUS_PERMISSION_REQUIRED = 3;
+}
+enum TargetMode {
+  TARGET_MODE_UNSPECIFIED = 0;
+  TARGET_MODE_SELECTED_APPS = 1;
+  TARGET_MODE_DEVICE_WIDE = 2;
+}
+message RestrictionPolicy {
+  string device_id = 1;
+  PolicyStatus status = 2;
+  TargetMode target_mode = 3;
+  // Fixed for now: ACTIVE_USAGE.
+  string usage_time_mode = 4;
+  // Fixed for now: STANDARD_APPS_EXCEPT_SAFARI.
+  string allowed_apps_policy = 5;
+  // Version of the app selection kept on the device.
+  int64 device_config_version = 6;
+  // Whether the device has finished selecting target apps.
+  bool configured = 7;
+  int64 version = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+message UpdateRestrictionPolicyRequest {
+  string operation_id = 1;
+  string device_id = 2;
+  // 0 to create.
+  int64 expected_version = 3;
+  bool enabled = 4;
+  TargetMode target_mode = 5;
+  int64 device_config_version = 6;
+  bool configured = 7;
+}
+message UpdateRestrictionPolicyResponse { RestrictionPolicy policy = 1; }
+message GetRestrictionPolicyRequest { string device_id = 1; }
+message GetRestrictionPolicyResponse { RestrictionPolicy policy = 1; }
+
+enum GrantStatus {
+  GRANT_STATUS_UNSPECIFIED = 0;
+  GRANT_STATUS_RESERVED = 1;
+  GRANT_STATUS_ACTIVATED = 2;
+  GRANT_STATUS_EXHAUSTED = 3;
+  GRANT_STATUS_REVOKED = 4;
+  GRANT_STATUS_ACTIVATION_FAILED = 5;
+}
+enum GrantEndReason {
+  GRANT_END_REASON_UNSPECIFIED = 0;
+  GRANT_END_REASON_USAGE_EXHAUSTED = 1;
+  GRANT_END_REASON_WORK_STARTED = 2;
+  GRANT_END_REASON_WORK_RESUMED = 3;
+  GRANT_END_REASON_SESSION_FINISHED = 4;
+  GRANT_END_REASON_SESSION_ABORTED = 5;
+  GRANT_END_REASON_ACTIVATION_FAILED = 6;
+}
+message UsageGrant {
+  string id = 1;
+  string session_id = 2;
+  string device_id = 3;
+  int64 requested_seconds = 4;
+  int64 reserved_seconds = 5;
+  GrantStatus status = 6;
+  // Control revision that carries this unlock.
+  int64 control_revision = 7;
+  google.protobuf.Timestamp issued_at = 8;
+  google.protobuf.Timestamp activated_at = 9;
+  // Latest cumulative usage reported by the device.
+  int64 reported_seconds = 10;
+  // Confirmed values. Unset until confirmed; never guessed.
+  optional int64 consumed_seconds = 11;
+  optional int64 discarded_seconds = 12;
+  GrantEndReason end_reason = 13;
+  string ended_by_operation_id = 14;
+  google.protobuf.Timestamp completed_at = 15;
+}
+message ReserveUsageGrantRequest {
+  string operation_id = 1;
+  string session_id = 2;
+  int64 expected_session_version = 3;
+  string device_id = 4;
+  int64 requested_seconds = 5;
+}
+message ReserveUsageGrantResponse {
+  UsageGrant grant = 1;
+  reward.v1.RewardBalance balance = 2;
+  RestrictionState state = 3;
+}
+message GetUsageGrantRequest { string grant_id = 1; }
+message GetUsageGrantResponse { UsageGrant grant = 1; }
+
+enum DesiredMode {
+  DESIRED_MODE_UNSPECIFIED = 0;
+  // No work session: target apps are not restricted.
+  DESIRED_MODE_UNRESTRICTED = 1;
+  DESIRED_MODE_SHIELDED = 2;
+  // Unlocked until the active grant is used up.
+  DESIRED_MODE_TIMED_UNLOCK = 3;
+  // Unlocked because the session finished or aborted. Usage is not counted.
+  DESIRED_MODE_SESSION_ENDED = 4;
+}
+enum ShieldStatus {
+  SHIELD_STATUS_UNSPECIFIED = 0;
+  SHIELD_STATUS_SHIELDED = 1;
+  SHIELD_STATUS_UNSHIELDED = 2;
+  SHIELD_STATUS_UNKNOWN = 3;
+  SHIELD_STATUS_ERROR = 4;
+}
+enum PermissionStatus {
+  PERMISSION_STATUS_UNSPECIFIED = 0;
+  PERMISSION_STATUS_GRANTED = 1;
+  PERMISSION_STATUS_DENIED = 2;
+  PERMISSION_STATUS_NOT_DETERMINED = 3;
+}
+// What the server wants (desired_mode at control_revision) and what the iPhone last reported.
+// The device must apply the newest revision; a report never counts as applied for a newer revision.
+message RestrictionState {
+  string session_id = 1;
+  string device_id = 2;
+  int64 control_revision = 3;
+  DesiredMode desired_mode = 4;
+  UsageGrant active_grant = 5;
+  int64 applied_revision = 6;
+  ShieldStatus shield_status = 7;
+  PermissionStatus permission_status = 8;
+  google.protobuf.Timestamp last_applied_at = 9;
+  google.protobuf.Timestamp last_reported_at = 10;
+  string failure_reason = 11;
+}
+message GetRestrictionStateRequest {}
+message GetRestrictionStateResponse { RestrictionState state = 1; }
+message ReportRestrictionStateRequest {
+  string operation_id = 1;
+  string device_id = 2;
+  int64 control_revision = 3;
+  // Set when the report is about applying a timed unlock.
+  string grant_id = 4;
+  ShieldStatus shield_status = 5;
+  google.protobuf.Timestamp applied_at = 6;
+  PermissionStatus permission_status = 7;
+  string failure_reason = 8;
+}
+message ReportRestrictionStateResponse {
+  // False when the report was older than the latest applied revision and only refreshed reported_at.
+  bool applied = 1;
+  RestrictionState state = 2;
+}
+message ReportUsageRequest {
+  string operation_id = 1;
+  string grant_id = 2;
+  // Increases per report of the grant. Reports with an older seq are ignored.
+  int64 report_seq = 3;
+  // Cumulative actual usage of target apps since the unlock. Always-allowed apps are excluded.
+  int64 cumulative_seconds = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  // For a revoked grant: the last report, which settles consumed and discarded seconds.
+  bool final = 6;
+}
+message ReportUsageResponse {
+  UsageGrant grant = 1;
+  RestrictionState state = 2;
+}
+enum OperationKind {
+  OPERATION_KIND_UNSPECIFIED = 0;
+  OPERATION_KIND_UPDATE_POLICY = 1;
+  OPERATION_KIND_RESERVE = 2;
+  OPERATION_KIND_REPORT_STATE = 3;
+  OPERATION_KIND_REPORT_USAGE = 4;
+}
+enum OperationStatus {
+  OPERATION_STATUS_UNSPECIFIED = 0;
+  // No committed result. This does not guarantee the operation never ran; retry with the same ID.
+  OPERATION_STATUS_NOT_FOUND = 1;
+  OPERATION_STATUS_SUCCEEDED = 2;
+}
+message GetRestrictionOperationRequest {
+  OperationKind kind = 1;
+  string operation_id = 2;
+}
+message GetRestrictionOperationResponse {
+  OperationStatus status = 1;
+  // Policy device ID, grant ID or state device ID depending on the kind.
+  string resource_id = 2;
+}

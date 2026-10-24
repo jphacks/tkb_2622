@@ -2,7 +2,21 @@ openapi: 3.1.0
 info:
   title: tkb backend API
   version: v1
-  description: Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない．
+  description: |
+    Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない（`make -C backend generate`）．
+    すべてのRPCに Supabase のアクセストークン（右上の Authorize）が必要．
+
+    **準備**：EnsureUser → 各端末で RegisterDevice（PCは MACOS／WINDOWS，iPhoneは IOS）→ iPhoneで UpdateRestrictionPolicy（enabled=true）→ PCで CreateTask．
+
+    **基本ループ**
+    1. PC：StartSession（iPhoneへ制限を要求）
+    2. PC：UploadActivityBatch を seq=1,2,… で定期送信．作業時間（TASK＋RELATED_TRANSITION）の1/3が秒単位切り捨てで残高に付与される
+    3. PC：PauseSession（last_seq に最後に送った seq）
+    4. iPhone：ReserveUsageGrant で残高から秒数を確保 → ReportRestrictionState（解除適用）→ ReportUsage（累積の実利用秒数）
+    5. PC：ResumeSession（利用枠の残りは破棄，残高は保持）または FinishSession／AbortSession（残高は全て破棄）
+
+    iPhoneは常に RestrictionState の最新 control_revision を適用し，適用結果を ReportRestrictionState で報告する．
+    変更系RPCは operation_id（UUID）で冪等．応答を失った場合は同じIDで再送するか Get*Operation で照会する．
 servers:
   - url: /
 security:
@@ -124,6 +138,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/reward.v1.RewardBalance'
           title: balance
+        restriction:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: restriction
       title: AbortSessionResponse
       additionalProperties: false
     focus.v1.ActivityClass:
@@ -296,6 +314,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/reward.v1.RewardBalance'
           title: balance
+        restriction:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: restriction
       title: FinishSessionResponse
       additionalProperties: false
     focus.v1.FocusMode:
@@ -487,6 +509,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/reward.v1.RewardBalance'
           title: balance
+        restriction:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: restriction
       title: ResumeSessionResponse
       additionalProperties: false
     focus.v1.Session:
@@ -595,6 +621,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/reward.v1.RewardBalance'
           title: balance
+        restriction:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: restriction
       title: StartSessionResponse
       additionalProperties: false
     focus.v1.Task:
@@ -883,6 +913,481 @@ components:
           type: string
           title: created_at
       title: User
+      additionalProperties: false
+    restriction.v1.DesiredMode:
+      type: string
+      title: DesiredMode
+      enum:
+        - DESIRED_MODE_UNSPECIFIED
+        - DESIRED_MODE_UNRESTRICTED
+        - DESIRED_MODE_SHIELDED
+        - DESIRED_MODE_TIMED_UNLOCK
+        - DESIRED_MODE_SESSION_ENDED
+    restriction.v1.GetRestrictionOperationRequest:
+      type: object
+      properties:
+        kind:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.OperationKind'
+          title: kind
+        operationId:
+          type: string
+          title: operation_id
+      title: GetRestrictionOperationRequest
+      additionalProperties: false
+    restriction.v1.GetRestrictionOperationResponse:
+      type: object
+      properties:
+        status:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.OperationStatus'
+          title: status
+        resourceId:
+          type: string
+          title: resource_id
+          description: Policy device ID, grant ID or state device ID depending on the kind.
+      title: GetRestrictionOperationResponse
+      additionalProperties: false
+    restriction.v1.GetRestrictionPolicyRequest:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          title: device_id
+      title: GetRestrictionPolicyRequest
+      additionalProperties: false
+    restriction.v1.GetRestrictionPolicyResponse:
+      type: object
+      properties:
+        policy:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionPolicy'
+          title: policy
+      title: GetRestrictionPolicyResponse
+      additionalProperties: false
+    restriction.v1.GetRestrictionStateRequest:
+      type: object
+      title: GetRestrictionStateRequest
+      additionalProperties: false
+    restriction.v1.GetRestrictionStateResponse:
+      type: object
+      properties:
+        state:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: state
+      title: GetRestrictionStateResponse
+      additionalProperties: false
+    restriction.v1.GetUsageGrantRequest:
+      type: object
+      properties:
+        grantId:
+          type: string
+          title: grant_id
+      title: GetUsageGrantRequest
+      additionalProperties: false
+    restriction.v1.GetUsageGrantResponse:
+      type: object
+      properties:
+        grant:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.UsageGrant'
+          title: grant
+      title: GetUsageGrantResponse
+      additionalProperties: false
+    restriction.v1.GrantEndReason:
+      type: string
+      title: GrantEndReason
+      enum:
+        - GRANT_END_REASON_UNSPECIFIED
+        - GRANT_END_REASON_USAGE_EXHAUSTED
+        - GRANT_END_REASON_WORK_STARTED
+        - GRANT_END_REASON_WORK_RESUMED
+        - GRANT_END_REASON_SESSION_FINISHED
+        - GRANT_END_REASON_SESSION_ABORTED
+        - GRANT_END_REASON_ACTIVATION_FAILED
+    restriction.v1.GrantStatus:
+      type: string
+      title: GrantStatus
+      enum:
+        - GRANT_STATUS_UNSPECIFIED
+        - GRANT_STATUS_RESERVED
+        - GRANT_STATUS_ACTIVATED
+        - GRANT_STATUS_EXHAUSTED
+        - GRANT_STATUS_REVOKED
+        - GRANT_STATUS_ACTIVATION_FAILED
+    restriction.v1.OperationKind:
+      type: string
+      title: OperationKind
+      enum:
+        - OPERATION_KIND_UNSPECIFIED
+        - OPERATION_KIND_UPDATE_POLICY
+        - OPERATION_KIND_RESERVE
+        - OPERATION_KIND_REPORT_STATE
+        - OPERATION_KIND_REPORT_USAGE
+    restriction.v1.OperationStatus:
+      type: string
+      title: OperationStatus
+      enum:
+        - OPERATION_STATUS_UNSPECIFIED
+        - OPERATION_STATUS_NOT_FOUND
+        - OPERATION_STATUS_SUCCEEDED
+    restriction.v1.PermissionStatus:
+      type: string
+      title: PermissionStatus
+      enum:
+        - PERMISSION_STATUS_UNSPECIFIED
+        - PERMISSION_STATUS_GRANTED
+        - PERMISSION_STATUS_DENIED
+        - PERMISSION_STATUS_NOT_DETERMINED
+    restriction.v1.PolicyStatus:
+      type: string
+      title: PolicyStatus
+      enum:
+        - POLICY_STATUS_UNSPECIFIED
+        - POLICY_STATUS_ENABLED
+        - POLICY_STATUS_DISABLED
+        - POLICY_STATUS_PERMISSION_REQUIRED
+    restriction.v1.ReportRestrictionStateRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        deviceId:
+          type: string
+          title: device_id
+        controlRevision:
+          type: string
+          title: control_revision
+          format: int64
+        grantId:
+          type: string
+          title: grant_id
+          description: Set when the report is about applying a timed unlock.
+        shieldStatus:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.ShieldStatus'
+          title: shield_status
+        appliedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: applied_at
+        permissionStatus:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.PermissionStatus'
+          title: permission_status
+        failureReason:
+          type: string
+          title: failure_reason
+      title: ReportRestrictionStateRequest
+      additionalProperties: false
+    restriction.v1.ReportRestrictionStateResponse:
+      type: object
+      properties:
+        applied:
+          type: boolean
+          title: applied
+          description: False when the report was older than the latest applied revision and only refreshed reported_at.
+        state:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: state
+      title: ReportRestrictionStateResponse
+      additionalProperties: false
+    restriction.v1.ReportUsageRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        grantId:
+          type: string
+          title: grant_id
+        reportSeq:
+          type: string
+          title: report_seq
+          format: int64
+          description: Increases per report of the grant. Reports with an older seq are ignored.
+        cumulativeSeconds:
+          type: string
+          title: cumulative_seconds
+          format: int64
+          description: Cumulative actual usage of target apps since the unlock. Always-allowed apps are excluded.
+        observedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: observed_at
+        final:
+          type: boolean
+          title: final
+          description: 'For a revoked grant: the last report, which settles consumed and discarded seconds.'
+      title: ReportUsageRequest
+      additionalProperties: false
+    restriction.v1.ReportUsageResponse:
+      type: object
+      properties:
+        grant:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.UsageGrant'
+          title: grant
+        state:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: state
+      title: ReportUsageResponse
+      additionalProperties: false
+    restriction.v1.ReserveUsageGrantRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        sessionId:
+          type: string
+          title: session_id
+        expectedSessionVersion:
+          type: string
+          title: expected_session_version
+          format: int64
+        deviceId:
+          type: string
+          title: device_id
+        requestedSeconds:
+          type: string
+          title: requested_seconds
+          format: int64
+      title: ReserveUsageGrantRequest
+      additionalProperties: false
+    restriction.v1.ReserveUsageGrantResponse:
+      type: object
+      properties:
+        grant:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.UsageGrant'
+          title: grant
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardBalance'
+          title: balance
+        state:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionState'
+          title: state
+      title: ReserveUsageGrantResponse
+      additionalProperties: false
+    restriction.v1.RestrictionPolicy:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          title: device_id
+        status:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.PolicyStatus'
+          title: status
+        targetMode:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.TargetMode'
+          title: target_mode
+        usageTimeMode:
+          type: string
+          title: usage_time_mode
+          description: 'Fixed for now: ACTIVE_USAGE.'
+        allowedAppsPolicy:
+          type: string
+          title: allowed_apps_policy
+          description: 'Fixed for now: STANDARD_APPS_EXCEPT_SAFARI.'
+        deviceConfigVersion:
+          type: string
+          title: device_config_version
+          format: int64
+          description: Version of the app selection kept on the device.
+        configured:
+          type: boolean
+          title: configured
+          description: Whether the device has finished selecting target apps.
+        version:
+          type: string
+          title: version
+          format: int64
+        updatedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: updated_at
+      title: RestrictionPolicy
+      additionalProperties: false
+    restriction.v1.RestrictionState:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          title: session_id
+        deviceId:
+          type: string
+          title: device_id
+        controlRevision:
+          type: string
+          title: control_revision
+          format: int64
+        desiredMode:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.DesiredMode'
+          title: desired_mode
+        activeGrant:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.UsageGrant'
+          title: active_grant
+        appliedRevision:
+          type: string
+          title: applied_revision
+          format: int64
+        shieldStatus:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.ShieldStatus'
+          title: shield_status
+        permissionStatus:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.PermissionStatus'
+          title: permission_status
+        lastAppliedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: last_applied_at
+        lastReportedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: last_reported_at
+        failureReason:
+          type: string
+          title: failure_reason
+      title: RestrictionState
+      additionalProperties: false
+      description: |-
+        What the server wants (desired_mode at control_revision) and what the iPhone last reported.
+         The device must apply the newest revision; a report never counts as applied for a newer revision.
+    restriction.v1.ShieldStatus:
+      type: string
+      title: ShieldStatus
+      enum:
+        - SHIELD_STATUS_UNSPECIFIED
+        - SHIELD_STATUS_SHIELDED
+        - SHIELD_STATUS_UNSHIELDED
+        - SHIELD_STATUS_UNKNOWN
+        - SHIELD_STATUS_ERROR
+    restriction.v1.TargetMode:
+      type: string
+      title: TargetMode
+      enum:
+        - TARGET_MODE_UNSPECIFIED
+        - TARGET_MODE_SELECTED_APPS
+        - TARGET_MODE_DEVICE_WIDE
+    restriction.v1.UpdateRestrictionPolicyRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        deviceId:
+          type: string
+          title: device_id
+        expectedVersion:
+          type: string
+          title: expected_version
+          format: int64
+          description: 0 to create.
+        enabled:
+          type: boolean
+          title: enabled
+        targetMode:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.TargetMode'
+          title: target_mode
+        deviceConfigVersion:
+          type: string
+          title: device_config_version
+          format: int64
+        configured:
+          type: boolean
+          title: configured
+      title: UpdateRestrictionPolicyRequest
+      additionalProperties: false
+    restriction.v1.UpdateRestrictionPolicyResponse:
+      type: object
+      properties:
+        policy:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.RestrictionPolicy'
+          title: policy
+      title: UpdateRestrictionPolicyResponse
+      additionalProperties: false
+    restriction.v1.UsageGrant:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        sessionId:
+          type: string
+          title: session_id
+        deviceId:
+          type: string
+          title: device_id
+        requestedSeconds:
+          type: string
+          title: requested_seconds
+          format: int64
+        reservedSeconds:
+          type: string
+          title: reserved_seconds
+          format: int64
+        status:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.GrantStatus'
+          title: status
+        controlRevision:
+          type: string
+          title: control_revision
+          format: int64
+          description: Control revision that carries this unlock.
+        issuedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: issued_at
+        activatedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: activated_at
+        reportedSeconds:
+          type: string
+          title: reported_seconds
+          format: int64
+          description: Latest cumulative usage reported by the device.
+        consumedSeconds:
+          type:
+            - string
+            - "null"
+          title: consumed_seconds
+          format: int64
+          description: Confirmed values. Unset until confirmed; never guessed.
+        discardedSeconds:
+          type:
+            - string
+            - "null"
+          title: discarded_seconds
+          format: int64
+        endReason:
+          allOf:
+            - $ref: '#/components/schemas/restriction.v1.GrantEndReason'
+          title: end_reason
+        endedByOperationId:
+          type: string
+          title: ended_by_operation_id
+        completedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: completed_at
+      title: UsageGrant
       additionalProperties: false
     reward.v1.GetBalanceRequest:
       type: object
@@ -1323,7 +1828,9 @@ paths:
       tags:
         - FocusService
       summary: StartSession
-      description: The measuring device is the PC device registered for the caller's auth session.
+      description: |-
+        The measuring device is the PC device registered for the caller's auth session.
+         Requires an active iPhone with an enabled restriction policy.
       operationId: focus.v1.FocusService.StartSession
       parameters:
         - name: Connect-Protocol-Version
@@ -1623,6 +2130,312 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+  /restriction.v1.RestrictionService/GetRestrictionOperation:
+    post:
+      tags:
+        - RestrictionService
+      summary: GetRestrictionOperation
+      operationId: restriction.v1.RestrictionService.GetRestrictionOperation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.GetRestrictionOperationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.GetRestrictionOperationResponse'
+  /restriction.v1.RestrictionService/GetRestrictionPolicy:
+    post:
+      tags:
+        - RestrictionService
+      summary: GetRestrictionPolicy
+      operationId: restriction.v1.RestrictionService.GetRestrictionPolicy
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.GetRestrictionPolicyRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.GetRestrictionPolicyResponse'
+  /restriction.v1.RestrictionService/GetRestrictionState:
+    post:
+      tags:
+        - RestrictionService
+      summary: GetRestrictionState
+      operationId: restriction.v1.RestrictionService.GetRestrictionState
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.GetRestrictionStateRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.GetRestrictionStateResponse'
+  /restriction.v1.RestrictionService/GetUsageGrant:
+    post:
+      tags:
+        - RestrictionService
+      summary: GetUsageGrant
+      operationId: restriction.v1.RestrictionService.GetUsageGrant
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.GetUsageGrantRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.GetUsageGrantResponse'
+  /restriction.v1.RestrictionService/ReportRestrictionState:
+    post:
+      tags:
+        - RestrictionService
+      summary: ReportRestrictionState
+      operationId: restriction.v1.RestrictionService.ReportRestrictionState
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.ReportRestrictionStateRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.ReportRestrictionStateResponse'
+  /restriction.v1.RestrictionService/ReportUsage:
+    post:
+      tags:
+        - RestrictionService
+      summary: ReportUsage
+      operationId: restriction.v1.RestrictionService.ReportUsage
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.ReportUsageRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.ReportUsageResponse'
+  /restriction.v1.RestrictionService/ReserveUsageGrant:
+    post:
+      tags:
+        - RestrictionService
+      summary: ReserveUsageGrant
+      description: Spends balance and issues a timed unlock. Only while the session is PAUSED with all records evaluated.
+      operationId: restriction.v1.RestrictionService.ReserveUsageGrant
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.ReserveUsageGrantRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.ReserveUsageGrantResponse'
+  /restriction.v1.RestrictionService/UpdateRestrictionPolicy:
+    post:
+      tags:
+        - RestrictionService
+      summary: UpdateRestrictionPolicy
+      description: Called by the iPhone for itself. Rejected while a usage grant is open.
+      operationId: restriction.v1.RestrictionService.UpdateRestrictionPolicy
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/restriction.v1.UpdateRestrictionPolicyRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/restriction.v1.UpdateRestrictionPolicyResponse'
   /reward.v1.RewardService/GetBalance:
     post:
       tags:
@@ -1663,5 +2476,7 @@ paths:
                 $ref: '#/components/schemas/reward.v1.GetBalanceResponse'
 tags:
   - name: RewardService
+  - name: RestrictionService
+    description: Apple selection tokens stay on the iPhone; this API only handles metadata, grants and reports.
   - name: FocusService
   - name: IdentityService

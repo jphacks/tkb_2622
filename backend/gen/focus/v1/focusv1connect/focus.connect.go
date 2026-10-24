@@ -76,6 +76,7 @@ type FocusServiceClient interface {
 	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
 	// The measuring device is the PC device registered for the caller's auth session.
+	// Requires an active iPhone with an enabled restriction policy.
 	StartSession(context.Context, *connect.Request[v1.StartSessionRequest]) (*connect.Response[v1.StartSessionResponse], error)
 	UploadActivityBatch(context.Context, *connect.Request[v1.UploadActivityBatchRequest]) (*connect.Response[v1.UploadActivityBatchResponse], error)
 	PauseSession(context.Context, *connect.Request[v1.PauseSessionRequest]) (*connect.Response[v1.PauseSessionResponse], error)
@@ -254,6 +255,7 @@ type FocusServiceHandler interface {
 	GetTask(context.Context, *connect.Request[v1.GetTaskRequest]) (*connect.Response[v1.GetTaskResponse], error)
 	ListTasks(context.Context, *connect.Request[v1.ListTasksRequest]) (*connect.Response[v1.ListTasksResponse], error)
 	// The measuring device is the PC device registered for the caller's auth session.
+	// Requires an active iPhone with an enabled restriction policy.
 	StartSession(context.Context, *connect.Request[v1.StartSessionRequest]) (*connect.Response[v1.StartSessionResponse], error)
 	UploadActivityBatch(context.Context, *connect.Request[v1.UploadActivityBatchRequest]) (*connect.Response[v1.UploadActivityBatchResponse], error)
 	PauseSession(context.Context, *connect.Request[v1.PauseSessionRequest]) (*connect.Response[v1.PauseSessionResponse], error)

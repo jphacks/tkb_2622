@@ -3,6 +3,7 @@ package focus.v1;
 option go_package = "github.com/jphacks/tkb_2622/backend/gen/focus/v1;focusv1";
 
 import "google/protobuf/timestamp.proto";
+import "restriction/v1/restriction.proto";
 import "reward/v1/reward.proto";
 
 service FocusService {
@@ -11,6 +12,7 @@ service FocusService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
   // The measuring device is the PC device registered for the caller's auth session.
+  // Requires an active iPhone with an enabled restriction policy.
   rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
   rpc UploadActivityBatch(UploadActivityBatchRequest) returns (UploadActivityBatchResponse);
   rpc PauseSession(PauseSessionRequest) returns (PauseSessionResponse);
@@ -135,6 +137,7 @@ message StartSessionRequest {
 message StartSessionResponse {
   Session session = 1;
   reward.v1.RewardBalance balance = 2;
+  restriction.v1.RestrictionState restriction = 3;
 }
 enum BatchStatus {
   BATCH_STATUS_UNSPECIFIED = 0;
@@ -186,6 +189,7 @@ message ResumeSessionRequest {
 message ResumeSessionResponse {
   Session session = 1;
   reward.v1.RewardBalance balance = 2;
+  restriction.v1.RestrictionState restriction = 3;
 }
 message FinishSessionRequest {
   string operation_id = 1;
@@ -200,6 +204,7 @@ message FinishSessionResponse {
   Session session = 1;
   int64 discarded_seconds = 2;
   reward.v1.RewardBalance balance = 3;
+  restriction.v1.RestrictionState restriction = 4;
 }
 message AbortSessionRequest {
   string operation_id = 1;
@@ -213,6 +218,7 @@ message AbortSessionResponse {
   Session session = 1;
   int64 discarded_seconds = 2;
   reward.v1.RewardBalance balance = 3;
+  restriction.v1.RestrictionState restriction = 4;
 }
 message GetCurrentSessionRequest {}
 // session is unset when there is no unfinished session.

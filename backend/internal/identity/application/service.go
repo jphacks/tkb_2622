@@ -42,6 +42,7 @@ type Repository interface {
 	ListDevices(context.Context, Principal, string, int) (DevicePage, error)
 	RevokeDevice(context.Context, Principal, RevokeInput) (domain.Device, error)
 	Actor(context.Context, Principal) (Actor, error)
+	ActiveIPhone(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct{ repo Repository }
@@ -108,4 +109,12 @@ func (s *Service) ResolveActor(ctx context.Context, p Principal) (Actor, error) 
 		return Actor{}, ErrUnauthenticated
 	}
 	return s.repo.Actor(ctx, p)
+}
+
+// ActiveIPhone returns the ID of the user's single active iPhone, or ErrNotFound.
+func (s *Service) ActiveIPhone(ctx context.Context, userID string) (string, error) {
+	if !ValidID(userID) {
+		return "", ErrInvalid
+	}
+	return s.repo.ActiveIPhone(ctx, userID)
 }

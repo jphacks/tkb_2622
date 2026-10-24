@@ -3,7 +3,10 @@ package domain
 
 import "errors"
 
-var ErrState = errors.New("wallet does not belong to this session")
+var (
+	ErrState        = errors.New("wallet does not belong to this session")
+	ErrInsufficient = errors.New("insufficient reward balance")
+)
 
 // Policy converts work time (TASK + RELATED_TRANSITION) into break seconds.
 type Policy struct {

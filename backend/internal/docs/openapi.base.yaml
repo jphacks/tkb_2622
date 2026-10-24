@@ -2,7 +2,21 @@ openapi: 3.1.0
 info:
   title: tkb backend API
   version: v1
-  description: Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない．
+  description: |
+    Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない（`make -C backend generate`）．
+    すべてのRPCに Supabase のアクセストークン（右上の Authorize）が必要．
+
+    **準備**：EnsureUser → 各端末で RegisterDevice（PCは MACOS／WINDOWS，iPhoneは IOS）→ iPhoneで UpdateRestrictionPolicy（enabled=true）→ PCで CreateTask．
+
+    **基本ループ**
+    1. PC：StartSession（iPhoneへ制限を要求）
+    2. PC：UploadActivityBatch を seq=1,2,… で定期送信．作業時間（TASK＋RELATED_TRANSITION）の1/3が秒単位切り捨てで残高に付与される
+    3. PC：PauseSession（last_seq に最後に送った seq）
+    4. iPhone：ReserveUsageGrant で残高から秒数を確保 → ReportRestrictionState（解除適用）→ ReportUsage（累積の実利用秒数）
+    5. PC：ResumeSession（利用枠の残りは破棄，残高は保持）または FinishSession／AbortSession（残高は全て破棄）
+
+    iPhoneは常に RestrictionState の最新 control_revision を適用し，適用結果を ReportRestrictionState で報告する．
+    変更系RPCは operation_id（UUID）で冪等．応答を失った場合は同じIDで再送するか Get*Operation で照会する．
 servers:
   - url: /
 security:

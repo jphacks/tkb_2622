@@ -9,23 +9,28 @@ import (
 	"connectrpc.com/grpchealth"
 	"github.com/jphacks/tkb_2622/backend/gen/focus/v1/focusv1connect"
 	"github.com/jphacks/tkb_2622/backend/gen/identity/v1/identityv1connect"
+	"github.com/jphacks/tkb_2622/backend/gen/restriction/v1/restrictionv1connect"
 	"github.com/jphacks/tkb_2622/backend/gen/reward/v1/rewardv1connect"
+	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/docs"
 	focusconnect "github.com/jphacks/tkb_2622/backend/internal/focus/adapter/connect"
 	focus "github.com/jphacks/tkb_2622/backend/internal/focus/application"
 	identityconnect "github.com/jphacks/tkb_2622/backend/internal/identity/adapter/connect"
 	identity "github.com/jphacks/tkb_2622/backend/internal/identity/application"
+	restrictionconnect "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/connect"
+	restriction "github.com/jphacks/tkb_2622/backend/internal/restriction/application"
 	rewardconnect "github.com/jphacks/tkb_2622/backend/internal/reward/adapter/connect"
 	reward "github.com/jphacks/tkb_2622/backend/internal/reward/application"
 	workflow "github.com/jphacks/tkb_2622/backend/internal/workflow/application"
 )
 
 type Deps struct {
-	Identity *identity.Service
-	Verifier identityconnect.Verifier
-	Focus    *focus.Service
-	Sessions *workflow.Sessions
-	Wallets  *reward.Wallets
+	Identity    *identity.Service
+	Verifier    identityconnect.Verifier
+	Focus       *focus.Service
+	Sessions    *workflow.Sessions
+	Wallets     *reward.Wallets
+	Restriction *restriction.Service
 	// EnableDocs adds the Swagger UI at /docs and should stay off outside local development.
 	EnableDocs bool
 }
@@ -48,6 +53,17 @@ func actor(service *identity.Service) focusconnect.ResolveActor {
 	}
 }
 
+// Devices adapts identity's public operation to the workflow's Devices port.
+type Devices struct{ Identity *identity.Service }
+
+func (d Devices) ActiveIPhone(ctx context.Context, userID string) (string, error) {
+	id, err := d.Identity.ActiveIPhone(ctx, userID)
+	if errors.Is(err, identity.ErrNotFound) {
+		return "", apperr.ErrNotFound
+	}
+	return id, err
+}
+
 // Handler exposes only process health; it intentionally does not probe the database.
 func Handler(d Deps) http.Handler {
 	mux := http.NewServeMux()
@@ -63,10 +79,14 @@ func Handler(d Deps) http.Handler {
 	mux.Handle(rewardv1connect.NewRewardServiceHandler(rewardconnect.New(func(ctx context.Context) (string, error) {
 		a, err := resolve(ctx)
 		if err != nil {
-			return "", focusconnect.Error(err)
+			return "", apperr.Connect(err)
 		}
 		return a.UserID, nil
 	}, d.Wallets), auth, connect.WithReadMaxBytes(64*1024)))
+	mux.Handle(restrictionv1connect.NewRestrictionServiceHandler(restrictionconnect.New(func(ctx context.Context) (restriction.Actor, error) {
+		a, err := resolve(ctx)
+		return restriction.Actor{UserID: a.UserID, DeviceID: a.DeviceID, DevicePlatform: a.DevicePlatform}, err
+	}, d.Restriction, d.Sessions), auth, connect.WithReadMaxBytes(64*1024)))
 	if d.EnableDocs {
 		docs.Register(mux)
 	}

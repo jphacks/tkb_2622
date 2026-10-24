@@ -4,9 +4,11 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jphacks/tkb_2622/backend/internal/apperr"
 	"github.com/jphacks/tkb_2622/backend/internal/reward/domain"
 )
 
@@ -94,6 +96,27 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 		}
 	}
 	return earned, wallet, nil
+}
+
+// Spend deducts a usage grant from the balance. The grant's remainder is never refunded on expiry.
+func (w *Wallets) Spend(ctx context.Context, userID, sessionID, grantID string, seconds int64) (domain.Wallet, error) {
+	wallet, err := w.repo.Wallet(ctx, userID)
+	if err != nil {
+		return domain.Wallet{}, err
+	}
+	if wallet.SessionID != sessionID {
+		return domain.Wallet{}, domain.ErrState
+	}
+	if seconds <= 0 || seconds > wallet.BalanceSeconds {
+		return domain.Wallet{}, errors.Join(apperr.ErrPrecondition, domain.ErrInsufficient)
+	}
+	wallet.BalanceSeconds -= seconds
+	wallet.Version++
+	if err = w.repo.SaveWallet(ctx, wallet); err != nil {
+		return domain.Wallet{}, err
+	}
+	t := Transaction{ID: uuid.NewString(), UserID: userID, SessionID: sessionID, Type: "SPEND", SourceID: "grant:" + grantID, AmountSeconds: -seconds, BalanceAfter: wallet.BalanceSeconds}
+	return wallet, w.repo.AddTransaction(ctx, t)
 }
 
 // Discard zeroes the unused balance when the session finishes or aborts and detaches the wallet.

@@ -27,3 +27,12 @@ sql:
         out: internal/reward/adapter/persistence/sqlc
         sql_package: database/sql
         emit_empty_slices: true
+  - engine: postgresql
+    schema: migrations/postgres
+    queries: internal/restriction/adapter/persistence/queries.sql
+    gen:
+      go:
+        package: restrictionsql
+        out: internal/restriction/adapter/persistence/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true

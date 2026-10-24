@@ -18,6 +18,8 @@ import (
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/auth"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/persistence"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/application"
+	restrictionpersistence "github.com/jphacks/tkb_2622/backend/internal/restriction/adapter/persistence"
+	restriction "github.com/jphacks/tkb_2622/backend/internal/restriction/application"
 	rewardpersistence "github.com/jphacks/tkb_2622/backend/internal/reward/adapter/persistence"
 	reward "github.com/jphacks/tkb_2622/backend/internal/reward/application"
 	"github.com/jphacks/tkb_2622/backend/internal/server"
@@ -57,13 +59,15 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer db.Close()
+	identityService := application.New(persistence.New(db))
 	handler := server.Handler(server.Deps{
-		Identity:   application.New(persistence.New(db)),
-		Verifier:   verifier,
-		Focus:      focus.New(focuspersistence.NewStore(db)),
-		Sessions:   workflow.New(workflowadapter.NewRunner(db)),
-		Wallets:    reward.New(rewardpersistence.New(db)),
-		EnableDocs: os.Getenv("API_DOCS_ENABLED") == "true",
+		Identity:    identityService,
+		Verifier:    verifier,
+		Focus:       focus.New(focuspersistence.NewStore(db)),
+		Sessions:    workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
+		Wallets:     reward.New(rewardpersistence.New(db)),
+		Restriction: restriction.New(restrictionpersistence.NewStore(db)),
+		EnableDocs:  os.Getenv("API_DOCS_ENABLED") == "true",
 	})
 	srv := &http.Server{
 		Addr: net.JoinHostPort("", port), Handler: handler,
