@@ -91,3 +91,22 @@ struct ConnectJSONClient {
         return try JSONDecoder().decode(responseType, from: data)
     }
 }
+
+extension ConnectJSONClient.ClientError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingAccessToken:
+            "ログインセッションがありません。再ログインしてください。"
+        case .invalidResponse:
+            "APIから不正な応答を受け取りました。"
+        case .httpStatus(let status):
+            "APIがHTTP \(status)を返しました。"
+        case .connect(let code) where code == "unauthenticated":
+            "APIがアクセストークンを受け付けませんでした。APIのSUPABASE_JWT_ISSUERとアプリのProject URLが同じプロジェクトか確認してください。(unauthenticated)"
+        case .connect(let code):
+            "APIがエラーを返しました。(\(code))"
+        case .unexpectedHealthStatus(let status):
+            "APIの状態が想定外です。(\(status))"
+        }
+    }
+}

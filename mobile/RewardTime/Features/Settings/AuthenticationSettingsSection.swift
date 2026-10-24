@@ -10,6 +10,8 @@ struct AuthenticationSettingsSection: View {
     @State private var email = ""
     @State private var otp = ""
     @State private var isOTPRequested = false
+    /// The address the latest code was sent to. Verification always uses this value.
+    @State private var requestedEmail: String?
     @State private var isWorking = false
     @State private var auth: SupabaseAuthService?
     @State private var identity: MobileIdentity?
@@ -59,7 +61,16 @@ struct AuthenticationSettingsSection: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
+                    .disabled(isOTPRequested)
                     .accessibilityIdentifier("authEmail")
+
+                if isOTPRequested {
+                    Button("メールアドレスを変更") {
+                        resetOTPRequest()
+                    }
+                    .font(.caption)
+                    .disabled(isWorking)
+                }
 
                 Button {
                     Task { await requestOTP() }
@@ -85,7 +96,7 @@ struct AuthenticationSettingsSection: View {
                             .frame(maxWidth: .infinity, minHeight: 42)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isWorking || otp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isWorking || !EmailOTPInput.isPlausibleCode(EmailOTPInput.normalizedCode(otp)))
                 }
             }
 
@@ -144,7 +155,8 @@ struct AuthenticationSettingsSection: View {
             setMessage("Supabase Project URLと公開用publishable/anon keyを入力してください。", error: true)
             return
         }
-        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = EmailOTPInput.normalizedEmail(email)
+        let isResend = isOTPRequested
         isWorking = true
         defer { isWorking = false }
         do {
@@ -152,30 +164,43 @@ struct AuthenticationSettingsSection: View {
             auth = service
             email = normalizedEmail
             lastEmail = normalizedEmail
+            requestedEmail = normalizedEmail
             isOTPRequested = true
             otp = ""
-            setMessage("確認コードを送信しました。メール内の数字コードを入力してください。", error: false)
+            let note = isResend ? "以前のメールのコードは使えません。" : ""
+            setMessage("\(normalizedEmail) に確認コードを送信しました。\(note)最新のメールの数字コードを入力してください。", error: false)
         } catch {
-            setMessage("コードを送信できませんでした: \(error.localizedDescription)", error: true)
+            setMessage("コードを送信できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
         }
     }
 
     @MainActor
     private func verifyOTP() async {
-        guard let service = auth ?? makeAuthService() else { return }
-        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let code = otp.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Verify against the client and address that requested the code. A different
+        // address or project never matches the code and is reported as otp_expired.
+        guard let service = auth, let targetEmail = requestedEmail else {
+            setMessage("確認コードを送信してから入力してください。", error: true)
+            return
+        }
+        let code = EmailOTPInput.normalizedCode(otp)
+        guard EmailOTPInput.isPlausibleCode(code) else {
+            setMessage("メールに記載された数字コードをすべて入力してください。", error: true)
+            return
+        }
         isWorking = true
         defer { isWorking = false }
         do {
-            try await service.verifyEmailOTP(email: normalizedEmail, code: code)
-            auth = service
-            lastEmail = normalizedEmail
-            isOTPRequested = false
-            otp = ""
+            try await service.verifyEmailOTP(email: targetEmail, code: code)
+        } catch {
+            setMessage("確認コードを検証できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
+            return
+        }
+        lastEmail = targetEmail
+        resetOTPRequest()
+        do {
             try await loadBusinessIdentity(using: service)
         } catch {
-            setMessage("認証または業務User取得に失敗しました: \(error.localizedDescription)", error: true)
+            setMessage("ログインしましたが、業務User取得に失敗しました: \(AuthenticationErrorMessage.describe(error))", error: true)
         }
     }
 
@@ -203,7 +228,7 @@ struct AuthenticationSettingsSection: View {
         do {
             try await loadBusinessIdentity(using: service)
         } catch {
-            setMessage("業務User取得に失敗しました: \(error.localizedDescription)", error: true)
+            setMessage("業務User取得に失敗しました: \(AuthenticationErrorMessage.describe(error))", error: true)
         }
     }
 
@@ -231,11 +256,18 @@ struct AuthenticationSettingsSection: View {
             try await service.signOutFromThisDevice()
             identity = nil
             auth = nil
-            isOTPRequested = false
+            resetOTPRequest()
             setMessage("この端末からログアウトしました。", error: false)
         } catch {
-            setMessage("ログアウトできませんでした: \(error.localizedDescription)", error: true)
+            setMessage("ログアウトできませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
         }
+    }
+
+    @MainActor
+    private func resetOTPRequest() {
+        isOTPRequested = false
+        requestedEmail = nil
+        otp = ""
     }
 
     @MainActor
