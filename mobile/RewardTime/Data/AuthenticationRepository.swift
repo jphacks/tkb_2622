@@ -254,15 +254,13 @@ struct IdentityAPIRepository {
   }
 
   func ensureUserAndFetchCurrentUser(operationID: String) async throws -> MobileIdentity {
-    let _: EnsureUserResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let _: EnsureUserResponse = try await call(
       method: "EnsureUser",
       requestBody: EnsureUserRequest(operationId: operationID),
       responseType: EnsureUserResponse.self
     )
 
-    let response: GetMeResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: GetMeResponse = try await call(
       method: "GetMe",
       requestBody: EmptyIdentityRequest(),
       responseType: GetMeResponse.self
@@ -271,8 +269,7 @@ struct IdentityAPIRepository {
   }
 
   func updateDisplayName(_ displayName: String) async throws -> MobileIdentity {
-    let response: UpdateDisplayNameResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: UpdateDisplayNameResponse = try await call(
       method: "UpdateDisplayName",
       requestBody: UpdateDisplayNameRequest(displayName: displayName),
       responseType: UpdateDisplayNameResponse.self
@@ -281,12 +278,44 @@ struct IdentityAPIRepository {
   }
 
   func updateAvatar(_ avatarID: String) async throws -> MobileIdentity {
-    let response: UpdateAvatarResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: UpdateAvatarResponse = try await call(
       method: "UpdateAvatar",
       requestBody: UpdateAvatarRequest(avatarID: avatarID),
       responseType: UpdateAvatarResponse.self
     )
     return response.user
+  }
+
+  private func call<Request: Encodable, Response: Decodable>(
+    method: String,
+    requestBody: Request,
+    responseType: Response.Type
+  ) async throws -> Response {
+    do {
+      return try await client.call(
+        service: "identity.v1.IdentityService",
+        method: method,
+        requestBody: requestBody,
+        responseType: responseType
+      )
+    } catch {
+      throw IdentityAPIRepositoryError.requestFailed(
+        operation: "identity.v1.IdentityService/\(method)",
+        underlying: error
+      )
+    }
+  }
+}
+
+private enum IdentityAPIRepositoryError: LocalizedError {
+  case requestFailed(operation: String, underlying: Error)
+
+  var errorDescription: String? {
+    switch self {
+    case .requestFailed(let operation, let underlying):
+      let detail = (underlying as? LocalizedError)?.errorDescription
+        ?? underlying.localizedDescription
+      return "\(detail) (API: \(operation))"
+    }
   }
 }
