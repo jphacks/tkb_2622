@@ -94,6 +94,25 @@ final class NotificationEndpointRepositorySimulatorTests: XCTestCase {
         XCTAssertEqual(methods.values, ["RegisterDevice", "RegisterNotificationEndpoint"])
     }
 
+    func testPreservesDeleteNotificationEndpointOperationAndConnectError() async {
+        let methods = LockedEndpointMethods()
+        NotificationEndpointRepositoryURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            methods.append(method)
+            return (500, #"{"code":"internal","message":"request failed"}"#)
+        }
+
+        do {
+            try await repository().delete(client: client())
+            XCTFail("The notification endpoint deletion Connect error must be returned")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("(internal)"))
+            XCTAssertTrue(error.localizedDescription.contains("identity.v1.IdentityService/DeleteNotificationEndpoint"))
+        }
+
+        XCTAssertEqual(methods.values, ["DeleteNotificationEndpoint"])
+    }
+
     private func repository() -> ConfiguredNotificationEndpointRepository {
         ConfiguredNotificationEndpointRepository(defaults: defaults)
     }

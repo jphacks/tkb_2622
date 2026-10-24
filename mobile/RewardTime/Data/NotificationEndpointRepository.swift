@@ -73,6 +73,10 @@ struct ConfiguredNotificationEndpointRepository {
 
     func delete() async throws {
         let client = try makeClient()
+        try await delete(client: client)
+    }
+
+    func delete(client: ConnectJSONClient) async throws {
         let registrationID = ConfiguredDeviceSettingsRepository(defaults: defaults).stableRegistrationID()
         do {
             let response: DeleteResponse = try await client.call(

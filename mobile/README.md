@@ -83,7 +83,7 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
-Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で40件が通過し、Device失効、通知先削除、operation IDを保持した応答喪失後の再試行、Homeの3 APIエラー時のRPC名表示とpartial snapshot抑止、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、HistoryのRPC名付きエラー・一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 40件、ログイン画面UI testをDebug／Release各1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
+Simulator `RewardTimeSimulatorTests`は`URLProtocol`による応答stubを使うため、local backend・Supabase・APNsの疎通確認とは別。iPhone 17 Simulator (iOS 27.0)で41件が通過し、Device失効、通知先登録／削除のAPI操作とエラー内のRPC名、operation IDを保持した応答喪失後の再試行、Homeの3 APIエラー時のRPC名表示とpartial snapshot抑止、Group API操作・作業開始フィードのerror案内と一覧refresh失敗後の前回データ保持、HistoryのRPC名付きエラー・一覧refresh失敗後の前回データ保持、初回未認証・同期失敗・認証済み・ローカル利用の入口状態、EnsureUser→GetMeの順序と失敗時の後続要求抑止、UpdateDisplayName／UpdateAvatarのpath／request field、利用枠API、OTPの`create_user: true`、OTP検証の`type: email`とsession保存、期限切れsession refresh、refresh通信断後のsession保持を検証する。別schemeの`RewardTimeUITests`は初回未ログイン画面のメール欄・ログイン後回し・接続未設定時のOTP送信無効状態と、Debug設定欄の表示（Debug）／非表示（Release）を確認する。2026-10-25にhost 45件、Simulator 41件、ログイン画面UI testをDebug／Release各1件実行し、すべて通過した。OTP実送信・新規／既存ログイン・Desktop同一アカウントE2E、Release値を使った実機接続、端末失効付きログアウトは未確認。
 
 ## ソース構成
 
