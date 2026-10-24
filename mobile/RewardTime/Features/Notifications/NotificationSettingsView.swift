@@ -47,7 +47,7 @@ private final class NotificationSettingsViewModel: ObservableObject {
         #endif
         do {
             try await ConfiguredNotificationEndpointRepository().register(token: token, environment: environment)
-            apiStatusMessage = "通知先をサーバーに登録しました。配信にはサーバー側のAPNs設定が必要です。"
+            apiStatusMessage = "通知先をサーバーに登録しました。"
         } catch {
             apiStatusMessage = "通知先の登録に失敗しました: \(error.localizedDescription)"
         }
