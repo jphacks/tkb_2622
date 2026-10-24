@@ -1,19 +1,24 @@
+import Combine
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: HomeViewModel
+    @ObservedObject private var screenTime: MobileScreenTimeController
 
-    init(repository: any HomeRepository = MockHomeRepository()) {
+    init(
+        repository: any HomeRepository = ConfiguredHomeRepository(),
+        screenTime: MobileScreenTimeController
+    ) {
         _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
+        _screenTime = ObservedObject(wrappedValue: screenTime)
     }
 
     var body: some View {
         ScreenContainer {
-            SampleNotice(title: "サンプルデータ・API未接続")
-
-#if DEBUG
-            previewControls
-#endif
+            if case .loaded(let snapshot) = viewModel.state, snapshot.isSampleData {
+                SampleNotice(title: "サンプルデータ・API未接続")
+            }
 
             switch viewModel.state {
             case .loading:
@@ -21,20 +26,20 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, minHeight: 180)
             case .loaded(let snapshot):
                 sessionCard(snapshot)
-                workTimeCard(snapshot)
                 rewardBalanceCard(snapshot)
                 restrictedAppsCard(snapshot)
                 restrictionStateCard(snapshot)
                 breakAction(snapshot)
-            case .failed:
-                errorCard
+            case .failed(let message):
+                errorCard(message: message)
             }
+
         }
         .navigationTitle("Focus Link")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Label("サンプル \(viewModel.lastUpdatedTime)", systemImage: "clock")
+                Label(viewModel.lastUpdatedLabel, systemImage: "clock")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
                     .labelStyle(.titleAndIcon)
@@ -42,42 +47,26 @@ struct HomeView: View {
         }
         .task {
             if case .loading = viewModel.state {
-                await viewModel.load()
+                await loadAndReconcile()
             }
         }
         .refreshable {
-            await viewModel.load()
+            await loadAndReconcile()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await loadAndReconcile() } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await loadAndReconcile() }
         }
     }
 
-#if DEBUG
-    private var previewControls: some View {
-        SurfaceCard {
-            Label("表示するサンプル状態", systemImage: "slider.horizontal.3")
-                .font(.subheadline.weight(.bold))
-            Menu("画面状態を選ぶ") {
-                Button("08 作業中・制限中") { viewModel.showPreview(.workingSample) }
-                Button("10 一時停止中") { viewModel.showPreview(.pausedSample) }
-                Button("11 小休憩中") { viewModel.showPreview(.releasedSample) }
-                Button("08 セッションなし") { viewModel.showPreview(.noSessionSample) }
-                Button("通信エラー") { viewModel.showFailurePreview() }
-            }
-            .font(.subheadline.weight(.semibold))
-            NavigationLink {
-                RestrictionShieldPreview()
-            } label: {
-                Label("09 制限画面のプレビュー", systemImage: "lock.iphone")
-                    .font(.footnote.weight(.medium))
-            }
-            NavigationLink {
-                BackendHealthCheckView()
-            } label: {
-                Label("backendヘルスチェック", systemImage: "network")
-                    .font(.footnote.weight(.medium))
-            }
-        }
+    @MainActor
+    private func loadAndReconcile() async {
+        await viewModel.load()
+        guard case .loaded(let snapshot) = viewModel.state else { return }
+        await screenTime.reconcileServerRestriction(snapshot)
     }
-#endif
 
     private func sessionCard(_ snapshot: MobileHomeSnapshot) -> some View {
         SurfaceCard(padding: 20) {
@@ -90,35 +79,34 @@ struct HomeView: View {
                     .foregroundStyle(AppTheme.primary)
             }
 
-            Text(sessionDescription(snapshot.sessionStatus))
-                .font(.footnote)
-                .foregroundStyle(AppTheme.secondaryInk)
-        }
-    }
-
-    private func workTimeCard(_ snapshot: MobileHomeSnapshot) -> some View {
-        SurfaceCard {
             VStack(alignment: .leading, spacing: 5) {
                 Text("計測時間")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(AppTheme.secondaryInk)
-                Text(formattedWorkTime(snapshot.elapsedWorkMinutes))
+                Text(formattedWorkTime(snapshot.elapsedMinutes))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(AppTheme.ink)
                     .accessibilityIdentifier("elapsedWorkTime")
             }
 
-            if let elapsed = snapshot.elapsedWorkMinutes,
-               let minimum = snapshot.minimumWorkMinutes {
-                let remaining = max(minimum - elapsed, 0)
-                Text(remaining > 0
-                     ? "最小作業時間 \(minimum)分 まで あと \(remaining)分"
-                     : "最小作業時間 \(minimum)分を達成")
+            if snapshot.elapsedMinutes != nil,
+               let minimumSeconds = snapshot.minimumSeconds {
+                let progress = snapshot.minimumProgress ?? 0
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(AppTheme.lavender)
+                        Capsule().fill(AppTheme.primary).frame(width: geometry.size.width * progress)
+                    }
+                }
+                .frame(height: 8)
+                Text(snapshot.minimumReached
+                     ? "最小作業時間を達成"
+                     : "最小作業時間 \(formattedDuration(minimumSeconds)) まで計測中")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(AppTheme.secondaryInk)
             } else {
-                Text("作業セッションが始まると計測時間が表示されます。")
+                Text(sessionDescription(snapshot.sessionStatus))
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
             }
@@ -126,12 +114,12 @@ struct HomeView: View {
     }
 
     private func rewardBalanceCard(_ snapshot: MobileHomeSnapshot) -> some View {
-        SurfaceCard {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("報酬の残高")
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(AppTheme.secondaryInk)
+                        .foregroundStyle(.white.opacity(0.82))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(snapshot.rewardBalanceMinutes.formatted())
                             .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -140,30 +128,40 @@ struct HomeView: View {
                         Text("分")
                             .font(.title3.weight(.semibold))
                     }
-                    .foregroundStyle(AppTheme.teal)
+                    .foregroundStyle(.white)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "hourglass")
                     .font(.title2)
-                    .foregroundStyle(AppTheme.teal)
+                    .foregroundStyle(.white)
                     .padding(14)
-                    .background(AppTheme.mint, in: Circle())
+                    .background(.white.opacity(0.15), in: Circle())
             }
 
             Text("今回の報酬は作業セッション中の小休憩に使えます。終了・中止時に未使用分は破棄されます。")
                 .font(.footnote)
-                .foregroundStyle(AppTheme.secondaryInk)
+                .foregroundStyle(.white.opacity(0.88))
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.primary, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private func restrictedAppsCard(_ snapshot: MobileHomeSnapshot) -> some View {
-        SurfaceCard {
+        let isSelectingApps = screenTime.restrictionMode == .selectedApplications
+        let hasLocalSelection = isSelectingApps && (screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData)
+        let selectedTokens = Array(screenTime.restrictedApplicationTokens)
+        let count = hasLocalSelection
+            ? screenTime.restrictedApplicationCount
+            : (snapshot.restrictedApplicationCount ?? snapshot.restrictedApps.count)
+
+        return SurfaceCard {
             HStack {
-                Text("制限中のアプリ")
+                Text(isSelectingApps ? "制限するアプリ" : "標準以外のアプリ")
                     .font(.subheadline.weight(.bold))
                 Spacer()
-                Text("\(snapshot.restrictedApps.count)個")
+                Text(isSelectingApps ? "\(count)個" : "対象")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppTheme.primary)
                     .padding(.horizontal, 10)
@@ -171,25 +169,55 @@ struct HomeView: View {
                     .background(AppTheme.lavender, in: Capsule())
             }
 
-            if snapshot.restrictedApps.isEmpty {
-                Text("制限対象のアプリはありません。")
+            if !isSelectingApps {
+                Text("常時許可に選んだアプリを除くすべてのアプリにShieldを設定します。")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
-            } else {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
-                    ForEach(snapshot.restrictedApps, id: \.self) { app in
-                        Label(app, systemImage: "app.fill")
+            } else if hasLocalSelection && !selectedTokens.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+                    ForEach(selectedTokens, id: \.self) { token in
+                        Label(token)
                             .font(.caption.weight(.medium))
+                            .labelStyle(.titleAndIcon)
                             .lineLimit(1)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
+            } else if !hasLocalSelection && !snapshot.restrictedApps.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+                    ForEach(snapshot.restrictedApps, id: \.self) { app in
+                        Label(app, systemImage: "app.fill")
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+            } else if count > 0 {
+                Text("選択したアプリを表示できません。設定から選び直してください。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            } else {
+                Text(!screenTime.isAuthorized
+                     ? "スクリーンタイムを許可すると、設定から対象アプリを選べます。"
+                     : (screenTime.restrictionMode == .selectedApplications
+                        ? "設定から制限するアプリを選べます。"
+                        : "設定から常時許可するアプリを選べます。"))
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
             }
 
-            Text("iPhoneの標準アプリ（Safariを除く）はいつでも使えます。")
+            Label(screenTime.appliedRestrictionLabel,
+                  systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "checkmark.shield.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(screenTime.appliedRestrictionMode == nil ? AppTheme.secondaryInk : AppTheme.teal)
+
+            Text("適用状態は設定画面から変更できます。対象アプリを開いてShieldが表示されることも確認してください。")
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondaryInk)
         }
@@ -197,43 +225,86 @@ struct HomeView: View {
 
     private func restrictionStateCard(_ snapshot: MobileHomeSnapshot) -> some View {
         SurfaceCard {
-            Label("iPhoneの適用状態", systemImage: "lock.iphone")
-                .font(.subheadline.weight(.bold))
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("サーバーの要求：\(desiredRestrictionLabel(snapshot.desiredRestriction))")
+                        .font(.footnote.weight(.medium))
 
-            switch snapshot.restrictionStatus {
-            case .unrestricted:
-                Text("制限解除済み")
-                    .foregroundStyle(AppTheme.secondaryInk)
-            case .restricted:
-                Text("制限中")
-                    .foregroundStyle(AppTheme.teal)
-            case .temporarilyReleased(let endsAt):
-                Text("一時解除中・終了予定 \(endsAt.formatted(date: .omitted, time: .shortened))")
-                    .foregroundStyle(AppTheme.teal)
-            case .notConfirmed:
-                Text("iPhoneでの適用を確認できていません")
-                    .foregroundStyle(AppTheme.secondaryInk)
+                    Label("iPhoneでの適用状態", systemImage: "lock.iphone")
+                        .font(.subheadline.weight(.bold))
+
+                    switch snapshot.restrictionStatus {
+                    case .unrestricted:
+                        Text("制限解除済み").foregroundStyle(AppTheme.secondaryInk)
+                    case .restricted:
+                        Text("制限中").foregroundStyle(AppTheme.teal)
+                    case .temporarilyReleased(let endsAt):
+                        if let endsAt {
+                            Text("一時解除中・終了予定 \(endsAt.formatted(date: .omitted, time: .shortened))").foregroundStyle(AppTheme.teal)
+                        } else {
+                            Text("一時解除中").foregroundStyle(AppTheme.teal)
+                        }
+                    case .notConfirmed:
+                        Text("iPhoneでの適用を確認できていません").foregroundStyle(AppTheme.secondaryInk)
+                    case .failed:
+                        Text("iPhoneでの適用に失敗しました。設定を確認してください。").foregroundStyle(.red)
+                    }
+
+                    Text("サーバーの要求とiPhoneから報告された適用状態を分けて表示します。")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+                .padding(.top, 10)
+            } label: {
+                Label("同期と制限の詳細", systemImage: "server.rack")
+                    .font(.subheadline.weight(.bold))
             }
+            .tint(AppTheme.primary)
+        }
+    }
 
-            Text("サーバーの希望状態とiPhoneでの適用確認は分けて表示します。")
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryInk)
+    private func desiredRestrictionLabel(_ mode: DesiredRestrictionMode) -> String {
+        switch mode {
+        case .unrestricted: "制限解除を要求"
+        case .shielded: "制限を要求"
+        case .timedUnlock: "利用枠の間、一時解除を要求"
+        case .sessionEnded: "作業終了後の制限解除を要求"
+        case .unknown: "サーバーの要求状態を確認できません"
         }
     }
 
     @ViewBuilder
     private func breakAction(_ snapshot: MobileHomeSnapshot) -> some View {
         if snapshot.sessionStatus == .paused {
-            NavigationLink {
-                UsageReservationView(balanceMinutes: snapshot.rewardBalanceMinutes)
-            } label: {
-                Label("残高を使う", systemImage: "cup.and.saucer.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 52)
+            if let grantID = snapshot.activeGrantID,
+               let reservedSeconds = snapshot.activeGrantReservedSeconds,
+               ["GRANT_STATUS_RESERVED", "GRANT_STATUS_ACTIVATED"].contains(snapshot.activeGrantStatus ?? "") {
+                NavigationLink {
+                    ActiveUsageView(grantID: grantID, reservedSeconds: Int64(reservedSeconds))
+                } label: {
+                    Label("利用中の枠を確認", systemImage: "timer")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primary)
+            } else {
+                NavigationLink {
+                    UsageReservationView(
+                        balanceMinutes: snapshot.rewardBalanceMinutes,
+                        sessionID: snapshot.sessionID ?? "",
+                        sessionVersion: snapshot.sessionVersion ?? 0,
+                        screenTime: screenTime
+                    )
+                } label: {
+                    Label("残高を使う", systemImage: "cup.and.saucer.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.primary)
+                .disabled(snapshot.rewardBalanceMinutes <= 0)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.primary)
-            .disabled(snapshot.rewardBalanceMinutes <= 0)
         } else {
             Label {
                 Text(snapshot.sessionStatus == .working
@@ -248,11 +319,11 @@ struct HomeView: View {
         }
     }
 
-    private var errorCard: some View {
+    private func errorCard(message: String) -> some View {
         SurfaceCard {
             Label("状態を読み込めませんでした", systemImage: "wifi.exclamationmark")
                 .font(.headline)
-            Text("接続状態を確認して、もう一度お試しください。")
+            Text(message)
                 .font(.footnote)
                 .foregroundStyle(AppTheme.secondaryInk)
             Button("再読み込み") {
@@ -266,6 +337,12 @@ struct HomeView: View {
     private func formattedWorkTime(_ minutes: Int?) -> String {
         guard let minutes else { return "--:--" }
         return String(format: "%d:%02d", minutes / 60, minutes % 60)
+    }
+
+    private func formattedDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return remainder == 0 ? "\(minutes)分" : "\(minutes)分\(remainder)秒"
     }
 
     private func sessionTitle(_ status: SessionStatus) -> String {
@@ -288,11 +365,11 @@ struct HomeView: View {
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .workingSample)) }
+            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .workingSample), screenTime: MobileScreenTimeController()) }
                 .previewDisplayName("作業中")
-            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .pausedSample)) }
+            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .pausedSample), screenTime: MobileScreenTimeController()) }
                 .previewDisplayName("一時停止中")
-            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .noSessionSample)) }
+            NavigationStack { HomeView(repository: MockHomeRepository(snapshot: .noSessionSample), screenTime: MobileScreenTimeController()) }
                 .previewDisplayName("セッションなし")
         }
     }

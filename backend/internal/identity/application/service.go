@@ -38,6 +38,7 @@ type DevicePage struct {
 type Repository interface {
 	EnsureUser(context.Context, Principal, string) (domain.User, error)
 	GetMe(context.Context, Principal) (domain.User, error)
+	UpdateDisplayName(context.Context, Principal, string) (domain.User, error)
 	RegisterDevice(context.Context, Principal, RegisterInput) (domain.Device, error)
 	ListDevices(context.Context, Principal, string, int) (DevicePage, error)
 	RevokeDevice(context.Context, Principal, RevokeInput) (domain.Device, error)
@@ -67,6 +68,16 @@ func (s *Service) GetMe(ctx context.Context, p Principal) (domain.User, error) {
 		return domain.User{}, ErrUnauthenticated
 	}
 	return s.repo.GetMe(ctx, p)
+}
+func (s *Service) UpdateDisplayName(ctx context.Context, p Principal, displayName string) (domain.User, error) {
+	if !validPrincipal(p) {
+		return domain.User{}, ErrUnauthenticated
+	}
+	displayName = strings.TrimSpace(displayName)
+	if !utf8.ValidString(displayName) || utf8.RuneCountInString(displayName) < 1 || utf8.RuneCountInString(displayName) > 30 {
+		return domain.User{}, ErrInvalid
+	}
+	return s.repo.UpdateDisplayName(ctx, p, displayName)
 }
 func (s *Service) RegisterDevice(ctx context.Context, p Principal, in RegisterInput) (domain.Device, error) {
 	if !validPrincipal(p) {

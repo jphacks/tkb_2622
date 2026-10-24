@@ -2368,6 +2368,162 @@ func (x *GetSessionResponse) GetReward() *v1.RewardSummary {
 	return nil
 }
 
+type SessionHistoryEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *Session               `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	Reward        *v1.RewardSummary      `protobuf:"bytes,2,opt,name=reward,proto3" json:"reward,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionHistoryEntry) Reset() {
+	*x = SessionHistoryEntry{}
+	mi := &file_focus_v1_focus_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionHistoryEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionHistoryEntry) ProtoMessage() {}
+
+func (x *SessionHistoryEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_focus_v1_focus_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionHistoryEntry.ProtoReflect.Descriptor instead.
+func (*SessionHistoryEntry) Descriptor() ([]byte, []int) {
+	return file_focus_v1_focus_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *SessionHistoryEntry) GetSession() *Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *SessionHistoryEntry) GetReward() *v1.RewardSummary {
+	if x != nil {
+		return x.Reward
+	}
+	return nil
+}
+
+type ListSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsRequest) Reset() {
+	*x = ListSessionsRequest{}
+	mi := &file_focus_v1_focus_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsRequest) ProtoMessage() {}
+
+func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_focus_v1_focus_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_focus_v1_focus_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListSessionsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListSessionsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*SessionHistoryEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsResponse) Reset() {
+	*x = ListSessionsResponse{}
+	mi := &file_focus_v1_focus_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsResponse) ProtoMessage() {}
+
+func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_focus_v1_focus_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_focus_v1_focus_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListSessionsResponse) GetEntries() []*SessionHistoryEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *ListSessionsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 type GetSessionOperationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Kind          OperationKind          `protobuf:"varint,1,opt,name=kind,proto3,enum=focus.v1.OperationKind" json:"kind,omitempty"`
@@ -2378,7 +2534,7 @@ type GetSessionOperationRequest struct {
 
 func (x *GetSessionOperationRequest) Reset() {
 	*x = GetSessionOperationRequest{}
-	mi := &file_focus_v1_focus_proto_msgTypes[30]
+	mi := &file_focus_v1_focus_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2390,7 +2546,7 @@ func (x *GetSessionOperationRequest) String() string {
 func (*GetSessionOperationRequest) ProtoMessage() {}
 
 func (x *GetSessionOperationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_focus_v1_focus_proto_msgTypes[30]
+	mi := &file_focus_v1_focus_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2403,7 +2559,7 @@ func (x *GetSessionOperationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionOperationRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionOperationRequest) Descriptor() ([]byte, []int) {
-	return file_focus_v1_focus_proto_rawDescGZIP(), []int{30}
+	return file_focus_v1_focus_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetSessionOperationRequest) GetKind() OperationKind {
@@ -2430,7 +2586,7 @@ type GetSessionOperationResponse struct {
 
 func (x *GetSessionOperationResponse) Reset() {
 	*x = GetSessionOperationResponse{}
-	mi := &file_focus_v1_focus_proto_msgTypes[31]
+	mi := &file_focus_v1_focus_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2442,7 +2598,7 @@ func (x *GetSessionOperationResponse) String() string {
 func (*GetSessionOperationResponse) ProtoMessage() {}
 
 func (x *GetSessionOperationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_focus_v1_focus_proto_msgTypes[31]
+	mi := &file_focus_v1_focus_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2455,7 +2611,7 @@ func (x *GetSessionOperationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionOperationResponse.ProtoReflect.Descriptor instead.
 func (*GetSessionOperationResponse) Descriptor() ([]byte, []int) {
-	return file_focus_v1_focus_proto_rawDescGZIP(), []int{31}
+	return file_focus_v1_focus_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetSessionOperationResponse) GetStatus() OperationStatus {
@@ -2635,7 +2791,17 @@ const file_focus_v1_focus_proto_rawDesc = "" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"s\n" +
 	"\x12GetSessionResponse\x12+\n" +
 	"\asession\x18\x01 \x01(\v2\x11.focus.v1.SessionR\asession\x120\n" +
-	"\x06reward\x18\x02 \x01(\v2\x18.reward.v1.RewardSummaryR\x06reward\"l\n" +
+	"\x06reward\x18\x02 \x01(\v2\x18.reward.v1.RewardSummaryR\x06reward\"t\n" +
+	"\x13SessionHistoryEntry\x12+\n" +
+	"\asession\x18\x01 \x01(\v2\x11.focus.v1.SessionR\asession\x120\n" +
+	"\x06reward\x18\x02 \x01(\v2\x18.reward.v1.RewardSummaryR\x06reward\"Q\n" +
+	"\x13ListSessionsRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"w\n" +
+	"\x14ListSessionsResponse\x127\n" +
+	"\aentries\x18\x01 \x03(\v2\x1d.focus.v1.SessionHistoryEntryR\aentries\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"l\n" +
 	"\x1aGetSessionOperationRequest\x12+\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x17.focus.v1.OperationKindR\x04kind\x12!\n" +
 	"\foperation_id\x18\x02 \x01(\tR\voperationId\"o\n" +
@@ -2684,7 +2850,7 @@ const file_focus_v1_focus_proto_rawDesc = "" +
 	"\x0fOperationStatus\x12 \n" +
 	"\x1cOPERATION_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aOPERATION_STATUS_NOT_FOUND\x10\x01\x12\x1e\n" +
-	"\x1aOPERATION_STATUS_SUCCEEDED\x10\x022\xa6\b\n" +
+	"\x1aOPERATION_STATUS_SUCCEEDED\x10\x022\xf5\b\n" +
 	"\fFocusService\x12G\n" +
 	"\n" +
 	"CreateTask\x12\x1b.focus.v1.CreateTaskRequest\x1a\x1c.focus.v1.CreateTaskResponse\x12G\n" +
@@ -2700,7 +2866,8 @@ const file_focus_v1_focus_proto_rawDesc = "" +
 	"\fAbortSession\x12\x1d.focus.v1.AbortSessionRequest\x1a\x1e.focus.v1.AbortSessionResponse\x12\\\n" +
 	"\x11GetCurrentSession\x12\".focus.v1.GetCurrentSessionRequest\x1a#.focus.v1.GetCurrentSessionResponse\x12G\n" +
 	"\n" +
-	"GetSession\x12\x1b.focus.v1.GetSessionRequest\x1a\x1c.focus.v1.GetSessionResponse\x12b\n" +
+	"GetSession\x12\x1b.focus.v1.GetSessionRequest\x1a\x1c.focus.v1.GetSessionResponse\x12M\n" +
+	"\fListSessions\x12\x1d.focus.v1.ListSessionsRequest\x1a\x1e.focus.v1.ListSessionsResponse\x12b\n" +
 	"\x13GetSessionOperation\x12$.focus.v1.GetSessionOperationRequest\x1a%.focus.v1.GetSessionOperationResponseB:Z8github.com/jphacks/tkb_2622/backend/gen/focus/v1;focusv1b\x06proto3"
 
 var (
@@ -2716,7 +2883,7 @@ func file_focus_v1_focus_proto_rawDescGZIP() []byte {
 }
 
 var file_focus_v1_focus_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_focus_v1_focus_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_focus_v1_focus_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_focus_v1_focus_proto_goTypes = []any{
 	(TaskCategory)(0),                   // 0: focus.v1.TaskCategory
 	(FocusMode)(0),                      // 1: focus.v1.FocusMode
@@ -2755,93 +2922,101 @@ var file_focus_v1_focus_proto_goTypes = []any{
 	(*GetCurrentSessionResponse)(nil),   // 34: focus.v1.GetCurrentSessionResponse
 	(*GetSessionRequest)(nil),           // 35: focus.v1.GetSessionRequest
 	(*GetSessionResponse)(nil),          // 36: focus.v1.GetSessionResponse
-	(*GetSessionOperationRequest)(nil),  // 37: focus.v1.GetSessionOperationRequest
-	(*GetSessionOperationResponse)(nil), // 38: focus.v1.GetSessionOperationResponse
-	(*timestamppb.Timestamp)(nil),       // 39: google.protobuf.Timestamp
-	(*v1.RewardBalance)(nil),            // 40: reward.v1.RewardBalance
-	(*v11.RestrictionState)(nil),        // 41: restriction.v1.RestrictionState
-	(*v1.RewardSummary)(nil),            // 42: reward.v1.RewardSummary
+	(*SessionHistoryEntry)(nil),         // 37: focus.v1.SessionHistoryEntry
+	(*ListSessionsRequest)(nil),         // 38: focus.v1.ListSessionsRequest
+	(*ListSessionsResponse)(nil),        // 39: focus.v1.ListSessionsResponse
+	(*GetSessionOperationRequest)(nil),  // 40: focus.v1.GetSessionOperationRequest
+	(*GetSessionOperationResponse)(nil), // 41: focus.v1.GetSessionOperationResponse
+	(*timestamppb.Timestamp)(nil),       // 42: google.protobuf.Timestamp
+	(*v1.RewardBalance)(nil),            // 43: reward.v1.RewardBalance
+	(*v11.RestrictionState)(nil),        // 44: restriction.v1.RestrictionState
+	(*v1.RewardSummary)(nil),            // 45: reward.v1.RewardSummary
 }
 var file_focus_v1_focus_proto_depIdxs = []int32{
 	0,  // 0: focus.v1.TaskSettings.category:type_name -> focus.v1.TaskCategory
 	1,  // 1: focus.v1.TaskSettings.mode:type_name -> focus.v1.FocusMode
 	7,  // 2: focus.v1.Task.settings:type_name -> focus.v1.TaskSettings
-	39, // 3: focus.v1.Task.created_at:type_name -> google.protobuf.Timestamp
-	39, // 4: focus.v1.Task.updated_at:type_name -> google.protobuf.Timestamp
+	42, // 3: focus.v1.Task.created_at:type_name -> google.protobuf.Timestamp
+	42, // 4: focus.v1.Task.updated_at:type_name -> google.protobuf.Timestamp
 	7,  // 5: focus.v1.CreateTaskRequest.settings:type_name -> focus.v1.TaskSettings
 	8,  // 6: focus.v1.CreateTaskResponse.task:type_name -> focus.v1.Task
 	7,  // 7: focus.v1.UpdateTaskRequest.settings:type_name -> focus.v1.TaskSettings
 	8,  // 8: focus.v1.UpdateTaskResponse.task:type_name -> focus.v1.Task
 	8,  // 9: focus.v1.GetTaskResponse.task:type_name -> focus.v1.Task
 	8,  // 10: focus.v1.ListTasksResponse.tasks:type_name -> focus.v1.Task
-	39, // 11: focus.v1.ActivitySegment.start_time:type_name -> google.protobuf.Timestamp
-	39, // 12: focus.v1.ActivitySegment.end_time:type_name -> google.protobuf.Timestamp
+	42, // 11: focus.v1.ActivitySegment.start_time:type_name -> google.protobuf.Timestamp
+	42, // 12: focus.v1.ActivitySegment.end_time:type_name -> google.protobuf.Timestamp
 	3,  // 13: focus.v1.ActivitySegment.classification:type_name -> focus.v1.ActivityClass
 	7,  // 14: focus.v1.Session.task_snapshot:type_name -> focus.v1.TaskSettings
 	2,  // 15: focus.v1.Session.status:type_name -> focus.v1.SessionStatus
-	39, // 16: focus.v1.Session.started_at:type_name -> google.protobuf.Timestamp
-	39, // 17: focus.v1.Session.paused_at:type_name -> google.protobuf.Timestamp
-	39, // 18: focus.v1.Session.ended_at:type_name -> google.protobuf.Timestamp
+	42, // 16: focus.v1.Session.started_at:type_name -> google.protobuf.Timestamp
+	42, // 17: focus.v1.Session.paused_at:type_name -> google.protobuf.Timestamp
+	42, // 18: focus.v1.Session.ended_at:type_name -> google.protobuf.Timestamp
 	18, // 19: focus.v1.Session.durations:type_name -> focus.v1.Durations
 	19, // 20: focus.v1.StartSessionResponse.session:type_name -> focus.v1.Session
-	40, // 21: focus.v1.StartSessionResponse.balance:type_name -> reward.v1.RewardBalance
-	41, // 22: focus.v1.StartSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
+	43, // 21: focus.v1.StartSessionResponse.balance:type_name -> reward.v1.RewardBalance
+	44, // 22: focus.v1.StartSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
 	17, // 23: focus.v1.UploadActivityBatchRequest.segments:type_name -> focus.v1.ActivitySegment
 	4,  // 24: focus.v1.ActivityReceipt.status:type_name -> focus.v1.BatchStatus
 	23, // 25: focus.v1.UploadActivityBatchResponse.receipt:type_name -> focus.v1.ActivityReceipt
-	40, // 26: focus.v1.UploadActivityBatchResponse.balance:type_name -> reward.v1.RewardBalance
-	39, // 27: focus.v1.PauseSessionRequest.paused_at:type_name -> google.protobuf.Timestamp
+	43, // 26: focus.v1.UploadActivityBatchResponse.balance:type_name -> reward.v1.RewardBalance
+	42, // 27: focus.v1.PauseSessionRequest.paused_at:type_name -> google.protobuf.Timestamp
 	19, // 28: focus.v1.PauseSessionResponse.session:type_name -> focus.v1.Session
-	40, // 29: focus.v1.PauseSessionResponse.balance:type_name -> reward.v1.RewardBalance
+	43, // 29: focus.v1.PauseSessionResponse.balance:type_name -> reward.v1.RewardBalance
 	19, // 30: focus.v1.ResumeSessionResponse.session:type_name -> focus.v1.Session
-	40, // 31: focus.v1.ResumeSessionResponse.balance:type_name -> reward.v1.RewardBalance
-	41, // 32: focus.v1.ResumeSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
-	39, // 33: focus.v1.FinishSessionRequest.ended_at:type_name -> google.protobuf.Timestamp
+	43, // 31: focus.v1.ResumeSessionResponse.balance:type_name -> reward.v1.RewardBalance
+	44, // 32: focus.v1.ResumeSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
+	42, // 33: focus.v1.FinishSessionRequest.ended_at:type_name -> google.protobuf.Timestamp
 	17, // 34: focus.v1.FinishSessionRequest.remaining_segments:type_name -> focus.v1.ActivitySegment
 	19, // 35: focus.v1.FinishSessionResponse.session:type_name -> focus.v1.Session
-	40, // 36: focus.v1.FinishSessionResponse.balance:type_name -> reward.v1.RewardBalance
-	41, // 37: focus.v1.FinishSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
-	39, // 38: focus.v1.AbortSessionRequest.ended_at:type_name -> google.protobuf.Timestamp
+	43, // 36: focus.v1.FinishSessionResponse.balance:type_name -> reward.v1.RewardBalance
+	44, // 37: focus.v1.FinishSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
+	42, // 38: focus.v1.AbortSessionRequest.ended_at:type_name -> google.protobuf.Timestamp
 	17, // 39: focus.v1.AbortSessionRequest.remaining_segments:type_name -> focus.v1.ActivitySegment
 	19, // 40: focus.v1.AbortSessionResponse.session:type_name -> focus.v1.Session
-	40, // 41: focus.v1.AbortSessionResponse.balance:type_name -> reward.v1.RewardBalance
-	41, // 42: focus.v1.AbortSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
+	43, // 41: focus.v1.AbortSessionResponse.balance:type_name -> reward.v1.RewardBalance
+	44, // 42: focus.v1.AbortSessionResponse.restriction:type_name -> restriction.v1.RestrictionState
 	19, // 43: focus.v1.GetCurrentSessionResponse.session:type_name -> focus.v1.Session
 	19, // 44: focus.v1.GetSessionResponse.session:type_name -> focus.v1.Session
-	42, // 45: focus.v1.GetSessionResponse.reward:type_name -> reward.v1.RewardSummary
-	5,  // 46: focus.v1.GetSessionOperationRequest.kind:type_name -> focus.v1.OperationKind
-	6,  // 47: focus.v1.GetSessionOperationResponse.status:type_name -> focus.v1.OperationStatus
-	9,  // 48: focus.v1.FocusService.CreateTask:input_type -> focus.v1.CreateTaskRequest
-	11, // 49: focus.v1.FocusService.UpdateTask:input_type -> focus.v1.UpdateTaskRequest
-	13, // 50: focus.v1.FocusService.GetTask:input_type -> focus.v1.GetTaskRequest
-	15, // 51: focus.v1.FocusService.ListTasks:input_type -> focus.v1.ListTasksRequest
-	20, // 52: focus.v1.FocusService.StartSession:input_type -> focus.v1.StartSessionRequest
-	22, // 53: focus.v1.FocusService.UploadActivityBatch:input_type -> focus.v1.UploadActivityBatchRequest
-	25, // 54: focus.v1.FocusService.PauseSession:input_type -> focus.v1.PauseSessionRequest
-	27, // 55: focus.v1.FocusService.ResumeSession:input_type -> focus.v1.ResumeSessionRequest
-	29, // 56: focus.v1.FocusService.FinishSession:input_type -> focus.v1.FinishSessionRequest
-	31, // 57: focus.v1.FocusService.AbortSession:input_type -> focus.v1.AbortSessionRequest
-	33, // 58: focus.v1.FocusService.GetCurrentSession:input_type -> focus.v1.GetCurrentSessionRequest
-	35, // 59: focus.v1.FocusService.GetSession:input_type -> focus.v1.GetSessionRequest
-	37, // 60: focus.v1.FocusService.GetSessionOperation:input_type -> focus.v1.GetSessionOperationRequest
-	10, // 61: focus.v1.FocusService.CreateTask:output_type -> focus.v1.CreateTaskResponse
-	12, // 62: focus.v1.FocusService.UpdateTask:output_type -> focus.v1.UpdateTaskResponse
-	14, // 63: focus.v1.FocusService.GetTask:output_type -> focus.v1.GetTaskResponse
-	16, // 64: focus.v1.FocusService.ListTasks:output_type -> focus.v1.ListTasksResponse
-	21, // 65: focus.v1.FocusService.StartSession:output_type -> focus.v1.StartSessionResponse
-	24, // 66: focus.v1.FocusService.UploadActivityBatch:output_type -> focus.v1.UploadActivityBatchResponse
-	26, // 67: focus.v1.FocusService.PauseSession:output_type -> focus.v1.PauseSessionResponse
-	28, // 68: focus.v1.FocusService.ResumeSession:output_type -> focus.v1.ResumeSessionResponse
-	30, // 69: focus.v1.FocusService.FinishSession:output_type -> focus.v1.FinishSessionResponse
-	32, // 70: focus.v1.FocusService.AbortSession:output_type -> focus.v1.AbortSessionResponse
-	34, // 71: focus.v1.FocusService.GetCurrentSession:output_type -> focus.v1.GetCurrentSessionResponse
-	36, // 72: focus.v1.FocusService.GetSession:output_type -> focus.v1.GetSessionResponse
-	38, // 73: focus.v1.FocusService.GetSessionOperation:output_type -> focus.v1.GetSessionOperationResponse
-	61, // [61:74] is the sub-list for method output_type
-	48, // [48:61] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	45, // 45: focus.v1.GetSessionResponse.reward:type_name -> reward.v1.RewardSummary
+	19, // 46: focus.v1.SessionHistoryEntry.session:type_name -> focus.v1.Session
+	45, // 47: focus.v1.SessionHistoryEntry.reward:type_name -> reward.v1.RewardSummary
+	37, // 48: focus.v1.ListSessionsResponse.entries:type_name -> focus.v1.SessionHistoryEntry
+	5,  // 49: focus.v1.GetSessionOperationRequest.kind:type_name -> focus.v1.OperationKind
+	6,  // 50: focus.v1.GetSessionOperationResponse.status:type_name -> focus.v1.OperationStatus
+	9,  // 51: focus.v1.FocusService.CreateTask:input_type -> focus.v1.CreateTaskRequest
+	11, // 52: focus.v1.FocusService.UpdateTask:input_type -> focus.v1.UpdateTaskRequest
+	13, // 53: focus.v1.FocusService.GetTask:input_type -> focus.v1.GetTaskRequest
+	15, // 54: focus.v1.FocusService.ListTasks:input_type -> focus.v1.ListTasksRequest
+	20, // 55: focus.v1.FocusService.StartSession:input_type -> focus.v1.StartSessionRequest
+	22, // 56: focus.v1.FocusService.UploadActivityBatch:input_type -> focus.v1.UploadActivityBatchRequest
+	25, // 57: focus.v1.FocusService.PauseSession:input_type -> focus.v1.PauseSessionRequest
+	27, // 58: focus.v1.FocusService.ResumeSession:input_type -> focus.v1.ResumeSessionRequest
+	29, // 59: focus.v1.FocusService.FinishSession:input_type -> focus.v1.FinishSessionRequest
+	31, // 60: focus.v1.FocusService.AbortSession:input_type -> focus.v1.AbortSessionRequest
+	33, // 61: focus.v1.FocusService.GetCurrentSession:input_type -> focus.v1.GetCurrentSessionRequest
+	35, // 62: focus.v1.FocusService.GetSession:input_type -> focus.v1.GetSessionRequest
+	38, // 63: focus.v1.FocusService.ListSessions:input_type -> focus.v1.ListSessionsRequest
+	40, // 64: focus.v1.FocusService.GetSessionOperation:input_type -> focus.v1.GetSessionOperationRequest
+	10, // 65: focus.v1.FocusService.CreateTask:output_type -> focus.v1.CreateTaskResponse
+	12, // 66: focus.v1.FocusService.UpdateTask:output_type -> focus.v1.UpdateTaskResponse
+	14, // 67: focus.v1.FocusService.GetTask:output_type -> focus.v1.GetTaskResponse
+	16, // 68: focus.v1.FocusService.ListTasks:output_type -> focus.v1.ListTasksResponse
+	21, // 69: focus.v1.FocusService.StartSession:output_type -> focus.v1.StartSessionResponse
+	24, // 70: focus.v1.FocusService.UploadActivityBatch:output_type -> focus.v1.UploadActivityBatchResponse
+	26, // 71: focus.v1.FocusService.PauseSession:output_type -> focus.v1.PauseSessionResponse
+	28, // 72: focus.v1.FocusService.ResumeSession:output_type -> focus.v1.ResumeSessionResponse
+	30, // 73: focus.v1.FocusService.FinishSession:output_type -> focus.v1.FinishSessionResponse
+	32, // 74: focus.v1.FocusService.AbortSession:output_type -> focus.v1.AbortSessionResponse
+	34, // 75: focus.v1.FocusService.GetCurrentSession:output_type -> focus.v1.GetCurrentSessionResponse
+	36, // 76: focus.v1.FocusService.GetSession:output_type -> focus.v1.GetSessionResponse
+	39, // 77: focus.v1.FocusService.ListSessions:output_type -> focus.v1.ListSessionsResponse
+	41, // 78: focus.v1.FocusService.GetSessionOperation:output_type -> focus.v1.GetSessionOperationResponse
+	65, // [65:79] is the sub-list for method output_type
+	51, // [51:65] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_focus_v1_focus_proto_init() }
@@ -2856,7 +3031,7 @@ func file_focus_v1_focus_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_focus_v1_focus_proto_rawDesc), len(file_focus_v1_focus_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   32,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

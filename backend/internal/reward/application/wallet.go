@@ -4,8 +4,11 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jphacks/tkb_2622/backend/internal/apperr"
@@ -15,6 +18,7 @@ import (
 type Transaction struct {
 	ID, UserID, SessionID, Type, SourceID string
 	AmountSeconds, BalanceAfter           int64
+	OccurredAt                            time.Time
 }
 type Grant struct {
 	ID, SessionID, UserID, TransactionID string
@@ -30,6 +34,16 @@ type Repository interface {
 	AddTransaction(ctx context.Context, t Transaction) error
 	AddGrant(ctx context.Context, g Grant) error
 	Summary(ctx context.Context, sessionID string) (domain.Summary, error)
+	ListTransactions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]Transaction, error)
+}
+
+type TransactionPage struct {
+	Transactions []Transaction
+	Next         string
+}
+type transactionCursor struct {
+	OccurredAt time.Time `json:"occurred_at"`
+	ID         string    `json:"id"`
 }
 
 type Wallets struct {
@@ -44,6 +58,44 @@ func (w *Wallets) Balance(ctx context.Context, userID string) (domain.Wallet, er
 }
 func (w *Wallets) Summary(ctx context.Context, sessionID string) (domain.Summary, error) {
 	return w.repo.Summary(ctx, sessionID)
+}
+
+// ListTransactions returns the caller's reward ledger newest first. Page tokens are opaque cursors.
+func (w *Wallets) ListTransactions(ctx context.Context, userID, token string, size int) (TransactionPage, error) {
+	if size < 0 || size > 100 {
+		return TransactionPage{}, apperr.ErrInvalid
+	}
+	if size == 0 {
+		size = 20
+	}
+	var cursor transactionCursor
+	if token != "" {
+		encoded, err := base64.RawURLEncoding.DecodeString(token)
+		if err != nil || json.Unmarshal(encoded, &cursor) != nil || !validUUID(cursor.ID) || cursor.OccurredAt.IsZero() {
+			return TransactionPage{}, apperr.ErrInvalid
+		}
+		cursor.OccurredAt = cursor.OccurredAt.UTC()
+	}
+	transactions, err := w.repo.ListTransactions(ctx, userID, cursor.OccurredAt, cursor.ID, size+1)
+	if err != nil {
+		return TransactionPage{}, err
+	}
+	page := TransactionPage{Transactions: transactions}
+	if len(transactions) > size {
+		page.Transactions = transactions[:size]
+		last := page.Transactions[len(page.Transactions)-1]
+		encoded, err := json.Marshal(transactionCursor{OccurredAt: last.OccurredAt, ID: last.ID})
+		if err != nil {
+			return TransactionPage{}, err
+		}
+		page.Next = base64.RawURLEncoding.EncodeToString(encoded)
+	}
+	return page, nil
+}
+
+func validUUID(value string) bool {
+	id, err := uuid.Parse(value)
+	return err == nil && id != uuid.Nil && id.String() == value
 }
 
 // Open binds the wallet to a newly started session with a zero balance.

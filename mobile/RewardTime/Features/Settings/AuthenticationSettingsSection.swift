@@ -2,6 +2,7 @@ import SwiftUI
 import Supabase
 
 struct AuthenticationSettingsSection: View {
+    var onAuthenticationChanged: () -> Void = {}
     @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
     @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
     @AppStorage("mobile.api.baseURL") private var apiBaseURLText = "http://127.0.0.1:8080"
@@ -14,7 +15,9 @@ struct AuthenticationSettingsSection: View {
     @State private var requestedEmail: String?
     @State private var isWorking = false
     @State private var auth: SupabaseAuthService?
+    @State private var authenticatedEmail: String?
     @State private var identity: MobileIdentity?
+    @State private var displayNameDraft = ""
     @State private var message: String?
     @State private var isError = false
 
@@ -23,10 +26,11 @@ struct AuthenticationSettingsSection: View {
             Label("アカウント接続", systemImage: "person.crop.circle.badge.checkmark")
                 .font(.subheadline.weight(.bold))
 
-            Text("メールOTPでSupabase Authにログインし、業務UserのEnsureUserとGetMeを確認します。")
+            Text("メールに届く確認コードでログインします。ログイン後はアカウント状態をbackendと同期します。")
                 .font(.caption)
                 .foregroundStyle(AppTheme.secondaryInk)
 
+#if DEBUG
             Group {
                 TextField("Supabase Project URL", text: $projectURLText)
                     .keyboardType(.URL)
@@ -48,12 +52,26 @@ struct AuthenticationSettingsSection: View {
             .textFieldStyle(.roundedBorder)
             .font(.footnote)
 
-            Text("公開用キーだけを入力してください。service_role / secret keyは入力しないでください。実機ではAPI URLにMacのLAN IPを指定します。")
+            Text("公開用キーだけを入力してください。service_role / secret keyは入力しないでください。実機でMac上のbackendを使う場合、API URLにはMacのLAN IPを指定します（127.0.0.1はiPhone自身です）。")
                 .font(.caption2)
                 .foregroundStyle(AppTheme.secondaryInk)
+#else
+            if hasConnectionConfiguration {
+                Label("アプリの接続設定を使用します", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.teal)
+            } else {
+                Label("アプリの接続設定がありません。SUPABASE_PROJECT_URL、SUPABASE_PUBLISHABLE_KEY、CONNECT_API_BASE_URLをReleaseのBuild Settingsに設定してください。", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+#endif
 
             if let identity {
                 identityView(identity)
+            } else if let authenticatedEmail {
+                authenticatedSessionView(email: authenticatedEmail)
             } else {
                 TextField("メールアドレス", text: $email)
                     .keyboardType(.emailAddress)
@@ -80,7 +98,11 @@ struct AuthenticationSettingsSection: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.primary)
-                .disabled(isWorking || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    isWorking
+                        || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || !hasConnectionConfiguration
+                )
 
                 if isOTPRequested {
                     TextField("メールに届いた確認コード", text: $otp)
@@ -92,8 +114,13 @@ struct AuthenticationSettingsSection: View {
                     Button {
                         Task { await verifyOTP() }
                     } label: {
+#if DEBUG
                         Label("ログインして業務Userを確認", systemImage: "checkmark.shield")
                             .frame(maxWidth: .infinity, minHeight: 42)
+#else
+                        Label("ログイン", systemImage: "checkmark.shield")
+                            .frame(maxWidth: .infinity, minHeight: 42)
+#endif
                     }
                     .buttonStyle(.bordered)
                     .disabled(isWorking || !EmailOTPInput.isPlausibleCode(EmailOTPInput.normalizedCode(otp)))
@@ -117,23 +144,47 @@ struct AuthenticationSettingsSection: View {
             if email.isEmpty { email = lastEmail }
             Task { await restoreSessionIfPresent() }
         }
+        .onChange(of: identity?.displayName) { _, newValue in
+            if let newValue { displayNameDraft = newValue }
+        }
     }
 
     @ViewBuilder
     private func identityView(_ identity: MobileIdentity) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+#if DEBUG
             Label("認証済み・業務User取得済み", systemImage: "checkmark.circle.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.teal)
             Text("User ID: \(identity.id)")
             Text("状態: \(identity.status)")
             Text("作成日時: \(identity.createdAt)")
+#else
+            Label("ログイン済み", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.teal)
+#endif
+            Text("グループに表示する名前")
+                .font(.caption.weight(.semibold))
+            TextField("1〜30文字", text: $displayNameDraft)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("groupDisplayName")
+            Button("表示名を保存") {
+                Task { await saveDisplayName() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking || displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || displayNameDraft == identity.displayName)
+
             HStack {
+#if DEBUG
                 Button("業務Userを再取得") {
                     Task { await loadBusinessIdentity() }
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
+#endif
 
                 Button("この端末からログアウト") {
                     Task { await signOut() }
@@ -149,10 +200,36 @@ struct AuthenticationSettingsSection: View {
         .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 14))
     }
 
+    private func authenticatedSessionView(email: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("ログイン済み・アカウント情報の同期が必要です", systemImage: "person.crop.circle.badge.exclamationmark")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text(email)
+                .font(.caption)
+            HStack {
+                Button("アカウント情報を再同期") {
+                    Task { await loadBusinessIdentity() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isWorking)
+
+                Button("ログアウト", role: .destructive) {
+                    Task { await signOut() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isWorking)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 14))
+    }
+
     @MainActor
     private func requestOTP() async {
         guard let service = makeAuthService() else {
-            setMessage("Supabase Project URLと公開用publishable/anon keyを入力してください。", error: true)
+            setMessage(authenticationConfigurationMessage, error: true)
             return
         }
         let normalizedEmail = EmailOTPInput.normalizedEmail(email)
@@ -195,8 +272,11 @@ struct AuthenticationSettingsSection: View {
             setMessage("確認コードを検証できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
             return
         }
+        auth = service
+        authenticatedEmail = targetEmail
         lastEmail = targetEmail
         resetOTPRequest()
+        onAuthenticationChanged()
         do {
             try await loadBusinessIdentity(using: service)
         } catch {
@@ -210,13 +290,26 @@ struct AuthenticationSettingsSection: View {
         auth = service
         do {
             let session = try await service.client.auth.session
+            authenticatedEmail = session.user.email
             if email.isEmpty, let sessionEmail = session.user.email {
                 email = sessionEmail
                 lastEmail = sessionEmail
             }
+            onAuthenticationChanged()
+        } catch {
+            setMessage(
+                "保存済みのSupabaseログインを確認できませんでした: \(AuthenticationErrorMessage.describe(error))",
+                error: true
+            )
+            return
+        }
+        do {
             try await loadBusinessIdentity(using: service)
         } catch {
-            setMessage("保存済みセッションを確認できませんでした。再ログインしてください。", error: true)
+            setMessage(
+                "Supabaseログインは保存されていますが、backendのEnsureUser／GetMeに失敗しました: \(AuthenticationErrorMessage.describe(error))",
+                error: true
+            )
         }
     }
 
@@ -235,16 +328,54 @@ struct AuthenticationSettingsSection: View {
     @MainActor
     private func loadBusinessIdentity(using service: SupabaseAuthService) async throws {
         let session = try await service.client.auth.session
+        guard let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL else {
+            throw SettingsInputError.invalidURL("Connect API URL")
+        }
         let operationKey = "mobile.identity.ensureUser.operation.\(session.user.id.uuidString)"
         let defaults = UserDefaults.standard
-        let operationID = defaults.string(forKey: operationKey) ?? UUID().uuidString
+        let operationID = (defaults.string(forKey: operationKey) ?? UUID().uuidString).lowercased()
         defaults.set(operationID, forKey: operationKey)
 
         let repository = IdentityAPIRepository(baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"), auth: service)
         let currentIdentity = try await repository.ensureUserAndFetchCurrentUser(operationID: operationID)
         defaults.removeObject(forKey: operationKey)
         identity = currentIdentity
+#if DEBUG
         setMessage("Supabase Auth、EnsureUser、GetMeを確認しました。", error: false)
+#else
+        setMessage("ログインしました。", error: false)
+#endif
+        onAuthenticationChanged()
+    }
+
+    @MainActor
+    private func saveDisplayName() async {
+        guard let service = auth ?? makeAuthService(),
+              let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL else {
+            setMessage("表示名を保存できません。ログイン状態とAPI設定を確認してください。", error: true)
+            return
+        }
+        let displayName = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !displayName.isEmpty, displayName.unicodeScalars.count <= 30 else {
+            setMessage("表示名は前後の空白を除いて1〜30文字にしてください。", error: true)
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let repository = IdentityAPIRepository(
+                baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"),
+                auth: service
+            )
+            let updatedIdentity = try await repository.updateDisplayName(displayName)
+            auth = service
+            identity = updatedIdentity
+            displayNameDraft = updatedIdentity.displayName
+            onAuthenticationChanged()
+            setMessage("表示名を保存しました。グループメンバーに表示されます。", error: false)
+        } catch {
+            setMessage("表示名を保存できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
+        }
     }
 
     @MainActor
@@ -256,7 +387,9 @@ struct AuthenticationSettingsSection: View {
             try await service.signOutFromThisDevice()
             identity = nil
             auth = nil
+            authenticatedEmail = nil
             resetOTPRequest()
+            onAuthenticationChanged()
             setMessage("この端末からログアウトしました。", error: false)
         } catch {
             setMessage("ログアウトできませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
@@ -277,16 +410,31 @@ struct AuthenticationSettingsSection: View {
 
     @MainActor
     private func configuredAuthService() -> SupabaseAuthService? {
-        guard let projectURL = try? validatedURL(projectURLText, label: "Supabase Project URL"),
-              !publishableKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        guard let projectURLText = MobileAppConfiguration.supabaseProjectURL,
+              let publishableKey = MobileAppConfiguration.supabasePublishableKey,
+              let projectURL = try? validatedURL(projectURLText, label: "Supabase Project URL"),
               !publishableKey.localizedCaseInsensitiveContains("service_role"),
               !publishableKey.localizedCaseInsensitiveContains("secret") else {
             return nil
         }
         return SupabaseAuthService(
             projectURL: projectURL,
-            publishableKey: publishableKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            publishableKey: publishableKey
         )
+    }
+
+    private var hasConnectionConfiguration: Bool {
+        MobileAppConfiguration.supabaseProjectURL != nil
+            && MobileAppConfiguration.supabasePublishableKey != nil
+            && MobileAppConfiguration.connectAPIBaseURL != nil
+    }
+
+    private var authenticationConfigurationMessage: String {
+#if DEBUG
+        "Supabase Project URLと公開用publishable/anon keyを入力してください。"
+#else
+        "アプリの接続設定を読み込めません。ReleaseのBuild Settingsを確認してください。"
+#endif
     }
 
     private func validatedURL(_ value: String, label: String) throws -> URL {

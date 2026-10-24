@@ -3,9 +3,10 @@ package domain
 import "time"
 
 type User struct {
-	ID        string
-	Status    string
-	CreatedAt time.Time
+	ID          string
+	Status      string
+	DisplayName string
+	CreatedAt   time.Time
 }
 
 type Device struct {

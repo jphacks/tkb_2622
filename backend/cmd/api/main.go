@@ -15,6 +15,8 @@ import (
 	"github.com/jphacks/tkb_2622/backend/internal/database"
 	focuspersistence "github.com/jphacks/tkb_2622/backend/internal/focus/adapter/persistence"
 	focus "github.com/jphacks/tkb_2622/backend/internal/focus/application"
+	grouppersistence "github.com/jphacks/tkb_2622/backend/internal/group/adapter/persistence"
+	group "github.com/jphacks/tkb_2622/backend/internal/group/application"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/auth"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/adapter/persistence"
 	"github.com/jphacks/tkb_2622/backend/internal/identity/application"
@@ -64,6 +66,7 @@ func run(logger *slog.Logger) error {
 		Identity:    identityService,
 		Verifier:    verifier,
 		Focus:       focus.New(focuspersistence.NewStore(db)),
+		Groups:      group.New(grouppersistence.New(db)),
 		Sessions:    workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
 		Wallets:     reward.New(rewardpersistence.New(db)),
 		Restriction: restriction.New(restrictionpersistence.NewStore(db)),
