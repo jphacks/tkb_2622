@@ -62,6 +62,11 @@ struct GroupView: View {
                     Text("メンバー \(group.members.count)人")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
+                    if let createdAt = group.createdAt?.date {
+                        Text("作成 \(createdAt.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
                 }
                 Spacer()
                 Image(systemName: "person.2.fill")
@@ -81,6 +86,12 @@ struct GroupView: View {
                         .font(.subheadline.weight(.medium))
                     if member.isCurrentUser {
                         Text("本人")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.secondaryInk)
+                    }
+                    Spacer()
+                    if let joinedAt = member.joinedAt?.date {
+                        Text("参加 \(joinedAt.formatted(date: .abbreviated, time: .omitted))")
                             .font(.caption)
                             .foregroundStyle(AppTheme.secondaryInk)
                     }

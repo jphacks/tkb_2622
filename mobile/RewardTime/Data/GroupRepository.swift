@@ -3,18 +3,53 @@ import Foundation
 struct MobileGroup: Decodable, Identifiable {
     struct Member: Decodable {
         let isCurrentUser: Bool
+        let joinedAt: GroupProtoTimestamp?
 
-        private enum CodingKeys: String, CodingKey { case isCurrentUser }
+        private enum CodingKeys: String, CodingKey { case isCurrentUser, joinedAt }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             isCurrentUser = try container.decodeIfPresent(Bool.self, forKey: .isCurrentUser) ?? false
+            joinedAt = try container.decodeIfPresent(GroupProtoTimestamp.self, forKey: .joinedAt)
         }
     }
 
     let id: String
     let name: String
+    let createdAt: GroupProtoTimestamp?
     let members: [Member]
+
+    private enum CodingKeys: String, CodingKey { case id, name, createdAt, members }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "グループ"
+        createdAt = try container.decodeIfPresent(GroupProtoTimestamp.self, forKey: .createdAt)
+        members = try container.decodeIfPresent([Member].self, forKey: .members) ?? []
+    }
+}
+
+struct GroupProtoTimestamp: Decodable {
+    let date: Date
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let text = try container.decode(String.self)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: text) ?? Self.withoutFractionalSeconds.date(from: text) {
+            self.date = date
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected an RFC 3339 group timestamp")
+        }
+    }
+
+    private static let withoutFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 }
 
 protocol GroupRepository {

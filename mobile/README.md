@@ -48,7 +48,7 @@ HomeRepository（ホーム情報取得の境界）
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |
 | 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。「選んだアプリを制限」を選ぶと直下にアプリ選択ボタンを表示し、「標準以外を制限」ではカテゴリ全体へShieldを適用する。セッション連動・適用状態報告・利用時間計測のコードは実装済み。実機動作は未確認 |
-| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`でDBの所属グループとメンバー数を取得。表示名・作業開始履歴・招待・退出は未接続 |
+| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`でDBの所属グループ、作成日、メンバー数、各メンバーの参加日を取得。表示名・作業開始履歴・招待・退出は未接続 |
 | 履歴 | `Features/History/HistoryView.swift`, `Data/HistoryRepository.swift`。`ListSessions`で終了・中止済み作業と報酬要約を、`ListTransactions`で獲得・利用・破棄の台帳をページング表示 |
 | 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く静的な通知例。APNs通知は未接続 |
 
