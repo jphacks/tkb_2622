@@ -168,11 +168,49 @@ func (a *App) bootstrapSession(ctx context.Context, current *cloud.AuthSession) 
 	}
 	a.persistLocked(time.Now())
 	a.mu.Unlock()
+	if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
+		a.markActivitySyncPending()
+	}
 	currentSession, err := a.cloudClient.GetCurrentSession(ctx, *current)
 	if err != nil {
 		return fmt.Errorf("未終了の作業を確認できませんでした: %w", err)
 	}
+	local := a.snapshot()
+	if currentSession != nil && local.Session != nil && local.Session.ID == currentSession.ID && local.Session.ServerVersion > 0 {
+		if err := a.ensureActivitySyncStateLocked(currentSession.ID, currentSession.AcceptedThroughSeq); err != nil {
+			a.markActivitySyncPending()
+		} else if currentSession.Status == "RUNNING" && local.Session.Status == "PAUSED" {
+			pausedAt := time.Now()
+			if err := a.queueCloudOperationLocked("pause", pausedAt, nil); err != nil {
+				a.markActivitySyncPending()
+			} else if err := a.prepareActivitySyncLocked(pausedAt, true); err != nil {
+				a.markActivitySyncPending()
+			} else {
+				if err := a.flushActivitySyncLocked(ctx, *current); err != nil {
+					a.markActivitySyncPending()
+				}
+			}
+			currentSession, err = a.cloudClient.GetCurrentSession(ctx, *current)
+			if err != nil {
+				return fmt.Errorf("復元した作業状態を確認できませんでした: %w", err)
+			}
+		}
+	}
+	var balance *cloud.Balance
+	if currentSession != nil {
+		currentBalance, err := a.cloudClient.GetBalance(ctx, *current)
+		if err != nil {
+			return fmt.Errorf("作業中の報酬残高を取得できませんでした: %w", err)
+		}
+		if currentBalance.SessionID != currentSession.ID {
+			return errors.New("APIの報酬残高が現在のセッションと一致しません")
+		}
+		balance = &currentBalance
+	}
 	a.reconcileCloudSession(currentSession, current.PCDeviceID)
+	if balance != nil {
+		a.applyCloudBalance(balance.SessionID, *balance)
+	}
 	return nil
 }
 
@@ -182,10 +220,8 @@ func (a *App) reconcileCloudSession(current *cloud.Session, localDeviceID string
 	state := a.engine.Snapshot()
 	local := state.Session
 	if current == nil {
-		if local != nil && local.ServerVersion > 0 {
-			a.engine.SetServerSession(local.ID, local.Task, 0, now)
-		}
 		a.engine.SetCloudSession(nil, now)
+		a.engine.ClearCloudBalance(now)
 	} else {
 		task := session.Task{
 			ID: current.TaskID, Name: current.TaskSettings.Name, Category: current.TaskSettings.Category,
@@ -201,11 +237,19 @@ func (a *App) reconcileCloudSession(current *cloud.Session, localDeviceID string
 		remote := &session.CloudSession{
 			ID: current.ID, TaskID: current.TaskID, Name: current.TaskSettings.Name,
 			Status: current.Status, Version: current.Version,
+			TrackingOnly:      current.TrackingOnly,
 			Message:           "サーバーに未終了の作業があります。このMacの記録と照合できるまで新しい作業を開始できません。",
 			OwnedByThisDevice: current.DeviceID == localDeviceID,
 		}
+		if current.TrackingOnly {
+			remote.Message = "この作業はiPhone制限なしの記録専用セッションです。"
+		}
 		if !remote.OwnedByThisDevice {
-			remote.Message = "別のPCで開始された未終了の作業があります。開始したPCで再開または中止してください。"
+			if current.TrackingOnly {
+				remote.Message = "別のPCで開始されたiPhone制限なしの記録専用セッションです。開始したPCで再開または中止してください。"
+			} else {
+				remote.Message = "別のPCで開始された未終了の作業があります。開始したPCで再開または中止してください。"
+			}
 		}
 		if task.Name == "" {
 			task.Name = current.TaskID
@@ -213,6 +257,7 @@ func (a *App) reconcileCloudSession(current *cloud.Session, localDeviceID string
 		}
 		if remote.OwnedByThisDevice && local != nil && local.ID == current.ID {
 			a.engine.SetServerSession(current.ID, task, current.Version, now)
+			a.engine.SetTrackingOnly(current.ID, current.TrackingOnly, now)
 			if local.Status == current.Status {
 				a.engine.SetCloudSession(nil, now)
 			} else {
@@ -262,11 +307,19 @@ func (a *App) abortCloudSession(current cloud.Session) error {
 	if err != nil {
 		return err
 	}
+	remote, err := a.cloudClient.GetCurrentSession(ctx, auth)
+	if err != nil {
+		return err
+	}
+	if remote == nil || remote.ID != current.ID {
+		return errors.New("サーバー上の未終了セッションを確認できません")
+	}
 	operationID, err := newUUID()
 	if err != nil {
 		return errors.New("中止操作のIDを作成できませんでした")
 	}
-	return a.cloudClient.AbortSession(ctx, auth, operationID, current.ID, current.Version, time.Now())
+	_, err = a.cloudClient.AbortSessionWithActivity(ctx, auth, operationID, current.ID, remote.Version, time.Now(), remote.AcceptedThroughSeq, nil)
+	return err
 }
 
 func (a *App) currentCloudAuthLocked(ctx context.Context) (cloud.AuthSession, error) {
@@ -312,6 +365,10 @@ func (a *App) abortServerSessionIfNeeded() *session.Snapshot {
 	a.mu.Lock()
 	state := a.engine.Snapshot()
 	if !state.Actions["abort"].Allowed {
+		a.mu.Unlock()
+		return nil
+	}
+	if state.Session != nil && state.Session.ServerVersion > 0 {
 		a.mu.Unlock()
 		return nil
 	}

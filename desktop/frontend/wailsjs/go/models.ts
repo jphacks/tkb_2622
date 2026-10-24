@@ -82,6 +82,7 @@ export namespace session {
 	    status: string;
 	    version: number;
 	    ownedByThisDevice: boolean;
+	    trackingOnly: boolean;
 	    message: string;
 
 	    static createFrom(source: any = {}) {
@@ -96,6 +97,7 @@ export namespace session {
 	        this.status = source["status"];
 	        this.version = source["version"];
 	        this.ownedByThisDevice = source["ownedByThisDevice"];
+	        this.trackingOnly = source["trackingOnly"];
 	        this.message = source["message"];
 	    }
 	}
@@ -288,6 +290,7 @@ export namespace session {
 	    status: string;
 	    task: Task;
 	    serverVersion?: number;
+	    trackingOnly?: boolean;
 	    classifications?: Classification[];
 	    rulesVersion?: string;
 	    elapsedSeconds: number;
@@ -304,6 +307,7 @@ export namespace session {
 	        this.status = source["status"];
 	        this.task = this.convertValues(source["task"], Task);
 	        this.serverVersion = source["serverVersion"];
+	        this.trackingOnly = source["trackingOnly"];
 	        this.classifications = this.convertValues(source["classifications"], Classification);
 	        this.rulesVersion = source["rulesVersion"];
 	        this.elapsedSeconds = source["elapsedSeconds"];
@@ -335,6 +339,7 @@ export namespace session {
 	    updatedAt: string;
 	    session?: WorkSession;
 	    cloudSession?: CloudSession;
+	    cloudOperationPending?: boolean;
 	    balanceSeconds?: number;
 	    sync: string;
 	    permission: string;
@@ -361,6 +366,7 @@ export namespace session {
 	        this.updatedAt = source["updatedAt"];
 	        this.session = this.convertValues(source["session"], WorkSession);
 	        this.cloudSession = this.convertValues(source["cloudSession"], CloudSession);
+	        this.cloudOperationPending = source["cloudOperationPending"];
 	        this.balanceSeconds = source["balanceSeconds"];
 	        this.sync = source["sync"];
 	        this.permission = source["permission"];

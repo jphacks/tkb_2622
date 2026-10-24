@@ -182,6 +182,7 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .session-status i { width: 10px; height: 10px; border-radius: 50%; background: #6D5DF0; }
 .session-status.paused { color: #076353; }
 .session-status.paused i { background: #0B7F6B; }
+.tracking-only-badge { color: #55469D; background: #F0EDFF; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .session-name { max-width: 180px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .timer-card { padding: 16px 18px; border-radius: 14px; background: #ECE9FF; color: #3F2FB8; }
 .timer-card > span, .timer-card p { font-size: 12px; }

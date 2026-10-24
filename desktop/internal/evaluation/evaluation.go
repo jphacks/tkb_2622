@@ -19,9 +19,27 @@ import (
 const pollSeconds = 1
 
 func Evaluate(records []monitor.Record, workSession session.WorkSession) (session.Result, error) {
+	result, _, _, err := EvaluateDetailed(records, workSession, time.Time{})
+	return result, err
+}
+
+type ActivitySegment struct {
+	StartTime      time.Time
+	EndTime        time.Time
+	Classification string
+	Reasons        []string
+}
+
+// EvaluateDetailed は確定済み記録またはクラウド送信用の一時区間を評価する。
+func EvaluateDetailed(records []monitor.Record, workSession session.WorkSession, through time.Time) (session.Result, []ActivitySegment, string, error) {
+	if !through.IsZero() && !hasTerminalRecord(records) {
+		records = append(append([]monitor.Record(nil), records...), monitor.Record{
+			Kind: "finished", SessionID: workSession.ID, RecordedAt: through,
+		})
+	}
 	capture, pauses, evidence, err := makeCapture(records)
 	if err != nil {
-		return session.Result{}, err
+		return session.Result{}, nil, "", err
 	}
 	rules := make([]poc.Rule, 0, len(workSession.Classifications))
 	for _, classification := range workSession.Classifications {
@@ -37,7 +55,7 @@ func Evaluate(records []monitor.Record, workSession session.WorkSession) (sessio
 		case "distraction":
 			class = poc.RuleDistraction
 		default:
-			return session.Result{}, fmt.Errorf("unsupported classification category %q", classification.Category)
+			return session.Result{}, nil, "", fmt.Errorf("unsupported classification category %q", classification.Category)
 		}
 		rules = append(rules, poc.Rule{AppID: classification.AppID, Domain: classification.Domain, Class: class})
 	}
@@ -58,21 +76,59 @@ func Evaluate(records []monitor.Record, workSession session.WorkSession) (sessio
 		Pauses: pauses,
 	}
 	if err := poc.ValidateSession(offlineSession); err != nil {
-		return session.Result{}, fmt.Errorf("saved classification rules are invalid: %w", err)
+		return session.Result{}, nil, "", fmt.Errorf("saved classification rules are invalid: %w", err)
 	}
 	observed := analysis.Analyze(capture)
 	evaluated, err := poc.EvaluateWithEvidence(offlineSession, observed, evidence)
 	if err != nil {
-		return session.Result{}, fmt.Errorf("activity evaluation failed: %w", err)
+		return session.Result{}, nil, "", fmt.Errorf("activity evaluation failed: %w", err)
 	}
 	totals := roundTotals(evaluated.Totals, evaluated.ElapsedSeconds)
-	return session.Result{
+	result := session.Result{
 		SessionID: workSession.ID, Name: workSession.Name, Status: workSession.Status,
 		ElapsedSeconds: totals.elapsed, TaskSeconds: totals.task, RelatedSeconds: totals.related,
 		WorkSeconds: totals.task + totals.related, DistractedSeconds: totals.distraction,
 		UncertainSeconds: totals.unknown, InactiveSeconds: totals.inactive,
 		EvaluatorVersion: evaluated.EvaluatorVersion,
-	}, nil
+	}
+	segments := make([]ActivitySegment, 0, len(evaluated.Segments))
+	for _, segment := range evaluated.Segments {
+		classification, err := activityClass(segment.Class)
+		if err != nil {
+			return session.Result{}, nil, "", err
+		}
+		segments = append(segments, ActivitySegment{
+			StartTime: segment.StartAt, EndTime: segment.EndAt, Classification: classification,
+			Reasons: append([]string(nil), segment.Reasons...),
+		})
+	}
+	return result, segments, evaluated.EvaluatorVersion, nil
+}
+
+func hasTerminalRecord(records []monitor.Record) bool {
+	for _, record := range records {
+		if record.Kind == "finished" || record.Kind == "aborted" {
+			return true
+		}
+	}
+	return false
+}
+
+func activityClass(class string) (string, error) {
+	switch class {
+	case poc.ClassTask:
+		return "ACTIVITY_CLASS_TASK", nil
+	case poc.ClassRelatedTransition:
+		return "ACTIVITY_CLASS_RELATED_TRANSITION", nil
+	case poc.ClassDistraction:
+		return "ACTIVITY_CLASS_DISTRACTION", nil
+	case poc.ClassUnknown:
+		return "ACTIVITY_CLASS_UNKNOWN", nil
+	case poc.ClassInactive:
+		return "ACTIVITY_CLASS_IDLE", nil
+	default:
+		return "", fmt.Errorf("unsupported evaluated activity class %q", class)
+	}
 }
 
 func makeCapture(records []monitor.Record) (model.Capture, []poc.TimeRange, []poc.EvidenceInterval, error) {

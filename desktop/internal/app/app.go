@@ -79,6 +79,7 @@ func New() *Host {
 				app.stateLoaded = true
 				if exists {
 					snapshot.Mode = "local-monitor"
+					clearStaleTerminalEvaluationFailure(&snapshot)
 					currentMonitor := toSessionMonitor(app.recorder.Status())
 					if snapshot.Session != nil && (snapshot.Session.Status == "RUNNING" || snapshot.Session.Status == "PAUSED") {
 						currentMonitor.State = "paused"
@@ -117,6 +118,16 @@ func New() *Host {
 	return &Host{API: app}
 }
 
+func clearStaleTerminalEvaluationFailure(snapshot *session.Snapshot) {
+	if snapshot == nil || snapshot.Session == nil || snapshot.Failure == nil || snapshot.Failure.Code != "local_evaluation" {
+		return
+	}
+	switch snapshot.Session.Status {
+	case "FINALIZED", "ABORTED", "COMPLETED_LOCAL", "ABORTED_LOCAL":
+		snapshot.Failure = nil
+	}
+}
+
 func (h *Host) Startup(ctx context.Context) { h.API.ctx = ctx }
 
 func (h *Host) DomReady(ctx context.Context) {
@@ -133,6 +144,19 @@ func (h *Host) DomReady(ctx context.Context) {
 			select {
 			case now := <-ticker.C:
 				a.tick(loop, now)
+			case <-loop.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		a.syncActivity(loop)
+		ticker := time.NewTicker(activityBatchInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				a.syncActivity(loop)
 			case <-loop.Done():
 				return
 			}
@@ -175,6 +199,7 @@ func (a *App) tick(ctx context.Context, now time.Time) {
 
 func (a *App) shutdown() {
 	now := time.Now()
+	queuePause := false
 	a.mu.Lock()
 	state := a.engine.Snapshot()
 	if state.Mode == "local-monitor" && state.Session != nil && state.Session.Status == "RUNNING" {
@@ -186,9 +211,23 @@ func (a *App) shutdown() {
 			}
 		}
 		a.engine.PauseForShutdown(now)
+		queuePause = state.Session.ServerVersion > 0
+		if queuePause {
+			a.engine.SetCloudOperationPending(true, now)
+			a.engine.SetSyncStatus("pending", now)
+		}
 	}
 	a.persistLocked(now)
 	a.mu.Unlock()
+	if queuePause {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := a.queueAndPrepareCloudOperation("pause", time.Now()); err == nil {
+			_ = a.flushActivitySync(ctx)
+		} else {
+			a.markActivitySyncPending()
+		}
+	}
 }
 
 func (a *App) GetStartupState() session.Snapshot {
@@ -296,9 +335,26 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 			a.finishMonitoring("aborted", now)
 		}
 	}
+	cloudOperation := before.Session != nil && before.Session.ServerVersion > 0 && state.Session != nil && state.Session.ID == before.Session.ID &&
+		state.Session.Status != before.Session.Status &&
+		(command.Action == "pause" || command.Action == "resume" || command.Action == "finish" || command.Action == "abort")
+	if cloudOperation {
+		a.engine.SetCloudOperationPending(true, now)
+		a.engine.SetSyncStatus("pending", now)
+	}
 	a.persistLocked(now)
 	state = a.engine.Snapshot()
 	a.mu.Unlock()
+	if cloudOperation {
+		ctx, cancel := context.WithTimeout(a.context(), 20*time.Second)
+		defer cancel()
+		if err := a.queueAndPrepareCloudOperation(command.Action, time.Now()); err != nil {
+			a.markActivitySyncPending()
+		} else if err := a.flushActivitySync(ctx); err != nil {
+			a.markActivitySyncPending()
+		}
+		state = a.snapshot()
+	}
 	if a.ctx != nil {
 		wailsruntime.EventsEmit(a.ctx, StateEvent, state)
 	}
@@ -394,6 +450,7 @@ func (a *App) startSession(command session.Command) session.Snapshot {
 			task.PlannedSeconds = int(cloudSession.TaskSettings.PlannedSeconds)
 			task.MinimumSeconds = int(cloudSession.TaskSettings.MinimumSeconds)
 			a.engine.SetServerSession(cloudSession.ID, task, cloudSession.Version, now)
+			a.engine.SetCloudBalance(cloudSession.ID, int(cloudSession.Balance.BalanceSeconds), now)
 			state = a.engine.Snapshot()
 		}
 		startErr = a.startMonitoring(state, before, now)
@@ -403,6 +460,27 @@ func (a *App) startSession(command session.Command) session.Snapshot {
 	a.persistLocked(now)
 	state = a.engine.Snapshot()
 	a.mu.Unlock()
+	if cloudSession != nil && startErr == nil {
+		if err := a.ensureActivitySyncState(cloudSession.ID, cloudSession.AcceptedThroughSeq); err != nil {
+			if a.recorder != nil {
+				status, _ := a.recorder.Finish("aborted")
+				a.mu.Lock()
+				a.engine.Restore(before, time.Now())
+				a.engine.SetMonitor(toSessionMonitor(status), time.Now())
+				a.engine.SetFailure("activity_outbox", "サーバー作業を記録するローカル送信待ちを作成できませんでした。", true, time.Now())
+				a.persistLocked(time.Now())
+				state = a.engine.Snapshot()
+				a.mu.Unlock()
+			}
+			startErr = err
+		} else {
+			a.mu.Lock()
+			a.engine.SetTrackingOnly(cloudSession.ID, cloudSession.TrackingOnly, time.Now())
+			a.persistLocked(time.Now())
+			state = a.engine.Snapshot()
+			a.mu.Unlock()
+		}
+	}
 	if startErr != nil && cloudSession != nil {
 		if err := a.abortCloudSession(*cloudSession); err != nil {
 			return a.failOrphanedCloudStart(*cloudSession, err)
@@ -452,6 +530,7 @@ func (a *App) failOrphanedCloudStart(started cloud.Session, cause error) session
 	a.engine.SetCloudSession(&session.CloudSession{
 		ID: started.ID, TaskID: started.TaskID, Name: started.TaskSettings.Name,
 		Status: started.Status, Version: started.Version,
+		TrackingOnly:      started.TrackingOnly,
 		OwnedByThisDevice: true,
 		Message:           "このMacで計測を開始できず、サーバー側セッションも中止できませんでした。設定から再接続してください。",
 	}, now)

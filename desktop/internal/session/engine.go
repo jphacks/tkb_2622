@@ -63,6 +63,9 @@ func (e *Engine) SetLocalStorageReady(ready bool, now time.Time) {
 
 func (e *Engine) SetAccount(account AccountState, now time.Time) {
 	e.state.Account = account
+	if account.Status != "signedIn" {
+		e.state.BalanceSeconds = nil
+	}
 	e.touch(now)
 }
 
@@ -142,6 +145,87 @@ func (e *Engine) SetServerSession(id string, task Task, version int64, now time.
 	}
 	e.touch(now)
 	return true
+}
+
+func (e *Engine) SetServerVersion(id string, version int64, now time.Time) bool {
+	if e.state.Session == nil || e.state.Session.ID != id || version < 0 {
+		return false
+	}
+	e.state.Session.ServerVersion = version
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) SetTrackingOnly(id string, trackingOnly bool, now time.Time) bool {
+	if e.state.Session == nil || e.state.Session.ID != id {
+		return false
+	}
+	e.state.Session.TrackingOnly = trackingOnly
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) SetCloudBalance(id string, seconds int, now time.Time) bool {
+	if seconds < 0 {
+		return false
+	}
+	if e.state.Session == nil || e.state.Session.ID != id {
+		if e.state.CloudSession == nil || e.state.CloudSession.ID != id {
+			return false
+		}
+	}
+	e.state.BalanceSeconds = &seconds
+	e.touch(now)
+	return true
+}
+
+func (e *Engine) ClearCloudBalance(now time.Time) {
+	e.state.BalanceSeconds = nil
+	e.touch(now)
+}
+
+func (e *Engine) SetSyncStatus(status string, now time.Time) {
+	if status != "synced" && status != "pending" && status != "failed" {
+		return
+	}
+	e.state.Sync = status
+	if status == "synced" && e.state.Failure != nil && e.state.Failure.Code == "cloud_activity_sync" {
+		e.state.Failure = nil
+	}
+	e.touch(now)
+}
+
+func (e *Engine) SetCloudOperationPending(pending bool, now time.Time) {
+	e.state.CloudOperationPending = pending
+	e.touch(now)
+}
+
+func (e *Engine) SetResultReward(id string, earned, spent, discarded int, now time.Time) bool {
+	if earned < 0 || spent < 0 || discarded < 0 {
+		return false
+	}
+	updated := false
+	if e.state.Result != nil && e.state.Result.SessionID == id {
+		e.state.Result.EarnedSeconds = earned
+		e.state.Result.UsedSeconds = spent
+		e.state.Result.DiscardedSeconds = discarded
+		updated = true
+	}
+	for index := range e.state.History {
+		if e.state.History[index].SessionID == id {
+			e.state.History[index].EarnedSeconds = earned
+			e.state.History[index].UsedSeconds = spent
+			e.state.History[index].DiscardedSeconds = discarded
+			updated = true
+		}
+	}
+	if updated {
+		if e.state.Session != nil && e.state.Session.ID == id {
+			e.state.Session.Evaluation = "complete"
+		}
+		e.touch(now)
+	}
+	return updated
 }
 
 func (e *Engine) SetCloudSession(current *CloudSession, now time.Time) {
@@ -476,16 +560,17 @@ func (e *Engine) updateActions() {
 	active := s != nil && (s.Status == "RUNNING" || s.Status == "PAUSED")
 	available := s == nil || terminal(s.Status)
 	cloudManaged := s != nil && s.ServerVersion > 0
+	cloudOperationPending := e.state.CloudOperationPending
 	cloudRecovery := e.state.CloudSession != nil
 	monitorReady := e.state.Mode != "local-monitor" || e.state.Monitor.State == "ready" || e.state.Monitor.State == "finished" || e.state.Monitor.State == "aborted"
 	monitorCanResume := e.state.Mode != "local-monitor" || e.state.Monitor.State == "paused" || e.state.Monitor.State == "ready"
 	storageReady := e.state.Mode != "local-monitor" || e.localStorageReady
 	rules := map[string]bool{
-		"start":  available && monitorReady && storageReady && !cloudRecovery && e.state.Account.Status != "error" && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
-		"pause":  active && s.Status == "RUNNING" && !cloudManaged,
-		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && !cloudManaged && (e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
-		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds && !cloudManaged,
-		"abort":  active && (e.state.CloudSession == nil || e.state.CloudSession.ID != s.ID || e.state.CloudSession.OwnedByThisDevice),
+		"start":  available && monitorReady && storageReady && !cloudRecovery && !cloudOperationPending && e.state.Account.Status != "error" && (e.state.Mode == "local-monitor" || e.state.Online) && e.state.Permission != "denied",
+		"pause":  active && s.Status == "RUNNING" && !cloudOperationPending,
+		"resume": active && s.Status == "PAUSED" && monitorCanResume && storageReady && e.state.Permission != "denied" && !cloudOperationPending && (cloudManaged || e.state.Mode == "local-monitor" || e.state.Online && e.state.Sync == "synced" && s.Evaluation == "complete"),
+		"finish": active && s.ElapsedSeconds >= s.Task.MinimumSeconds && !cloudOperationPending,
+		"abort":  active && !cloudOperationPending && (e.state.CloudSession == nil || e.state.CloudSession.ID != s.ID || e.state.CloudSession.OwnedByThisDevice),
 		"retry":  e.state.Mode != "local-monitor" && e.state.Sync != "synced",
 	}
 	if !active && cloudRecovery {
@@ -518,12 +603,10 @@ func (e *Engine) updateActions() {
 	if !rules["start"] && e.state.Account.Status == "error" {
 		e.state.Actions["start"] = Capability{Reason: "ログイン状態を確認できません。設定から再接続してください。"}
 	}
-	if cloudManaged && active {
-		message := "ログイン中セッションの一時停止・再開・通常終了は、API接続後に利用できます。中止は利用できます。"
-		for _, action := range []string{"pause", "resume", "finish"} {
-			if !rules[action] {
-				e.state.Actions[action] = Capability{Reason: message}
-			}
+	if cloudOperationPending && active {
+		message := "サーバーへの作業状態の同期が終わるまでお待ちください。"
+		for _, action := range []string{"pause", "resume", "finish", "abort"} {
+			e.state.Actions[action] = Capability{Reason: message}
 		}
 	}
 	if active && s.Status == "PAUSED" && e.state.Mode == "local-monitor" && !storageReady {
@@ -539,7 +622,7 @@ func (e *Engine) updateActions() {
 	if !rules["start"] && e.state.Permission == "denied" {
 		e.state.Actions["start"] = Capability{Reason: "計測権限が拒否されています。設定を確認してください。"}
 	}
-	if active && !rules["finish"] && !cloudManaged {
+	if active && !rules["finish"] && !cloudOperationPending {
 		e.state.Actions["finish"] = Capability{Reason: "最小作業時間に達していません。"}
 	}
 }
