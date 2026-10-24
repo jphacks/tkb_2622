@@ -1,0 +1,37 @@
+import { useState } from 'react';
+import type { Command, SessionAction, Snapshot } from '../bridge/types';
+import { clock, duration, minimumDuration, plannedDuration } from '../components/format';
+
+export const statusLabels: Record<string, string> = { RUNNING: '作業中', PAUSED: '一時停止中', FINALIZED: '作業終了', ABORTED: '中止済み', COMPLETED_LOCAL: '終了・同期待ち', ABORTED_LOCAL: '中止・同期待ち' };
+export interface PageProps { state: Snapshot; busy: boolean; execute: (command: Command) => void; onNavigate?: (page: 'feedback' | 'history' | 'settings') => void }
+
+export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
+  const [name, setName] = useState('');
+  const [choosingTask, setChoosingTask] = useState(false);
+  const session = state.session;
+  const active = session && ['RUNNING', 'PAUSED'].includes(session.status);
+  const task = active ? session.task : state.settings.tasks.find(item => item.id === state.settings.selectedTaskId)!;
+  const elapsed = session?.elapsedSeconds ?? 0;
+  const canFinish = state.actions.finish.allowed;
+  const act = (action: SessionAction, label: string, primary = false) => <button className={primary ? 'button primary panel-button' : 'button panel-button'} disabled={busy || !state.actions[action].allowed} title={state.actions[action].reason} onClick={() => execute({ action, name })}>{label}</button>;
+
+  if (!active) return <section className="session-panel start-panel" aria-label="作業開始">
+    <header className="panel-header"><strong className="panel-brand">Focus Link</strong><span>{state.balanceSeconds === null ? '利用できる時間　未取得' : `利用できる時間　${duration(state.balanceSeconds)}（デモ）`}</span></header>
+    <button className="start-button" disabled={busy || !state.actions.start.allowed} title={state.actions.start.reason} onClick={() => execute({ action: 'start', name })}><span aria-hidden="true">▶</span><strong>開始</strong></button>
+    <label className="panel-label">作業名<input maxLength={80} placeholder="今日は何に取り組みますか？" value={name} onChange={event => setName(event.target.value)} /></label>
+    <div className="task-strip"><span><strong>{choosingTask ? 'タスクを選ぶ' : task.name}</strong><small>{choosingTask ? '選択すると次回の作業から反映されます' : `予定 ${plannedDuration(task.plannedSeconds)} ・ 最小 ${minimumDuration(task.minimumSeconds)}`}</small></span>{choosingTask ? <select aria-label="タスク" value={task.id} disabled={busy} onChange={event => { const selected = state.settings.tasks.find(item => item.id === event.target.value)!; execute({ action: 'saveTask', task: selected }); setChoosingTask(false); }}><option value={task.id}>{task.name}</option>{state.settings.tasks.filter(item => item.id !== task.id).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select> : <button className="link-button" onClick={() => setChoosingTask(true)}>変更</button>}</div>
+    <div className="start-details"><p>押すとまとめて始まること</p><ul><li className="available">記録と判定 <span>デモ</span></li><li>iPhone利用枠終了 <span>未接続</span></li><li>VS Codeとフォルダ <span>未接続</span></li><li>グループ通知 <span>未接続</span></li></ul></div>
+    {!state.actions.start.allowed && <p className="panel-note">{state.actions.start.reason}</p>}
+    <footer className="panel-footer"><button onClick={() => onNavigate?.('history')}>これまでの記録</button><button onClick={() => onNavigate?.('settings')}>設定</button></footer>
+  </section>;
+
+  const paused = session.status === 'PAUSED';
+  const remaining = Math.max(0, task.minimumSeconds - elapsed);
+  return <section className={`session-panel ${paused ? 'paused-panel' : 'running-panel'}`} aria-label={paused ? '一時停止中の作業' : '作業中'}>
+    <header className="running-header"><span className={paused ? 'session-status paused' : 'session-status'}><i />{paused ? '一時停止中' : '作業中'}</span><span className="session-name">{paused ? `計測 ${clock(elapsed)} で停止` : session.name || session.task.name}</span></header>
+    {paused ? <div className="pause-balance"><span>iPhone利用枠</span><strong>未取得</strong><small>実際の利用時間の取得・制限は未接続</small></div> : <div className="timer-card"><span>計測時間（一時停止を除く）</span><strong className="panel-timer">{clock(elapsed)}</strong><div className="progress"><span style={{ width: `${Math.min(100, elapsed / task.minimumSeconds * 100)}%` }} /></div><p>{canFinish ? '最小作業時間に到達しました' : `最小作業時間 ${minimumDuration(task.minimumSeconds)}（あと${duration(remaining)}）`}</p></div>}
+    {paused && <div className="balance-row"><span>報酬の残高</span><strong>{state.balanceSeconds === null ? '未取得' : `${duration(state.balanceSeconds)}（デモ）`}</strong></div>}
+    {paused && <div className="paused-explanation"><p className="panel-note">再開すると、残っている利用枠は破棄されます。実際のiPhone利用枠はありません。</p>{session.evaluation !== 'complete' || state.sync !== 'synced' ? <button className="link-button" disabled={busy} onClick={() => execute({ action: 'retry' })}>記録の送信・評価を確認する（デモ）</button> : null}</div>}
+    {!paused ? <><div className="panel-actions">{act('pause', '一時停止')}{act('finish', canFinish ? '終了' : `終了（あと${duration(remaining)}）`, true)}</div><p className="panel-note">一時停止中のiPhone利用枠は未接続です。作業を再開すると計測を再開します。</p><footer className="panel-footer"><button className="danger-link" disabled={busy || !state.actions.abort.allowed} onClick={() => { if (window.confirm('作業を中止しますか？（デモ）')) execute({ action: 'abort' }); }}>中止する（報酬なし）</button><span className="panel-sync">{state.sync === 'synced' ? '同期済み（デモ）' : '同期待ち'}</span></footer></> : <><span className="resume-spacer" />{act('resume', '作業を再開する', true)}<div className="paused-subactions"><button className="link-button" disabled={busy || !state.actions.finish.allowed} title={state.actions.finish.reason} onClick={() => execute({ action: 'finish' })}>終了する</button><button className="link-button danger-link" disabled={busy || !state.actions.abort.allowed} onClick={() => { if (window.confirm('作業を中止しますか？（デモ）')) execute({ action: 'abort' }); }}>中止する（報酬なし）</button></div></>}
+  </section>;
+}

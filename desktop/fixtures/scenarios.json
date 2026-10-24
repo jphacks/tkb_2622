@@ -1,0 +1,29 @@
+{
+  "task": { "id": "programming", "name": "プログラミング（標準）", "purpose": "プログラミング", "plannedSeconds": 7200, "minimumSeconds": 3600 },
+  "tasks": [
+    { "id": "programming", "name": "プログラミング（標準）", "purpose": "プログラミング", "plannedSeconds": 7200, "minimumSeconds": 3600 },
+    { "id": "thesis", "name": "卒論", "purpose": "文書作成", "plannedSeconds": 10800, "minimumSeconds": 5400 },
+    { "id": "reading", "name": "論文を読む", "purpose": "読解", "plannedSeconds": 3600, "minimumSeconds": 1800 }
+  ],
+  "classifications": [
+    { "name": "VS Code", "category": "work" },
+    { "name": "ターミナル", "category": "work" },
+    { "name": "github.com", "category": "work" },
+    { "name": "developer.apple.com", "category": "work" },
+    { "name": "Notion", "category": "work" },
+    { "name": "youtube.com", "category": "distraction" },
+    { "name": "x.com", "category": "distraction" },
+    { "name": "instagram.com", "category": "distraction" },
+    { "name": "Discord", "category": "distraction" }
+  ],
+  "scenarios": [
+    { "id": "ready", "label": "開始前", "status": "", "elapsedSeconds": 0, "evaluation": "pending", "sync": "synced", "permission": "unknown", "online": true, "balanceSeconds": null },
+    { "id": "running", "label": "作業中・最小時間未達", "status": "RUNNING", "elapsedSeconds": 12, "evaluation": "pending", "sync": "synced", "permission": "unknown", "online": true, "balanceSeconds": 120 },
+    { "id": "pausing", "label": "停止・評価待ち", "status": "PAUSED", "elapsedSeconds": 5560, "evaluation": "pending", "sync": "pending", "permission": "unknown", "online": true, "balanceSeconds": 120 },
+    { "id": "paused", "label": "停止・評価完了", "status": "PAUSED", "elapsedSeconds": 5560, "evaluation": "complete", "sync": "synced", "permission": "unknown", "online": true, "balanceSeconds": 120 },
+    { "id": "result", "label": "終了結果", "status": "FINALIZED", "elapsedSeconds": 600, "evaluation": "complete", "sync": "synced", "permission": "unknown", "online": true, "balanceSeconds": 0 },
+    { "id": "offline", "label": "オフライン・同期待ち", "status": "COMPLETED_LOCAL", "elapsedSeconds": 600, "evaluation": "pending", "sync": "pending", "permission": "unknown", "online": false, "balanceSeconds": 120 },
+    { "id": "denied", "label": "計測権限の拒否", "status": "", "elapsedSeconds": 0, "evaluation": "pending", "sync": "synced", "permission": "denied", "online": true, "balanceSeconds": null },
+    { "id": "failure", "label": "API失敗", "status": "PAUSED", "elapsedSeconds": 5560, "evaluation": "failed", "sync": "failed", "permission": "unknown", "online": true, "balanceSeconds": 120 }
+  ]
+}

@@ -33,6 +33,8 @@
 | [iOSクライアント開発フロー](docs/spec/6.iOSクライアント開発フロー.md) | バックエンドAPI完成後のmobile接続順，開始条件，画面別API対応，iOS側の未決事項と担当を記載 |
 | [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLの接続・権限・環境設定，Supabase接続の残作業を記載．コードのPostgreSQL移行は済み，Supabase接続は未実施 |
 | [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
+| [フロントエンド構成](docs/spec/6.フロントエンド構成.md) | Wails v2・React・TypeScript・ViteとSwiftUIの構成，責務・状態・検証方針を記載．デスクトップ共通基盤はデモ実装済み，API・計測・iPhone連携は未接続 |
+| [デスクトップ共同開発](docs/spec/7.デスクトップ共同開発.md) | Mac担当者が先行する共通基盤，OS別UIの境界・配置・接続契約，引き渡し条件・分担・検証を記載 |
 
 ## UIモック
 
