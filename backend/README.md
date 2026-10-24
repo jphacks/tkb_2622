@@ -23,7 +23,13 @@ curl --fail http://localhost:8080/grpc.health.v1.Health/Check \
 
 HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を返します．両方ともAPIプロセスの生存確認であり，DB接続・スキーマの確認は行いません．APIは起動時にDBへ接続し，接続できない場合は起動しません．
 
-`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．APIは `127.0.0.1:8080` に公開します．
+`Makefile`は常に`compose.local.yaml`を指定します．`up`はビルド，PostgreSQLコンテナの起動，マイグレーション，API起動の順に実行します．マイグレーションが失敗した場合はAPIを起動しません．既定ではAPIを `127.0.0.1:8080` にだけ公開します．実機iPhoneから確認する場合はMacのLAN IPv4を指定して起動します．
+
+```sh
+API_BIND_ADDRESS="$(ipconfig getifaddr en0)" make -C backend up
+```
+
+アプリのConnect API URLには `http://<MacのLAN IPv4>:8080` を設定します．この設定はローカル開発用APIをLANから到達可能にするためのものです．確認後は `make -C backend down` で停止し，通常時は既定のloopback公開を使います．
 
 | コマンド | 動作 |
 | --- | --- |
@@ -33,7 +39,18 @@ HTTPは `{"status":"ok"}`，Connectは `{"status":"SERVING_STATUS_SERVING"}` を
 | `make -C backend build` | イメージをビルド |
 | `make -C backend migrate-up` | ローカルDBへ未適用マイグレーションを適用 |
 | `make -C backend migrate-status` | ローカルDBの適用状態を表示 |
+| `SEED_AUTH_SUBJECT=<UUID> make -C backend seed` | 登録済みiOS開発ユーザー用のモックデータをローカルDBへ投入 |
 | `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
+
+### 開発用モックデータ
+
+アプリでSupabase Authへログインし，業務UserとiOS端末を登録した後に実行します。`SEED_AUTH_SUBJECT`にはログインしたSupabaseユーザーのUUIDを指定してください。投入先は`compose.local.yaml`で起動するローカルPostgreSQLに固定されています。
+
+```sh
+SEED_AUTH_SUBJECT="<SupabaseユーザーUUID>" make -C backend seed
+```
+
+作業タスク，作業中の一時停止セッション，終了・中止済み履歴，報酬台帳と残高，iOS制限状態，グループを投入します。固定IDを使うため繰り返し実行できます。実データとの混在を避けるため，既存の別セッション・履歴・残高があるアカウントでは処理を中止し，何も変更しません。専用の開発用アカウントで実行してください。Screen Timeの許可・Shield表示や通知許可など，iOS端末内の状態はこのseedでは変更しません。
 
 ローカルのPostgreSQL（`postgres:17.7-bookworm`）は名前付きボリューム`tkb-backend-local_postgres-data`に保存します．通常の停止・再起動では消えません．マイグレーションを再実行しても適用済みの変更は繰り返しません．
 
@@ -117,11 +134,12 @@ gcloud run deploy "tkb-$ENV-api" --image "$IMAGE" --project "$PROJECT_ID" --regi
 Go 1.26.8を使用します．依存バージョンは`go.mod`／`go.sum`で固定します．
 
 ```bash
+go test ./...
 go build ./...
 go vet ./...
 docker compose -f compose.local.yaml config --quiet
 ```
 
-テストコードは今回追加していません．ローカルで起動とヘルスチェックを確認できます．DB状態は`make migrate-status`で確認します．
+ローカルで起動とヘルスチェックを確認できます．DB状態は`make migrate-status`で確認します．
 
 SQLは`migrations/postgres`のgoose SQLをスキーマの正本として，sqlc（`sqlc.yaml`，PostgreSQLエンジン）でGoコードを生成します．APIはProtocol Buffers / BufでConnectのRPCを定義・生成します（`make -C backend generate`）．業務機能の追加時も同じ流れでモジュールごとに追加します．

@@ -12,7 +12,8 @@ service FocusService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
   // The measuring device is the PC device registered for the caller's auth session.
-  // Requires an active iPhone with an enabled restriction policy.
+  // 登録済みPCから開始する。有効なiPhoneがなければ記録専用モードで開始する。
+  // 有効なiPhoneがある場合は、制限ポリシーを有効にしておくこと。
   rpc StartSession(StartSessionRequest) returns (StartSessionResponse);
   rpc UploadActivityBatch(UploadActivityBatchRequest) returns (UploadActivityBatchResponse);
   rpc PauseSession(PauseSessionRequest) returns (PauseSessionResponse);
@@ -21,6 +22,7 @@ service FocusService {
   rpc AbortSession(AbortSessionRequest) returns (AbortSessionResponse);
   rpc GetCurrentSession(GetCurrentSessionRequest) returns (GetCurrentSessionResponse);
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
   rpc GetSessionOperation(GetSessionOperationRequest) returns (GetSessionOperationResponse);
 }
 
@@ -128,6 +130,8 @@ message Session {
   optional double quality = 14;
   // Wrate = (T + R) / E. Unset when E is 0.
   optional double work_rate = 15;
+  // trueなら作業計測と報酬記録だけを行い、iPhone制限は処理しない。
+  bool tracking_only = 16;
 }
 message StartSessionRequest {
   string operation_id = 1;
@@ -227,6 +231,18 @@ message GetSessionRequest { string session_id = 1; }
 message GetSessionResponse {
   Session session = 1;
   reward.v1.RewardSummary reward = 2;
+}
+message SessionHistoryEntry {
+  Session session = 1;
+  reward.v1.RewardSummary reward = 2;
+}
+message ListSessionsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+message ListSessionsResponse {
+  repeated SessionHistoryEntry entries = 1;
+  string next_page_token = 2;
 }
 enum OperationKind {
   OPERATION_KIND_UNSPECIFIED = 0;

@@ -1,9 +1,29 @@
 import { defaultClassifications, defaultTask, defaultTasks, scenarios } from '../fixtures';
-import type { Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result } from './types';
+import type { ClassificationCandidate, Command, DesktopBridge, Platform, Snapshot, SessionStatus, Result, Settings } from './types';
 
 const storageKey = 'focus-link.demo.v2';
 const terminal = (status: string) => status === 'FINALIZED' || status === 'ABORTED';
 const copy = <T,>(value: T): T => structuredClone(value);
+
+function normalizeSettings(input: Settings): Settings | null {
+  const settings = copy(input);
+  const taskIDs = new Set<string>();
+  for (const task of settings.tasks) {
+    task.id = task.id.trim();
+    task.name = task.name.trim();
+    if (!task.id || !task.name || [...task.name].length > 80 || !Number.isInteger(task.minimumSeconds) || task.minimumSeconds < 1 || task.minimumSeconds > 86400 || !Number.isInteger(task.plannedSeconds) || task.plannedSeconds < task.minimumSeconds || task.plannedSeconds > 86400 || taskIDs.has(task.id)) return null;
+    taskIDs.add(task.id);
+  }
+  if (settings.tasks.length === 0 || !taskIDs.has(settings.selectedTaskId.trim())) return null;
+  settings.selectedTaskId = settings.selectedTaskId.trim();
+  const classificationNames = new Set<string>();
+  for (const classification of settings.classifications) {
+    classification.name = classification.name.trim();
+    if (!classification.name || [...classification.name].length > 200 || !['work', 'related', 'distraction', 'uncertain'].includes(classification.category) || classificationNames.has(classification.name)) return null;
+    classificationNames.add(classification.name);
+  }
+  return settings;
+}
 
 // ブラウザ専用シミュレーター．実機ではGoの応答を使い，この判定を参照しない．
 export class DemoBridge implements DesktopBridge {
@@ -16,6 +36,7 @@ export class DemoBridge implements DesktopBridge {
     this.state = {
       revision: 0, platform, mode: 'demo', updatedAt: new Date().toISOString(), session: null,
       balanceSeconds: null, sync: 'synced', permission: 'unknown', online: true,
+      monitor: { state: 'demo', appId: '', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' },
       restrictionDesired: 'unknown', restrictionConfirmed: false,
       settings: { tasks: copy(defaultTasks), selectedTaskId: defaultTask.id, classifications: copy(defaultClassifications) },
       history: [], result: null, actions: {} as Snapshot['actions'], failure: null,
@@ -38,6 +59,36 @@ export class DemoBridge implements DesktopBridge {
   }
 
   async getStartupState() { return copy(this.state); }
+
+  async getClassificationCandidates(): Promise<ClassificationCandidate[]> {
+    return [
+      { name: 'Code', appId: 'com.microsoft.VSCode', appName: 'Code', domain: '', sampleCount: 24 },
+      { name: 'github.com', appId: 'com.google.Chrome', appName: 'Google Chrome', domain: 'github.com', sampleCount: 12 },
+      { name: 'ChatGPT', appId: 'com.openai.codex', appName: 'ChatGPT', domain: '', sampleCount: 8 },
+    ];
+  }
+
+  async captureCurrentClassificationCandidate(): Promise<ClassificationCandidate> {
+    return { name: 'Code', appId: 'com.microsoft.VSCode', appName: 'Code', domain: '', sampleCount: 1 };
+  }
+
+  async requestEmailOTP(email: string) {
+    this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };
+    this.touch();
+    return copy(this.state);
+  }
+
+  async verifyEmailOTP(email: string, _code: string) {
+    this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };
+    this.touch();
+    return copy(this.state);
+  }
+
+  async signOut() {
+    this.state.account = { status: 'signedOut', email: '', deviceRegistered: false, message: '' };
+    this.touch();
+    return copy(this.state);
+  }
 
   subscribe(listener: (state: Snapshot) => void) {
     this.listeners.add(listener);
@@ -129,6 +180,12 @@ export class DemoBridge implements DesktopBridge {
         else if (session) session.evaluation = 'complete'; break;
       }
       case 'connection': this.state.online = !this.state.online; break;
+      case 'saveSettings': {
+        const settings = normalizeSettings(command.settings);
+        if (!settings) { this.fail('invalid_input', '設定内容を確認してください。'); break; }
+        this.state.settings = settings;
+        break;
+      }
       case 'saveTask': {
         const task = copy(command.task); task.name = task.name.trim();
         if (!task.name || [...task.name].length > 80 || !Number.isInteger(task.minimumSeconds) || task.minimumSeconds < 1 || task.minimumSeconds > 86400 || !Number.isInteger(task.plannedSeconds) || task.plannedSeconds < task.minimumSeconds || task.plannedSeconds > 86400) { this.fail('invalid_input', 'タスク名は1〜80文字、最小時間は1〜86400秒、予定時間は最小時間以上・86400秒以下で入力してください。'); break; }
@@ -139,7 +196,7 @@ export class DemoBridge implements DesktopBridge {
       }
       case 'classification': {
         const item = { ...command.classification, name: command.classification.name.trim() };
-        if (!item.name || [...item.name].length > 200 || !['work', 'distraction', 'uncertain'].includes(item.category)) { this.fail('invalid_input', '分類の名前と種別を確認してください。'); break; }
+        if (!item.name || [...item.name].length > 200 || !['work', 'related', 'distraction', 'uncertain'].includes(item.category)) { this.fail('invalid_input', '分類の名前と種別を確認してください。'); break; }
         const index = this.state.settings.classifications.findIndex(value => value.name === item.name);
         if (index >= 0) this.state.settings.classifications[index] = item; else this.state.settings.classifications.push(item); break;
       }

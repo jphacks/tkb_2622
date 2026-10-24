@@ -74,7 +74,7 @@ func rpcError(err error) error {
 	return connect.NewError(code, errors.New(message))
 }
 func user(u domain.User) *v1.User {
-	return &v1.User{Id: u.ID, Status: u.Status, CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano)}
+	return &v1.User{Id: u.ID, Status: u.Status, CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano), DisplayName: u.DisplayName}
 }
 func device(d domain.Device) *v1.Device {
 	return &v1.Device{Id: d.ID, Platform: v1.Platform(v1.Platform_value["PLATFORM_"+d.Platform]), Name: d.Name, Status: d.Status, Version: d.Version, CreatedAt: d.CreatedAt.UTC().Format(time.RFC3339Nano)}
@@ -92,6 +92,13 @@ func (h *Handler) GetMe(ctx context.Context, req *connect.Request[v1.GetMeReques
 		return nil, rpcError(e)
 	}
 	return connect.NewResponse(&v1.GetMeResponse{User: user(u)}), nil
+}
+func (h *Handler) UpdateDisplayName(ctx context.Context, req *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error) {
+	u, e := h.service.UpdateDisplayName(ctx, principal(ctx), req.Msg.DisplayName)
+	if e != nil {
+		return nil, rpcError(e)
+	}
+	return connect.NewResponse(&v1.UpdateDisplayNameResponse{User: user(u)}), nil
 }
 func (h *Handler) RegisterDevice(ctx context.Context, req *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
 	platforms := map[v1.Platform]string{v1.Platform_PLATFORM_MACOS: "MACOS", v1.Platform_PLATFORM_WINDOWS: "WINDOWS", v1.Platform_PLATFORM_IOS: "IOS"}

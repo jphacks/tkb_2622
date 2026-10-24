@@ -7,7 +7,8 @@
 - 対象OS：macOS・Windows．対応バージョンとCPUアーキテクチャは実機検証後に確定する．
 - アプリ基盤：Wails v2.17.0，Go 1.26.10，React 19，TypeScript 7，Vite 8．
 - 画面と端末内Go：Wailsのバインディングとイベントで連携する．
-- クラウドとの通信：端末内GoからConnect RPC / HTTPSでAPIへ接続する．DBへ直接接続せず，報酬の最終確定と残高管理はクラウド側で行う．
+- クラウドとの通信：React → Wails bridge → Go → Connect API．ReactからAPIへ直接通信しない．GoはSupabase AuthへメールOTPを要求し，業務APIにはBearer access tokenだけを送る．
+- 認証トークン：`99designs/keyring`を介してmacOS Keychain／Windows資格情報ストアへ保存する．OS資格情報ストアが利用できない場合に平文保存へ切り替えない．
 - 画面・状態・接続契約は共通で，画面の見た目は[`docs/UI`](../docs/UI/)を基準にする．Mac・Windowsで異なるUI外枠は`frontend/src/platforms/`に置く．
 
 Wails v2はmacOS・Windowsをサポートし，GoとWeb UIを組み合わせられるため，今回のアプリ基盤として採用する．Goを利用していても，端末内の計測処理とクラウドの業務処理は分けて管理する．
@@ -24,16 +25,34 @@ Mac担当者が共通基盤を先に作り，その後にMac担当者とWindows�
 | Windows UI | `frontend/src/platforms/windows`．Windowsの外枠・配置・スタイル |
 | Go | セッション状態・コマンド・イベント契約は共通．OS別起動設定は分離 |
 
-`internal/session`はプロセス内だけで動くデモ状態管理であり，ディスク保存，サーバー同期，API，計測，権限，通知，トレイは未接続．アプリ終了後にGo側のデモ状態は初期化される．ブラウザプレビューのローカル保存はデモ専用である．
+ブラウザプレビューは従来どおり`DemoBridge`を使い，表示確認用データだけを扱う．macOSのWailsアプリはローカル計測モードで起動し，作業状態をユーザー設定フォルダーの`Focus Link/desktop-state.json`へ保存する．観測記録は同じフォルダーの`sessions/<session-id>.jsonl`へ保存する．保存ディレクトリは`0700`，ファイルは`0600`で作成する．
+
+macOSでは既存のネイティブPoCから前面アプリ名・アプリID・入力アイドル時間・対応ブラウザーのドメインを取得する．raw URL，ページタイトル，キー入力内容，画面画像，ブラウザーのタブIDは保存・送信しない．分類済み区間をConnect APIへ送り，報酬はセッション内で記録する．有効なiPhoneがないセッションは記録専用として開始し，iPhone制限処理は行わない．Windowsは計測をデモモードとする．
+
+### API接続の範囲
+
+デスクトップのWailsアプリはメールOTPで認証し，起動時にEnsureUser，このPCの端末登録，ListTasksを順に呼ぶ．設定画面ではサーバー上のタスクを表示・作成・編集できる．初回の有効なOTPでSupabase Authユーザーを自動作成する．ブラウザプレビューは引き続きDemoBridgeを使い，実APIへ接続しない．
+
+起動プロセスに次の環境変数を設定する．値はアプリへ書き込まず，`.env`やソース管理へ追加しない．`SUPABASE_PUBLISHABLE_KEY`は公開用キーであり，サービスロールキーは使わない．
+
+| 環境変数 | 用途 |
+| --- | --- |
+| `FOCUS_LINK_API_BASE_URL` | Connect APIのベースURL（本番HTTPS，ローカル開発はloopback HTTP可） |
+| `FOCUS_LINK_SUPABASE_URL` | SupabaseプロジェクトのルートURL（`/auth/v1`より前） |
+| `FOCUS_LINK_SUPABASE_PUBLISHABLE_KEY` | Supabaseのpublishable／anonキー |
+
+Supabase側ではメールOTPのテンプレートに`{{ .Token }}`を含め，メール送信設定を行う．未設定の環境変数，API到達不能，資格情報ストア未使用は設定画面に表示する．
+
+ログイン中の作業ではStartSession／GetCurrentSessionでサーバーセッションを開始・復元し，UploadActivityBatchで分類済み区間を送る．一時停止・再開・終了・中止もConnect APIへ同期する．有効なiPhoneが未登録ならSessionの`tracking_only`がtrueとなり，制限を適用せず作業記録とセッション内報酬を保存する．iPhone登録済みで制限ポリシーが無効の場合は開始を拒否する．報酬は次のセッションへ持ち越さず，終了・中止時に未使用分を破棄する．ブラウザプレビューは引き続きDemoBridgeを使い，実APIへ接続しない．
 
 ### 着手順序
 
 1. Mac担当者がWails・React・TypeScript・Viteを初期化し，共通の型・bridge・状態管理・OS別UIの入口を実装する．
 2. 同じデモで開始・一時停止・再開・終了・中止と，失敗・同期待ち・権限拒否を再現する．MacのWailsでGo呼び出しとイベントを確認し，[引き渡し条件](../docs/spec/7.デスクトップ共同開発.md#6-開発の順序と担当)を満たす．
 3. Windows担当者が共通基盤を取得し，Windowsで起動・Go呼び出し・イベントを確認する．両担当がOS別UIを実装し，共通ファイルは作業ごとに編集担当を一人に決める．
-4. 両OSで同じシナリオを確認し，実API・計測・同期を順に接続する．トレイ・保存・認証・配布の実機確認は画面デモの完成と分ける．
+4. 共通Go bridgeから認証・PC登録・タスクAPIを接続する．続いて計測・セッション／報酬同期を接続する．トレイ・配布の実機確認は画面デモと分ける．
 
-7画面すべての完成や，実API・トレイの完成を待ってからWindowsのUIに着手する必要はない．共通基盤の段階では通常ウィンドウで操作を確認し，実接続されていない機能はデモ／未対応と表示する．
+macOSではメニューバーのStatus Itemからウィンドウを表示できる．ウィンドウを閉じてもアプリと計測は継続し，メニューの「終了」でアプリを終了する．Windowsのトレイ対応は未実装である．
 
 ### 起動手順の整備
 
@@ -47,7 +66,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．Wailsで起動する場合は`cd desktop`の後に`wails dev`を実行する．リリース向けビルドは同じ場所で`wails build`を実行する．
+ブラウザーで表示する場合は`http://127.0.0.1:5173/?platform=macos`または`?platform=windows`を開く．画面下の「デモの状態を切り替えて確認する」から状態を選ぶ．ブラウザーは従来どおりデモ表示である．実APIを使う場合はConnect API URLとSupabase Auth URL・公開キーを起動プロセスの`FOCUS_LINK_*`環境変数に設定する．ローカルAPIには`http://127.0.0.1:8080`を指定する．`make -C backend up`はPostgreSQL・マイグレーション・APIを起動するが，Authは`backend/.env`で指定したSupabaseプロジェクトを使う．
 
 #### Windowsでの起動
 
@@ -68,16 +87,20 @@ WSLのリポジトリをWindowsから直接動かさないのは，Windowsのnpm
 `setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加する．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．`package-lock.json`を変更したら`setup-win`を再実行する．処理は`scripts/windows/`（PowerShellの`setup.ps1`・`up.ps1`，WSL用の`wsl.sh`）にある．
 
 ```sh
-cd desktop/frontend
-npm run typecheck
-npm test
-npm run build
-cd ..
-go test -race ./...
-go vet ./...
+cd desktop
+sh build/dev-macos.sh
 ```
 
-確認できた範囲：macOS arm64でWails v2の起動，Goメソッド呼び出し，Goイベントの購読・解除，アプリビルド．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
+配布用のmacOSアプリは次のコマンドでビルドする．ビルド後，`native-collector`はアプリバンドル内へコピーされる．
+
+```sh
+cd desktop
+sh build/build-macos-app.sh
+```
+
+対応ブラウザーのドメイン取得にはmacOSのオートメーション許可が必要になる場合がある．許可しない場合もアプリ名とアイドル時間の観測を続け，取得できなかったサンプルは報酬評価に使わない．
+
+共通基盤の過去確認ではmacOS arm64のWails起動・Go呼び出し・イベント購読とアプリビルドが通っている．このローカル計測モードを追加した後のWailsビルドとmacOS権限の実機確認は，ビルド環境で確認する．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
 
 一時的な実行ログ・実機検証結果はPRなどに記録し，本READMEには継続利用する手順を残す．
 
@@ -99,7 +122,7 @@ Wailsの採用だけで，他アプリの最前面情報・入力・アイドル
 
 GoとNode.js / npmに加えて，macOSの開発にはXcode Command Line Tools，Windowsでの動作にはWebView2 Runtimeが必要．詳細は[Wails v2のインストール手順](https://wails.io/docs/gettingstarted/installation/)を参照する．Wailsはv2系を使用し，具体的なバージョンはプロジェクト初期化時に固定する．
 
-現時点の画面は共通基盤のデモである．実API・永続化・ネイティブ計測・メニューバー常駐・iPhone連携を実装済みとは扱わない．
+macOSのローカル観測・分類・作業状態保存，メールOTP・PC登録・タスク設定，作業セッションと分類済み活動区間のConnect同期，セッション内報酬の取得，メニューバー常駐を実装している．有効なiPhoneがない場合は記録専用セッションとなる．iPhone制限の実機連携，Windowsネイティブ計測・トレイは未接続である．Supabase AuthのSMTP／OTPテンプレートと接続URL・公開キーは環境ごとに設定する．
 
 ## 公式資料
 

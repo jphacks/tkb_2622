@@ -50,7 +50,7 @@ func checkSession(ctx context.Context, queries *q.Queries, p application.Princip
 }
 
 // All identity mutations serialize on the user row, including their replay record.
-func (r *Repository) transaction(ctx context.Context, p application.Principal, ensure bool, fn func(*q.Queries, q.AppUser) error) error {
+func (r *Repository) transaction(ctx context.Context, p application.Principal, ensure bool, fn func(*sql.Tx, *q.Queries, q.AppUser) error) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (r *Repository) transaction(ctx context.Context, p application.Principal, e
 	if u.Status != "ACTIVE" {
 		return application.ErrForbidden
 	}
-	if err = fn(queries, u); err != nil {
+	if err = fn(tx, queries, u); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -102,7 +102,7 @@ func save(ctx context.Context, queries *q.Queries, u q.AppUser, kind, op, h stri
 	return queries.SaveOperation(ctx, q.SaveOperationParams{UserID: u.ID, Kind: kind, OperationID: uid(op), RequestHash: h, Response: b})
 }
 func (r *Repository) EnsureUser(ctx context.Context, p application.Principal, op string) (out domain.User, err error) {
-	err = r.transaction(ctx, p, true, func(queries *q.Queries, u q.AppUser) error {
+	err = r.transaction(ctx, p, true, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {
 		if e := checkSession(ctx, queries, p, u.ID); e != nil {
 			return e
 		}
@@ -114,20 +114,42 @@ func (r *Repository) EnsureUser(ctx context.Context, p application.Principal, op
 		out = asUser(u)
 		return save(ctx, queries, u, "ensure", op, h, out)
 	})
+	if err == nil {
+		err = r.loadDisplayName(ctx, &out)
+	}
 	return
 }
 func (r *Repository) GetMe(ctx context.Context, p application.Principal) (out domain.User, err error) {
-	err = r.transaction(ctx, p, false, func(queries *q.Queries, u q.AppUser) error {
+	err = r.transaction(ctx, p, false, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {
 		if e := checkSession(ctx, queries, p, u.ID); e != nil {
 			return e
 		}
 		out = asUser(u)
 		return nil
 	})
+	if err == nil {
+		err = r.loadDisplayName(ctx, &out)
+	}
 	return
 }
+func (r *Repository) UpdateDisplayName(ctx context.Context, p application.Principal, displayName string) (out domain.User, err error) {
+	err = r.transaction(ctx, p, false, func(tx *sql.Tx, queries *q.Queries, u q.AppUser) error {
+		if e := checkSession(ctx, queries, p, u.ID); e != nil {
+			return e
+		}
+		_, e := tx.ExecContext(ctx, `UPDATE app.users SET display_name = $1 WHERE id = $2`, displayName, u.ID)
+		return e
+	})
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.GetMe(ctx, p)
+}
+func (r *Repository) loadDisplayName(ctx context.Context, user *domain.User) error {
+	return r.db.QueryRowContext(ctx, `SELECT display_name FROM app.users WHERE id = $1`, uid(user.ID)).Scan(&user.DisplayName)
+}
 func (r *Repository) RegisterDevice(ctx context.Context, p application.Principal, in application.RegisterInput) (out domain.Device, err error) {
-	err = r.transaction(ctx, p, false, func(queries *q.Queries, u q.AppUser) error {
+	err = r.transaction(ctx, p, false, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {
 		if e := checkSession(ctx, queries, p, u.ID); e != nil {
 			return e
 		}
@@ -174,7 +196,7 @@ func (r *Repository) RegisterDevice(ctx context.Context, p application.Principal
 	return
 }
 func (r *Repository) ListDevices(ctx context.Context, p application.Principal, after string, size int) (out application.DevicePage, err error) {
-	err = r.transaction(ctx, p, false, func(queries *q.Queries, u q.AppUser) error {
+	err = r.transaction(ctx, p, false, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {
 		if e := checkSession(ctx, queries, p, u.ID); e != nil {
 			return e
 		}
@@ -199,7 +221,7 @@ func (r *Repository) ListDevices(ctx context.Context, p application.Principal, a
 	return
 }
 func (r *Repository) RevokeDevice(ctx context.Context, p application.Principal, in application.RevokeInput) (out domain.Device, err error) {
-	err = r.transaction(ctx, p, false, func(queries *q.Queries, u q.AppUser) error {
+	err = r.transaction(ctx, p, false, func(_ *sql.Tx, queries *q.Queries, u q.AppUser) error {
 		h := hash(struct {
 			Input   application.RevokeInput
 			Session string

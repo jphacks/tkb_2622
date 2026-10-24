@@ -6,10 +6,10 @@ info:
     Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない（`make -C backend generate`）．
     すべてのRPCに Supabase のアクセストークン（右上の Authorize）が必要．
 
-    **準備**：EnsureUser → 各端末で RegisterDevice（PCは MACOS／WINDOWS，iPhoneは IOS）→ iPhoneで UpdateRestrictionPolicy（enabled=true）→ PCで CreateTask．
+    **準備**：EnsureUser → PCを RegisterDevice（MACOS／WINDOWS）→ CreateTask．iPhone制限を使う場合はiPhoneも登録し，UpdateRestrictionPolicy（enabled=true）を行う．
 
     **基本ループ**
-    1. PC：StartSession（iPhoneへ制限を要求）
+    1. PC：StartSession（有効なiPhoneがなければtracking-onlyで開始）
     2. PC：UploadActivityBatch を seq=1,2,… で定期送信．作業時間（TASK＋RELATED_TRANSITION）の1/3が秒単位切り捨てで残高に付与される
     3. PC：PauseSession（last_seq に最後に送った seq）
     4. iPhone：ReserveUsageGrant で残高から秒数を確保 → ReportRestrictionState（解除適用）→ ReportUsage（累積の実利用秒数）
@@ -404,6 +404,31 @@ components:
           title: task
       title: GetTaskResponse
       additionalProperties: false
+    focus.v1.ListSessionsRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListSessionsRequest
+      additionalProperties: false
+    focus.v1.ListSessionsResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/focus.v1.SessionHistoryEntry'
+          title: entries
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListSessionsResponse
+      additionalProperties: false
     focus.v1.ListTasksRequest:
       type: object
       properties:
@@ -584,7 +609,24 @@ components:
           title: work_rate
           format: double
           description: Wrate = (T + R) / E. Unset when E is 0.
+        trackingOnly:
+          type: boolean
+          title: tracking_only
+          description: trueなら作業計測と報酬記録だけを行い、iPhone制限は処理しない。
       title: Session
+      additionalProperties: false
+    focus.v1.SessionHistoryEntry:
+      type: object
+      properties:
+        session:
+          allOf:
+            - $ref: '#/components/schemas/focus.v1.Session'
+          title: session
+        reward:
+          allOf:
+            - $ref: '#/components/schemas/reward.v1.RewardSummary'
+          title: reward
+      title: SessionHistoryEntry
       additionalProperties: false
     focus.v1.SessionStatus:
       type: string
@@ -761,6 +803,140 @@ components:
         - "2024-12-25T12:00:00Z"
       format: date-time
       description: A point in time in RFC 3339 format, with up to nanosecond precision. Output uses UTC (`Z`); input may use an offset from UTC.
+    group.v1.AcceptInvitationRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        token:
+          type: string
+          title: token
+      title: AcceptInvitationRequest
+      additionalProperties: false
+    group.v1.AcceptInvitationResponse:
+      type: object
+      properties:
+        group:
+          allOf:
+            - $ref: '#/components/schemas/group.v1.Group'
+          title: group
+      title: AcceptInvitationResponse
+      additionalProperties: false
+    group.v1.CreateGroupRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        name:
+          type: string
+          title: name
+      title: CreateGroupRequest
+      additionalProperties: false
+    group.v1.CreateGroupResponse:
+      type: object
+      properties:
+        group:
+          allOf:
+            - $ref: '#/components/schemas/group.v1.Group'
+          title: group
+      title: CreateGroupResponse
+      additionalProperties: false
+    group.v1.CreateInvitationRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        groupId:
+          type: string
+          title: group_id
+      title: CreateInvitationRequest
+      additionalProperties: false
+    group.v1.CreateInvitationResponse:
+      type: object
+      properties:
+        invitationId:
+          type: string
+          title: invitation_id
+        token:
+          type: string
+          title: token
+        expiresAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: expires_at
+      title: CreateInvitationResponse
+      additionalProperties: false
+    group.v1.Group:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        name:
+          type: string
+          title: name
+        createdAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: created_at
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/group.v1.GroupMember'
+          title: members
+      title: Group
+      additionalProperties: false
+    group.v1.GroupMember:
+      type: object
+      properties:
+        isCurrentUser:
+          type: boolean
+          title: is_current_user
+        joinedAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: joined_at
+        displayName:
+          type: string
+          title: display_name
+      title: GroupMember
+      additionalProperties: false
+    group.v1.LeaveGroupRequest:
+      type: object
+      properties:
+        operationId:
+          type: string
+          title: operation_id
+        groupId:
+          type: string
+          title: group_id
+      title: LeaveGroupRequest
+      additionalProperties: false
+    group.v1.LeaveGroupResponse:
+      type: object
+      properties:
+        groupDeleted:
+          type: boolean
+          title: group_deleted
+      title: LeaveGroupResponse
+      additionalProperties: false
+    group.v1.ListGroupsRequest:
+      type: object
+      title: ListGroupsRequest
+      additionalProperties: false
+    group.v1.ListGroupsResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/group.v1.Group'
+          title: groups
+      title: ListGroupsResponse
+      additionalProperties: false
     identity.v1.Device:
       type: object
       properties:
@@ -900,6 +1076,23 @@ components:
           title: device
       title: RevokeDeviceResponse
       additionalProperties: false
+    identity.v1.UpdateDisplayNameRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          title: display_name
+      title: UpdateDisplayNameRequest
+      additionalProperties: false
+    identity.v1.UpdateDisplayNameResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.User'
+          title: user
+      title: UpdateDisplayNameResponse
+      additionalProperties: false
     identity.v1.User:
       type: object
       properties:
@@ -912,6 +1105,9 @@ components:
         createdAt:
           type: string
           title: created_at
+        displayName:
+          type: string
+          title: display_name
       title: User
       additionalProperties: false
     restriction.v1.DesiredMode:
@@ -1402,6 +1598,31 @@ components:
           title: balance
       title: GetBalanceResponse
       additionalProperties: false
+    reward.v1.ListTransactionsRequest:
+      type: object
+      properties:
+        pageSize:
+          type: integer
+          title: page_size
+          format: int32
+        pageToken:
+          type: string
+          title: page_token
+      title: ListTransactionsRequest
+      additionalProperties: false
+    reward.v1.ListTransactionsResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/reward.v1.RewardTransaction'
+          title: transactions
+        nextPageToken:
+          type: string
+          title: next_page_token
+      title: ListTransactionsResponse
+      additionalProperties: false
     reward.v1.RewardBalance:
       type: object
       properties:
@@ -1442,6 +1663,32 @@ components:
       title: RewardSummary
       additionalProperties: false
       description: Earned, spent and discarded seconds of one session. Spending arrives with the Restriction API.
+    reward.v1.RewardTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          title: id
+        sessionId:
+          type: string
+          title: session_id
+        type:
+          type: string
+          title: type
+        amountSeconds:
+          type: string
+          title: amount_seconds
+          format: int64
+        balanceAfter:
+          type: string
+          title: balance_after
+          format: int64
+        occurredAt:
+          allOf:
+            - $ref: '#/components/schemas/google.protobuf.Timestamp'
+          title: occurred_at
+      title: RewardTransaction
+      additionalProperties: false
 paths:
   /focus.v1.FocusService/AbortSession:
     post:
@@ -1709,6 +1956,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.GetTaskResponse'
+  /focus.v1.FocusService/ListSessions:
+    post:
+      tags:
+        - FocusService
+      summary: ListSessions
+      operationId: focus.v1.FocusService.ListSessions
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/focus.v1.ListSessionsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/focus.v1.ListSessionsResponse'
   /focus.v1.FocusService/ListTasks:
     post:
       tags:
@@ -1830,7 +2115,8 @@ paths:
       summary: StartSession
       description: |-
         The measuring device is the PC device registered for the caller's auth session.
-         Requires an active iPhone with an enabled restriction policy.
+         登録済みPCから開始する。有効なiPhoneがなければ記録専用モードで開始する。
+         有効なiPhoneがある場合は、制限ポリシーを有効にしておくこと。
       operationId: focus.v1.FocusService.StartSession
       parameters:
         - name: Connect-Protocol-Version
@@ -1940,6 +2226,196 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/focus.v1.UploadActivityBatchResponse'
+  /group.v1.GroupService/AcceptInvitation:
+    post:
+      tags:
+        - GroupService
+      summary: AcceptInvitation
+      operationId: group.v1.GroupService.AcceptInvitation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.AcceptInvitationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.AcceptInvitationResponse'
+  /group.v1.GroupService/CreateGroup:
+    post:
+      tags:
+        - GroupService
+      summary: CreateGroup
+      operationId: group.v1.GroupService.CreateGroup
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.CreateGroupRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.CreateGroupResponse'
+  /group.v1.GroupService/CreateInvitation:
+    post:
+      tags:
+        - GroupService
+      summary: CreateInvitation
+      operationId: group.v1.GroupService.CreateInvitation
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.CreateInvitationRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.CreateInvitationResponse'
+  /group.v1.GroupService/LeaveGroup:
+    post:
+      tags:
+        - GroupService
+      summary: LeaveGroup
+      operationId: group.v1.GroupService.LeaveGroup
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.LeaveGroupRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.LeaveGroupResponse'
+  /group.v1.GroupService/ListGroups:
+    post:
+      tags:
+        - GroupService
+      summary: ListGroups
+      operationId: group.v1.GroupService.ListGroups
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/group.v1.ListGroupsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/group.v1.ListGroupsResponse'
   /identity.v1.IdentityService/EnsureUser:
     post:
       tags:
@@ -2130,6 +2606,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+  /identity.v1.IdentityService/UpdateDisplayName:
+    post:
+      tags:
+        - IdentityService
+      summary: UpdateDisplayName
+      operationId: identity.v1.IdentityService.UpdateDisplayName
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.UpdateDisplayNameRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.UpdateDisplayNameResponse'
   /restriction.v1.RestrictionService/GetRestrictionOperation:
     post:
       tags:
@@ -2474,9 +2988,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/reward.v1.GetBalanceResponse'
+  /reward.v1.RewardService/ListTransactions:
+    post:
+      tags:
+        - RewardService
+      summary: ListTransactions
+      operationId: reward.v1.RewardService.ListTransactions
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/reward.v1.ListTransactionsRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/reward.v1.ListTransactionsResponse'
 tags:
   - name: RewardService
   - name: RestrictionService
     description: Apple selection tokens stay on the iPhone; this API only handles metadata, grants and reports.
   - name: FocusService
+  - name: GroupService
   - name: IdentityService

@@ -62,7 +62,7 @@ func (l *Lifecycle) Get(ctx context.Context, a Actor, sessionID string) (Session
 }
 
 // Start creates a RUNNING session on the caller's PC with a snapshot of the task.
-func (l *Lifecycle) Start(ctx context.Context, a Actor, taskID string, taskVersion int64, now time.Time) (Session, error) {
+func (l *Lifecycle) Start(ctx context.Context, a Actor, taskID string, taskVersion int64, trackingOnly bool, now time.Time) (Session, error) {
 	if !a.isPC() {
 		return Session{}, errors.Join(ErrPrecondition, errors.New("register this PC as a device first"))
 	}
@@ -78,7 +78,7 @@ func (l *Lifecycle) Start(ctx context.Context, a Actor, taskID string, taskVersi
 	} else if !errors.Is(err, ErrNotFound) {
 		return Session{}, err
 	}
-	s := domain.NewSession(uuid.NewString(), a.UserID, a.DeviceID, task, now)
+	s := domain.NewSession(uuid.NewString(), a.UserID, a.DeviceID, task, trackingOnly, now)
 	return s, l.repo.CreateSession(ctx, s)
 }
 

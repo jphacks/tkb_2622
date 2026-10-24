@@ -2,8 +2,11 @@ syntax = "proto3";
 package reward.v1;
 option go_package = "github.com/jphacks/tkb_2622/backend/gen/reward/v1;rewardv1";
 
+import "google/protobuf/timestamp.proto";
+
 service RewardService {
   rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
 }
 // Unused reward seconds of the current (unfinished) work session. Zero with no session_id when idle.
 message RewardBalance {
@@ -21,3 +24,19 @@ message RewardSummary {
 }
 message GetBalanceRequest {}
 message GetBalanceResponse { RewardBalance balance = 1; }
+message RewardTransaction {
+  string id = 1;
+  string session_id = 2;
+  string type = 3;
+  int64 amount_seconds = 4;
+  int64 balance_after = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+}
+message ListTransactionsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+message ListTransactionsResponse {
+  repeated RewardTransaction transactions = 1;
+  string next_page_token = 2;
+}

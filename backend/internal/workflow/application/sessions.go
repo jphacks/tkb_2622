@@ -18,7 +18,7 @@ type Focus interface {
 	Replay(ctx context.Context, a focus.Actor, kind, operationID, hash string, out any) (bool, error)
 	Record(ctx context.Context, a focus.Actor, kind, operationID, hash, resourceID string, out any) error
 	Get(ctx context.Context, a focus.Actor, sessionID string) (focus.Session, error)
-	Start(ctx context.Context, a focus.Actor, taskID string, taskVersion int64, now time.Time) (focus.Session, error)
+	Start(ctx context.Context, a focus.Actor, taskID string, taskVersion int64, trackingOnly bool, now time.Time) (focus.Session, error)
 	AcceptBatch(ctx context.Context, a focus.Actor, in focus.BatchInput, now time.Time) (focus.Receipt, focus.Session, error)
 	Pause(ctx context.Context, a focus.Actor, sessionID string, expectedVersion int64, pausedAt time.Time, lastSeq int64, now time.Time) (focus.Session, error)
 	Resume(ctx context.Context, a focus.Actor, sessionID string, expectedVersion int64, now time.Time) (focus.Session, error)
@@ -121,26 +121,27 @@ type StartInput struct {
 	TaskVersion         int64
 }
 
-// Start opens a RUNNING session, binds a zero-balance wallet and requests the shield on the user's iPhone.
+// StartはRUNNINGセッションを作り、残高0のwalletを結び付ける。有効なiPhoneがなければ記録専用で開始する。
 func (w *Sessions) Start(ctx context.Context, a focus.Actor, in StartInput) (SessionResult, error) {
 	if !focus.ValidID(in.TaskID) || in.TaskVersion < 1 {
 		return SessionResult{}, apperr.ErrInvalid
 	}
 	return w.mutate(ctx, a, "start", in.OperationID, in, func(f Focus, r Reward, x Restriction, now time.Time) (SessionResult, error) {
 		iPhone, err := w.devices.ActiveIPhone(ctx, a.UserID)
-		if errors.Is(err, apperr.ErrNotFound) {
-			return SessionResult{}, errors.Join(apperr.ErrPrecondition, errors.New("register an iPhone as the restriction target first"))
-		}
-		if err != nil {
+		trackingOnly := errors.Is(err, apperr.ErrNotFound)
+		if err != nil && !trackingOnly {
 			return SessionResult{}, err
 		}
-		s, err := f.Start(ctx, a, in.TaskID, in.TaskVersion, now)
+		s, err := f.Start(ctx, a, in.TaskID, in.TaskVersion, trackingOnly, now)
 		if err != nil {
 			return SessionResult{}, err
 		}
 		wallet, err := r.Open(ctx, a.UserID, s.ID)
 		if err != nil {
 			return SessionResult{}, err
+		}
+		if trackingOnly {
+			return SessionResult{Session: s, Balance: wallet}, nil
 		}
 		v, err := x.BeginSession(ctx, a.UserID, s.ID, iPhone, in.OperationID, now)
 		return SessionResult{Session: s, Balance: wallet, Restriction: v}, err
@@ -189,6 +190,9 @@ func (w *Sessions) Pause(ctx context.Context, a focus.Actor, in PauseInput) (Ses
 		if err != nil {
 			return SessionResult{}, err
 		}
+		if s.TrackingOnly {
+			return SessionResult{Session: s, Balance: wallet}, nil
+		}
 		v, err := x.View(ctx, a.UserID)
 		return SessionResult{Session: s, Balance: wallet, Restriction: v}, err
 	})
@@ -212,6 +216,9 @@ func (w *Sessions) Resume(ctx context.Context, a focus.Actor, in ResumeInput) (S
 		wallet, err := r.Balance(ctx, a.UserID)
 		if err != nil {
 			return SessionResult{}, err
+		}
+		if s.TrackingOnly {
+			return SessionResult{Session: s, Balance: wallet}, nil
 		}
 		v, err := x.ResumeSession(ctx, a.UserID, in.OperationID, now)
 		return SessionResult{Session: s, Balance: wallet, Restriction: v}, err
@@ -252,6 +259,9 @@ func (w *Sessions) end(ctx context.Context, a focus.Actor, abort bool, in EndInp
 		discarded, wallet, err := r.Discard(ctx, a.UserID, s.ID)
 		if err != nil {
 			return SessionResult{}, err
+		}
+		if s.TrackingOnly {
+			return SessionResult{Session: s, Balance: wallet, Discarded: discarded}, nil
 		}
 		v, err := x.EndSession(ctx, a.UserID, abort, in.OperationID, now)
 		return SessionResult{Session: s, Balance: wallet, Discarded: discarded, Restriction: v}, err
@@ -301,6 +311,9 @@ func (w *Sessions) Reserve(ctx context.Context, a focus.Actor, in ReserveInput) 
 		s, e := f.Get(ctx, a, in.SessionID)
 		if e != nil {
 			return e
+		}
+		if s.TrackingOnly {
+			return errors.Join(apperr.ErrPrecondition, errors.New("tracking-only sessions do not support usage grants"))
 		}
 		if s.Status != "PAUSED" {
 			return errors.Join(apperr.ErrPrecondition, errors.New("usage grants are only available while the session is paused"))

@@ -13,7 +13,7 @@ func seg(fromSec, toSec int, class string) Segment {
 }
 
 func newSession(minimum int64) Session {
-	return NewSession("s", "u", "d", Task{ID: "t", Settings: TaskSettings{Name: "n", Category: "STUDY", Mode: "NORMAL", PlannedSeconds: 3600, MinimumSeconds: minimum}}, t0)
+	return NewSession("s", "u", "d", Task{ID: "t", Settings: TaskSettings{Name: "n", Category: "STUDY", Mode: "NORMAL", PlannedSeconds: 3600, MinimumSeconds: minimum}}, false, t0)
 }
 
 func TestApplyTotalsAndScores(t *testing.T) {

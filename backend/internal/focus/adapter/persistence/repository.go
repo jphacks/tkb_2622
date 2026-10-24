@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +26,12 @@ func (s *Store) InUserTx(ctx context.Context, userID string, fn func(application
 func (s *Store) Reader() application.Repository { return New(s.db) }
 
 // Repository works on a *sql.DB or on the *sql.Tx of a workflow transaction.
-type Repository struct{ q *q.Queries }
+type Repository struct {
+	q  *q.Queries
+	db q.DBTX
+}
 
-func New(db q.DBTX) *Repository { return &Repository{q: q.New(db)} }
+func New(db q.DBTX) *Repository { return &Repository{q: q.New(db), db: db} }
 
 func uid(s string) uuid.UUID { return uuid.MustParse(s) }
 func translate(err error) error {
@@ -54,7 +58,7 @@ func asTask(t q.AppTask) domain.Task {
 }
 func asSession(s q.AppWorkSession) domain.Session {
 	return domain.Session{
-		ID: s.ID.String(), UserID: s.UserID.String(), DeviceID: s.DeviceID.String(), TaskID: s.TaskID.String(),
+		ID: s.ID.String(), UserID: s.UserID.String(), DeviceID: s.DeviceID.String(), TrackingOnly: s.TrackingOnly, TaskID: s.TaskID.String(),
 		Snapshot: domain.TaskSettings{Name: s.TaskName, Category: s.Category, Mode: s.Mode, PlannedSeconds: s.PlannedSeconds, MinimumSeconds: s.MinimumSeconds},
 		Status:   s.Status, Version: s.Version, StartedAt: s.StartedAt.UTC(), RunningSince: timePtr(s.RunningSince), ServerActiveMillis: s.ServerActiveMillis,
 		PausedAt: timePtr(s.PausedAt), EndedAt: timePtr(s.EndedAt), AcceptedSeq: s.AcceptedSeq, LastSegmentEnd: timePtr(s.LastSegmentEnd),
@@ -98,15 +102,57 @@ func (r *Repository) ListTasks(ctx context.Context, userID, after string, limit 
 }
 
 func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error {
-	return r.q.CreateSession(ctx, q.CreateSessionParams{
-		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TaskID: uid(s.TaskID),
+	err := r.q.CreateSession(ctx, q.CreateSessionParams{
+		ID: uid(s.ID), UserID: uid(s.UserID), DeviceID: uid(s.DeviceID), TrackingOnly: s.TrackingOnly, TaskID: uid(s.TaskID),
 		TaskName: s.Snapshot.Name, Category: s.Snapshot.Category, Mode: s.Snapshot.Mode, PlannedSeconds: s.Snapshot.PlannedSeconds, MinimumSeconds: s.Snapshot.MinimumSeconds,
 		Status: s.Status, Version: s.Version, StartedAt: s.StartedAt, RunningSince: nullTime(s.RunningSince),
 	})
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO app.group_work_start_events (session_id, user_id, started_at)
+		SELECT $1, $2, $3
+		WHERE EXISTS (
+		  SELECT 1 FROM app.group_memberships
+		  WHERE user_id = $2 AND status = 'ACTIVE' AND joined_at <= $3
+		)
+		ON CONFLICT (session_id) DO NOTHING`, uid(s.ID), uid(s.UserID), s.StartedAt)
+	return err
 }
 func (r *Repository) GetSession(ctx context.Context, userID, sessionID string) (domain.Session, error) {
 	row, err := r.q.GetSession(ctx, q.GetSessionParams{UserID: uid(userID), ID: uid(sessionID)})
 	return asSession(row), translate(err)
+}
+func (r *Repository) ListSessions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]domain.Session, error) {
+	query := `SELECT * FROM app.work_sessions WHERE user_id = $1 AND status IN ('FINALIZED', 'ABORTED')`
+	args := []any{uid(userID)}
+	if !before.IsZero() {
+		query += ` AND (started_at, id) < ($2, $3)`
+		args = append(args, before, uid(beforeID))
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(` ORDER BY started_at DESC, id DESC LIMIT $%d`, len(args))
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Session, 0, limit)
+	for rows.Next() {
+		var row q.AppWorkSession
+		if err := rows.Scan(
+			&row.ID, &row.UserID, &row.DeviceID, &row.TaskID, &row.TaskName, &row.Category, &row.Mode,
+			&row.PlannedSeconds, &row.MinimumSeconds, &row.Status, &row.Version, &row.StartedAt,
+			&row.RunningSince, &row.ServerActiveMillis, &row.PausedAt, &row.EndedAt, &row.AcceptedSeq,
+			&row.LastSegmentEnd, &row.TaskMillis, &row.RelatedMillis, &row.DistractionMillis,
+			&row.UnknownMillis, &row.IdleMillis, &row.FinalSegments,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, asSession(row))
+	}
+	return out, rows.Err()
 }
 func (r *Repository) CurrentSession(ctx context.Context, userID string) (domain.Session, error) {
 	row, err := r.q.CurrentSession(ctx, uid(userID))
