@@ -35,4 +35,8 @@ final class HomeViewModel: ObservableObject {
     func showPreview(_ snapshot: MobileHomeSnapshot) {
         state = .loaded(snapshot)
     }
+
+    func showFailurePreview() {
+        state = .failed
+    }
 }
