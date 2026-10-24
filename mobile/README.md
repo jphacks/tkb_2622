@@ -50,7 +50,7 @@ HomeRepository（ホーム情報取得の境界）
 | 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによるアプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。「選んだアプリを制限」を選ぶと直下にアプリ選択ボタンを表示し、「標準以外を制限」ではカテゴリ全体へShieldを適用する。セッション連動・適用状態報告・利用時間計測のコードは実装済み。実機動作は未確認 |
 | 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`でDBの所属グループ、作成日、メンバー数、各メンバーの参加日を取得。表示名・作業開始履歴・招待・退出は未接続 |
 | 履歴 | `Features/History/HistoryView.swift`, `Data/HistoryRepository.swift`。`ListSessions`で終了・中止済み作業と報酬要約を、`ListTransactions`で獲得・利用・破棄の台帳をページング表示 |
-| 14 通知例 | `Features/Notifications/NotificationExamplesView.swift`。設定画面から開く静的な通知例。APNs通知は未接続 |
+| 14 通知設定 | `Features/Notifications/NotificationSettingsView.swift`。iOS通知許可の実状態を取得し、未決定時の許可要求・拒否後の設定画面への誘導を行う。APNs登録・配信は未接続 |
 
 08・09モックは、報酬を同じ作業セッションの小休憩に使い、終了・中止時に未使用分を破棄する仕様に更新した。FamilyControlsの認可・アプリ選択・手動Shield、iPhone登録、制限ポリシー同期、利用枠API、DeviceActivity monitor extensionを本番アプリ側に追加した。OSの監視イベントによる計測は1分単位で、backend同期はアプリ表示中・foreground復帰時または利用中画面で行う。物理iPhoneでのApp Groups署名、監視イベント、期限後の自動Shieldは未検証であり、実機受け入れが必要。ホームのDebug用シナリオ選択で一時停止状態にすると10へ進める。同じ選択メニューの「通信エラー」で失敗表示と再読み込み導線を確認できるが、実際の通信は発生しない。履歴タブは作業と報酬のAPI履歴へ接続した。
 

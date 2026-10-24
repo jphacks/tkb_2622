@@ -183,22 +183,22 @@ struct SettingsView: View {
             SurfaceCard {
                 sectionTitle("通知", icon: "bell")
                 NavigationLink {
-                    NotificationExamplesView()
+                    NotificationSettingsView()
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("通知の動作")
+                            Text("通知設定")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppTheme.ink)
-                            Text("報酬通知の抑制・グループ開始通知")
+                            Text("iPhoneの許可状態を確認")
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.secondaryInk)
                         }
                         Spacer()
                     }
                 }
-                .accessibilityIdentifier("notificationExamplesLink")
-                Text("通知配信は未接続です。")
+                .accessibilityIdentifier("notificationSettingsLink")
+                Text("APNs配信は未接続です。")
                     .font(.caption)
                     .foregroundStyle(AppTheme.secondaryInk)
             }
