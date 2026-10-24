@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct GroupView: View {
@@ -83,6 +84,9 @@ struct GroupView: View {
         }
         .refreshable { await model.load() }
         .task { await model.load() }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await model.load() }
+        }
         .navigationTitle("グループ")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

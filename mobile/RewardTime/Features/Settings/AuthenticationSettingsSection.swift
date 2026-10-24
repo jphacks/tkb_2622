@@ -259,6 +259,7 @@ struct AuthenticationSettingsSection: View {
         authenticatedEmail = targetEmail
         lastEmail = targetEmail
         resetOTPRequest()
+        onAuthenticationChanged()
         do {
             try await loadBusinessIdentity(using: service)
         } catch {
@@ -277,6 +278,7 @@ struct AuthenticationSettingsSection: View {
                 email = sessionEmail
                 lastEmail = sessionEmail
             }
+            onAuthenticationChanged()
         } catch {
             setMessage(
                 "保存済みのSupabaseログインを確認できませんでした: \(AuthenticationErrorMessage.describe(error))",
@@ -340,6 +342,7 @@ struct AuthenticationSettingsSection: View {
             auth = nil
             authenticatedEmail = nil
             resetOTPRequest()
+            onAuthenticationChanged()
             setMessage("この端末からログアウトしました。", error: false)
         } catch {
             setMessage("ログアウトできませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)

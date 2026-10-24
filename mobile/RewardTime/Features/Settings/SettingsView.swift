@@ -15,6 +15,7 @@ struct SettingsView: View {
     var body: some View {
         ScreenContainer {
             AuthenticationSettingsSection {
+                NotificationCenter.default.post(name: .mobileAuthenticationChanged, object: nil)
                 Task { await syncDeviceSettings() }
             }
 

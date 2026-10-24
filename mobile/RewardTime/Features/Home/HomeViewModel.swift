@@ -12,6 +12,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var state: State = .loading
 
     private let repository: any HomeRepository
+    private var loadGeneration = 0
 
     var lastUpdatedTime: String {
         guard case .loaded(let snapshot) = state else { return "未同期" }
@@ -28,11 +29,16 @@ final class HomeViewModel: ObservableObject {
     }
 
     func load() async {
+        loadGeneration += 1
+        let requestGeneration = loadGeneration
         state = .loading
 
         do {
-            state = .loaded(try await repository.fetchCurrentSnapshot())
+            let snapshot = try await repository.fetchCurrentSnapshot()
+            guard requestGeneration == loadGeneration else { return }
+            state = .loaded(snapshot)
         } catch {
+            guard requestGeneration == loadGeneration else { return }
             state = .failed((error as? LocalizedError)?.errorDescription
                 ?? "APIへ接続できません。通信状態とAPI設定を確認してください。")
         }

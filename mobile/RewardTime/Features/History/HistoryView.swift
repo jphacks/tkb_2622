@@ -21,15 +21,22 @@ private final class HistoryViewModel: ObservableObject {
     @Published private(set) var isShowingStaleSnapshot = false
 
     private var repository: (any HistoryRepository)?
+    private var loadGeneration = 0
+    private var loadMoreGeneration = 0
 
     func load() async {
-        guard !isLoading else { return }
+        loadGeneration += 1
+        loadMoreGeneration += 1
+        let requestGeneration = loadGeneration
         let hadLoadedSnapshot = didLoad
         isLoading = true
+        isLoadingMore = false
         errorMessage = nil
         defer {
-            isLoading = false
-            didLoad = true
+            if requestGeneration == loadGeneration {
+                isLoading = false
+                didLoad = true
+            }
         }
 
         do {
@@ -38,12 +45,14 @@ private final class HistoryViewModel: ObservableObject {
             async let workPage = repository.fetchWorkHistory(pageToken: "")
             async let rewardPage = repository.fetchRewardHistory(pageToken: "")
             let (work, rewards) = try await (workPage, rewardPage)
+            guard requestGeneration == loadGeneration else { return }
             workItems = work.items
             nextWorkPageToken = work.nextPageToken
             rewardItems = rewards.items
             nextRewardPageToken = rewards.nextPageToken
             isShowingStaleSnapshot = false
         } catch {
+            guard requestGeneration == loadGeneration else { return }
             isShowingStaleSnapshot = hadLoadedSnapshot && (!workItems.isEmpty || !rewardItems.isEmpty)
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "履歴を読み込めませんでした。接続状態を確認してください。"
@@ -51,13 +60,18 @@ private final class HistoryViewModel: ObservableObject {
     }
 
     func loadMore() async {
-        guard !isLoadingMore else { return }
+        guard !isLoading, !isLoadingMore else { return }
+        loadMoreGeneration += 1
+        let requestGeneration = loadGeneration
+        let pageGeneration = loadMoreGeneration
         let requestedSection = section
         let token = requestedSection == .work ? nextWorkPageToken : nextRewardPageToken
         guard !token.isEmpty else { return }
         isLoadingMore = true
         errorMessage = nil
-        defer { isLoadingMore = false }
+        defer {
+            if pageGeneration == loadMoreGeneration { isLoadingMore = false }
+        }
 
         do {
             let repository = try self.repository ?? ConfiguredHistoryRepository()
@@ -65,14 +79,17 @@ private final class HistoryViewModel: ObservableObject {
             switch requestedSection {
             case .work:
                 let page = try await repository.fetchWorkHistory(pageToken: token)
+                guard requestGeneration == loadGeneration, pageGeneration == loadMoreGeneration else { return }
                 workItems.append(contentsOf: page.items)
                 nextWorkPageToken = page.nextPageToken
             case .rewards:
                 let page = try await repository.fetchRewardHistory(pageToken: token)
+                guard requestGeneration == loadGeneration, pageGeneration == loadMoreGeneration else { return }
                 rewardItems.append(contentsOf: page.items)
                 nextRewardPageToken = page.nextPageToken
             }
         } catch {
+            guard requestGeneration == loadGeneration, pageGeneration == loadMoreGeneration else { return }
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "続きの履歴を読み込めませんでした。"
         }
@@ -133,6 +150,9 @@ struct HistoryView: View {
         }
         .refreshable { await model.load() }
         .task { if !model.didLoad { await model.load() } }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await model.load() }
+        }
         .navigationTitle("履歴")
         .navigationBarTitleDisplayMode(.inline)
     }

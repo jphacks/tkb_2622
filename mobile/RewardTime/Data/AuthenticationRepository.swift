@@ -1,6 +1,10 @@
 import Foundation
 import Supabase
 
+extension Notification.Name {
+    static let mobileAuthenticationChanged = Notification.Name("mobile.authentication.changed")
+}
+
 enum MobileAppConfiguration {
     static var supabaseProjectURL: String? {
         configuredURL(value(userDefaultsKey: "mobile.supabase.projectURL", infoKey: "SUPABASE_PROJECT_URL"))

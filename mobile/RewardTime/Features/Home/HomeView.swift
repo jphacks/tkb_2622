@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct HomeView: View {
@@ -54,6 +55,9 @@ struct HomeView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await loadAndReconcile() } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
+            Task { await loadAndReconcile() }
         }
     }
 

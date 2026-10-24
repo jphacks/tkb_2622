@@ -11,16 +11,22 @@ final class GroupViewModel: ObservableObject {
 
     @Published private(set) var state: State = .loading
     private let repository: any GroupRepository
+    private var loadGeneration = 0
 
     init(repository: any GroupRepository) {
         self.repository = repository
     }
 
     func load() async {
+        loadGeneration += 1
+        let requestGeneration = loadGeneration
         state = .loading
         do {
-            state = .loaded(try await repository.fetchGroups())
+            let groups = try await repository.fetchGroups()
+            guard requestGeneration == loadGeneration else { return }
+            state = .loaded(groups)
         } catch {
+            guard requestGeneration == loadGeneration else { return }
             state = .failed(Self.failureMessage(for: error))
         }
     }
