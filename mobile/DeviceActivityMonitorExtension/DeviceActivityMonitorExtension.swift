@@ -21,9 +21,10 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             return
         }
 
-        defaults.set(seconds, forKey: "mobile.usage.measuredSeconds")
+        let measuredSeconds = max(defaults.integer(forKey: "mobile.usage.measuredSeconds"), seconds)
+        defaults.set(measuredSeconds, forKey: "mobile.usage.measuredSeconds")
         defaults.set(Date(), forKey: "mobile.usage.measuredAt")
-        if seconds == defaults.integer(forKey: "mobile.usage.reservedSeconds") {
+        if measuredSeconds >= defaults.integer(forKey: "mobile.usage.reservedSeconds") {
             applyShield(using: defaults)
             defaults.set(grantID, forKey: "mobile.usage.completedGrantID")
         }
