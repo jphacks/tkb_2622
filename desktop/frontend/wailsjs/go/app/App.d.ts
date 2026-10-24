@@ -5,3 +5,9 @@ import {session} from '../models';
 export function Execute(arg1:session.Command):Promise<session.Snapshot>;
 
 export function GetStartupState():Promise<session.Snapshot>;
+
+export function RequestEmailOTP(arg1:string):Promise<session.Snapshot>;
+
+export function VerifyEmailOTP(arg1:string,arg2:string):Promise<session.Snapshot>;
+
+export function SignOut():Promise<session.Snapshot>;

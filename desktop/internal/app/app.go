@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jphacks/tkb_2622/desktop/internal/cloud"
 	"github.com/jphacks/tkb_2622/desktop/internal/monitor"
 	"github.com/jphacks/tkb_2622/desktop/internal/session"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -14,12 +15,19 @@ import (
 const StateEvent = "desktop:state"
 
 type App struct {
-	mu          sync.Mutex
-	engine      *session.Engine
-	recorder    *monitor.Recorder
-	store       *stateStore
-	stateLoaded bool
-	ctx         context.Context
+	mu                 sync.Mutex
+	engine             *session.Engine
+	recorder           *monitor.Recorder
+	store              *stateStore
+	stateLoaded        bool
+	ctx                context.Context
+	cloudMu            sync.Mutex
+	cloudClient        *cloud.Client
+	cloudConfigError   error
+	credentials        *credentialStore
+	credentialStoreErr error
+	authSession        cloud.AuthSession
+	pendingEmail       string
 }
 
 // ライフサイクル関数をバインド対象から分け，画面に公開する操作を限定する．
@@ -38,7 +46,13 @@ func New() *Host {
 		platform = "windows"
 	}
 	engine := session.New(platform, now)
-	app := &App{engine: engine}
+	client, clientErr := cloud.NewClient(cloud.ConfigFromEnv())
+	credentials, credentialErr := newCredentialStore()
+	app := &App{
+		engine: engine, cloudClient: client, cloudConfigError: clientErr,
+		credentials: credentials, credentialStoreErr: credentialErr,
+	}
+	app.setAccountStatus(session.AccountState{Status: "unconfigured", Message: "Connect APIとSupabase Authの接続先を設定してください。"}, now)
 	if platform == "macos" {
 		engine.SetMode("local-monitor", now)
 		app.recorder = monitor.New(monitor.ResolveHelper())
@@ -156,6 +170,9 @@ func (a *App) shutdown() {
 }
 
 func (a *App) GetStartupState() session.Snapshot {
+	ctx, cancel := context.WithTimeout(a.context(), 15*time.Second)
+	defer cancel()
+	a.syncCloud(ctx)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := time.Now()
@@ -166,6 +183,9 @@ func (a *App) GetStartupState() session.Snapshot {
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "saveSettings" {
+		return a.saveTaskSettings(command)
+	}
 	now := time.Now()
 	a.mu.Lock()
 	before := a.engine.Snapshot()

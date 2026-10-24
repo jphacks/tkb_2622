@@ -9,3 +9,15 @@ export function Execute(arg1) {
 export function GetStartupState() {
   return window['go']['app']['App']['GetStartupState']();
 }
+
+export function RequestEmailOTP(arg1) {
+  return window['go']['app']['App']['RequestEmailOTP'](arg1);
+}
+
+export function VerifyEmailOTP(arg1, arg2) {
+  return window['go']['app']['App']['VerifyEmailOTP'](arg1, arg2);
+}
+
+export function SignOut() {
+  return window['go']['app']['App']['SignOut']();
+}

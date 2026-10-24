@@ -1,9 +1,10 @@
 export type Platform = 'macos' | 'windows' | 'unsupported';
 export type SessionStatus = 'RUNNING' | 'PAUSED' | 'FINALIZED' | 'ABORTED' | 'COMPLETED_LOCAL' | 'ABORTED_LOCAL';
-export interface Task { id: string; name: string; plannedSeconds: number; minimumSeconds: number }
+export interface Task { id: string; name: string; category?: string; mode?: string; plannedSeconds: number; minimumSeconds: number; version?: number; pendingOperationId?: string; pendingSettingsHash?: string }
 export interface WorkSession { id: string; name: string; status: SessionStatus; task: Task; elapsedSeconds: number; evaluation: 'pending' | 'complete' | 'failed' }
 export interface Capability { allowed: boolean; reason: string }
 export interface Failure { code: string; message: string; retryable: boolean }
+export interface AccountState { status: 'unconfigured' | 'storageUnavailable' | 'signedOut' | 'otpPending' | 'signedIn' | 'error' | 'demo'; email: string; deviceRegistered: boolean; message: string }
 export interface MonitorStatus { state: string; appName: string; browserName: string; domain: string; lastSample: string; sampleCount: number; message: string }
 export interface Classification { name: string; category: 'work' | 'distraction' | 'uncertain' }
 export interface Settings { tasks: Task[]; selectedTaskId: string; classifications: Classification[] }
@@ -14,6 +15,7 @@ export interface Snapshot {
   session: WorkSession | null; balanceSeconds: number | null;
   sync: 'synced' | 'pending' | 'failed'; permission: 'unknown' | 'denied'; online: boolean;
   monitor?: MonitorStatus;
+  account?: AccountState;
   restrictionDesired: 'unknown' | 'restricted' | 'unrestricted'; restrictionConfirmed: boolean;
   settings: Settings; history: Result[]; result: Result | null;
   actions: Record<SessionAction, Capability>; failure: Failure | null;
@@ -28,6 +30,9 @@ export type Command =
 export interface DesktopBridge {
   getStartupState(): Promise<Snapshot>;
   execute(command: Command): Promise<Snapshot>;
+  requestEmailOTP(email: string): Promise<Snapshot>;
+  verifyEmailOTP(email: string, code: string): Promise<Snapshot>;
+  signOut(): Promise<Snapshot>;
   subscribe(listener: (state: Snapshot) => void): () => void;
   dispose(): void;
 }

@@ -61,8 +61,39 @@ func (e *Engine) SetLocalStorageReady(ready bool, now time.Time) {
 	e.touch(now)
 }
 
+func (e *Engine) SetAccount(account AccountState, now time.Time) {
+	e.state.Account = account
+	e.touch(now)
+}
+
+func (e *Engine) SetTasks(tasks []Task, selectedTaskID string, now time.Time) bool {
+	settings := e.state.Settings
+	settings.Tasks = append([]Task(nil), tasks...)
+	settings.SelectedTaskID = selectedTaskID
+	selectedExists := false
+	for _, task := range settings.Tasks {
+		if task.ID == settings.SelectedTaskID {
+			selectedExists = true
+			break
+		}
+	}
+	if !selectedExists {
+		settings.SelectedTaskID = ""
+		if len(settings.Tasks) > 0 {
+			settings.SelectedTaskID = settings.Tasks[0].ID
+		}
+	}
+	normalized, valid := normalizeSettings(settings)
+	if !valid {
+		return false
+	}
+	e.state.Settings = normalized
+	e.touch(now)
+	return true
+}
+
 func (e *Engine) Restore(snapshot Snapshot, now time.Time) bool {
-	if snapshot.Platform != e.state.Platform || len(snapshot.Settings.Tasks) == 0 {
+	if snapshot.Platform != e.state.Platform {
 		return false
 	}
 	data, err := json.Marshal(snapshot)
@@ -152,7 +183,11 @@ func normalizeSettings(input Settings) (Settings, bool) {
 		selectedTaskExists = selectedTaskExists || task.ID == settings.SelectedTaskID
 		settings.Tasks[index] = task
 	}
-	if len(settings.Tasks) == 0 || !selectedTaskExists {
+	if len(settings.Tasks) == 0 {
+		if settings.SelectedTaskID != "" {
+			return Settings{}, false
+		}
+	} else if !selectedTaskExists {
 		return Settings{}, false
 	}
 	classificationNames := make(map[string]struct{}, len(input.Classifications))

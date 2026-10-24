@@ -1,10 +1,15 @@
 package session
 
 type Task struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	PlannedSeconds int    `json:"plannedSeconds"`
-	MinimumSeconds int    `json:"minimumSeconds"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Category            string `json:"category"`
+	Mode                string `json:"mode"`
+	PlannedSeconds      int    `json:"plannedSeconds"`
+	MinimumSeconds      int    `json:"minimumSeconds"`
+	Version             int64  `json:"version"`
+	PendingOperationID  string `json:"pendingOperationId,omitempty"`
+	PendingSettingsHash string `json:"pendingSettingsHash,omitempty"`
 }
 
 type WorkSession struct {
@@ -79,6 +84,14 @@ type Snapshot struct {
 	Result               *Result               `json:"result"`
 	Actions              map[string]Capability `json:"actions"`
 	Failure              *Failure              `json:"failure"`
+	Account              AccountState          `json:"account"`
+}
+
+type AccountState struct {
+	Status           string `json:"status"`
+	Email            string `json:"email"`
+	DeviceRegistered bool   `json:"deviceRegistered"`
+	Message          string `json:"message"`
 }
 
 type Scenario struct {

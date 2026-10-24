@@ -65,8 +65,13 @@ export namespace session {
 	export class Task {
 	    id: string;
 	    name: string;
+	    category: string;
+	    mode: string;
 	    plannedSeconds: number;
 	    minimumSeconds: number;
+	    version: number;
+	    pendingOperationId: string;
+	    pendingSettingsHash: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Task(source);
@@ -76,8 +81,13 @@ export namespace session {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.category = source["category"];
+	        this.mode = source["mode"];
 	        this.plannedSeconds = source["plannedSeconds"];
 	        this.minimumSeconds = source["minimumSeconds"];
+	        this.version = source["version"];
+	        this.pendingOperationId = source["pendingOperationId"];
+	        this.pendingSettingsHash = source["pendingSettingsHash"];
 	    }
 	}
 	export class Command {
@@ -207,6 +217,25 @@ export namespace session {
 		    return a;
 		}
 	}
+	export class AccountState {
+	    status: string;
+	    email: string;
+	    deviceRegistered: boolean;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new AccountState(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.email = source["email"];
+	        this.deviceRegistered = source["deviceRegistered"];
+	        this.message = source["message"];
+	    }
+	}
+
 	export class Snapshot {
 	    revision: number;
 	    platform: string;
@@ -224,6 +253,7 @@ export namespace session {
 	    result?: Result;
 	    actions: Record<string, Capability>;
 	    failure?: Failure;
+	    account: AccountState;
 	
 	    static createFrom(source: any = {}) {
 	        return new Snapshot(source);
@@ -247,6 +277,7 @@ export namespace session {
 	        this.result = this.convertValues(source["result"], Result);
 	        this.actions = this.convertValues(source["actions"], Capability, true);
 	        this.failure = this.convertValues(source["failure"], Failure);
+	        this.account = this.convertValues(source["account"], AccountState);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

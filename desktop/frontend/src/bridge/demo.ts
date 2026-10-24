@@ -60,6 +60,24 @@ export class DemoBridge implements DesktopBridge {
 
   async getStartupState() { return copy(this.state); }
 
+  async requestEmailOTP(email: string) {
+    this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };
+    this.touch();
+    return copy(this.state);
+  }
+
+  async verifyEmailOTP(email: string, _code: string) {
+    this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };
+    this.touch();
+    return copy(this.state);
+  }
+
+  async signOut() {
+    this.state.account = { status: 'signedOut', email: '', deviceRegistered: false, message: '' };
+    this.touch();
+    return copy(this.state);
+  }
+
   subscribe(listener: (state: Snapshot) => void) {
     this.listeners.add(listener);
     if (!this.timer) { this.lastTick = Date.now(); this.timer = setInterval(() => this.tick(), 250); }

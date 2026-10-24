@@ -24,11 +24,23 @@ export class DesktopStore {
   }
   disconnect() { this.generation++; this.unsubscribe?.(); this.unsubscribe = undefined; }
   async execute(command: Command): Promise<Snapshot | null> {
+		return this.perform(() => this.bridge.execute(command));
+	}
+	async requestEmailOTP(email: string): Promise<Snapshot | null> {
+		return this.perform(() => this.bridge.requestEmailOTP(email));
+	}
+	async verifyEmailOTP(email: string, code: string): Promise<Snapshot | null> {
+		return this.perform(() => this.bridge.verifyEmailOTP(email, code));
+	}
+	async signOut(): Promise<Snapshot | null> {
+		return this.perform(() => this.bridge.signOut());
+	}
+	private async perform(operation: () => Promise<Snapshot>): Promise<Snapshot | null> {
     if (this.view.busy) return null;
     const generation = this.generation;
     this.set({ busy: true, error: null });
     try {
-      const state = await this.bridge.execute(command);
+      const state = await operation();
       if (generation !== this.generation) return null;
       this.accept(state);
       return state;
