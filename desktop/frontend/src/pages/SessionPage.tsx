@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isNative } from '../bridge';
 import type { ClassificationCandidate, Command, SessionAction, Snapshot } from '../bridge/types';
 import { clock, duration, minimumDuration, plannedDuration } from '../components/format';
 
@@ -38,7 +39,9 @@ export function SessionPage({ state, busy, execute, onNavigate }: PageProps) {
   const cloudSessionHint = state.cloudSession?.message || (session?.serverVersion ? state.actions.pause.reason : '');
   const act = (action: SessionAction, label: string, primary = false) => <button className={primary ? 'button primary panel-button' : 'button panel-button'} disabled={busy || !state.actions[action].allowed} title={state.actions[action].reason} onClick={() => execute({ action, name })}>{label}</button>;
   const abort = () => {
-    if (state.mode !== 'local-monitor' && !window.confirm('作業を中止しますか？（デモ）')) return;
+    // ローカル計測とWindowsアプリでは，Go側がOSのダイアログで確認する．
+    const confirmedByHost = state.mode === 'local-monitor' || (state.platform === 'windows' && isNative());
+    if (!confirmedByHost && !window.confirm('作業を中止しますか？（デモ）')) return;
     void execute({ action: 'abort' });
   };
 

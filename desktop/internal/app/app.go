@@ -294,7 +294,8 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 	if command.Action == "abort" {
 		a.mu.Lock()
 		current := a.engine.Snapshot()
-		shouldConfirm := current.Mode == "local-monitor" && current.Actions["abort"].Allowed
+		// Windowsはデモモードでも，画面内に収まらないWebViewの確認ではなくOSのダイアログで確認する．
+		shouldConfirm := (current.Mode == "local-monitor" || current.Platform == "windows") && current.Actions["abort"].Allowed
 		a.mu.Unlock()
 		if shouldConfirm {
 			confirmed, err := a.confirmAbort()
@@ -549,6 +550,16 @@ func (a *App) emitState(state session.Snapshot) {
 }
 
 func (a *App) confirmAbort() (bool, error) {
+	if runtime.GOOS == "windows" {
+		// WindowsのMessageBoxはボタン名を変えられず「はい／いいえ」を返すため，文言で操作を示し既定を「いいえ」にする．
+		result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
+			Type:          wailsruntime.QuestionDialog,
+			Title:         "作業を中止しますか？",
+			Message:       "作業を中止します。未使用の報酬は破棄され、報酬は付与されません。\n\n「はい」で中止し、「いいえ」で作業に戻ります。",
+			DefaultButton: "No",
+		})
+		return result == "Yes", err
+	}
 	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
 		Type:          wailsruntime.QuestionDialog,
 		Title:         "作業を中止しますか？",
