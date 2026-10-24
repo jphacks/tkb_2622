@@ -14,3 +14,11 @@ desktop/build/bin/
 
 # macOS Finder metadata
 .DS_Store
+
+# Terraform
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/tfplan
+infra/**/*.secret.tfvars
+infra/**/crash.log

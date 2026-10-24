@@ -84,31 +84,31 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 
 ## Cloud Run向けの準備と実行手順
 
-`compose.deploy.yaml`はCloud RunのComposeデプロイ用です．ローカルDB・ボリューム・起動時マイグレーションを含みません．[Cloud Run公式手順](https://docs.cloud.google.com/run/docs/deploy-run-compose)に従い，Google Cloudプロジェクト，Artifact Registry，Supabaseプロジェクトと接続情報を事前に用意します．Supabase上ではAPI実行用ロールを作成し，`app`スキーマへの必要な権限だけを付与します（[インフラ構成](../docs/spec/2.インフラ構成.md)）．クラウドリソースは今後[infra](../infra/README.md)のTerraformで管理する予定です．以下は実行手順であり，この変更ではクラウドへのデプロイを行っていません．
+Cloud Runのサービス（`tkb-<env>-api`）・マイグレーション用Job（`tkb-<env>-migrate`）・Artifact Registry・Secretは[infra](../infra/README.md)のTerraformで作成します．環境変数とSecretの参照もTerraformで設定するため，デプロイではイメージだけを更新します．Supabase上ではAPI実行用ロールを作成し，`app`スキーマへの必要な権限だけを付与します（[インフラ構成](../docs/spec/2.インフラ構成.md)）．以下は実行手順であり，クラウドへのデプロイはまだ行っていません．
 
-1. `backend/`へ移動し，`BACKEND_IMAGE`にArtifact Registryのイメージ名と固定タグを設定します．Google Cloud・レジストリへの認証も済ませます．
-2. 同じイメージをビルド・公開します．
-
-```bash
-docker build --platform linux/amd64 -t "$BACKEND_IMAGE" .
-docker push "$BACKEND_IMAGE"
-```
-
-3. `MIGRATION_DATABASE_URL`にSupabaseの直接接続（IPv4環境ではセッションプーラー）のURLを設定し，デプロイ前に一度だけマイグレーションします．複数のデプロイから並行実行しないでください．
+1. `ENV`（`dev`／`prod`），`PROJECT_ID`，`REGION`（`asia-northeast1`）を設定し，リポジトリルートでイメージをビルド・公開します．タグはコミットIDなどの固定値にします．
 
 ```bash
-docker run --rm \
-  -e MIGRATION_DATABASE_URL \
-  "$BACKEND_IMAGE" /app/migrate up
+IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/tkb/backend:$(git rev-parse --short HEAD)"
+gcloud auth configure-docker "$REGION-docker.pkg.dev"
+docker build --platform linux/amd64 -t "$IMAGE" backend
+docker push "$IMAGE"
 ```
 
-4. マイグレーション成功後，`DATABASE_URL`（API実行用ロール．トランザクションプーラーが第一候補）と`SUPABASE_JWT_ISSUER`を設定し，同じイメージをデプロイします．`PROJECT_ID`と`REGION`は対象環境の値を設定します．
+2. マイグレーションJobのイメージを更新して実行します．Jobは並列数1で，失敗しても再試行しません．
 
 ```bash
-gcloud run compose up compose.deploy.yaml --project "$PROJECT_ID" --region "$REGION"
+gcloud run jobs update "tkb-$ENV-migrate" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION"
+gcloud run jobs execute "tkb-$ENV-migrate" --wait --project "$PROJECT_ID" --region "$REGION"
 ```
 
-環境変数はCompose経由でCloud Runへ渡します．トークンをファイルやリポジトリに書き込まず，値を展開する`docker compose config`の出力も共有しないでください．Cloud Runへのアクセス認証は別途設定し，本構成では公開アクセスを自動で有効化しません．Supabase実接続とCloud Run実行は接続情報の用意後に検証します．
+3. マイグレーション成功後，APIを同じイメージで更新します．
+
+```bash
+gcloud run deploy "tkb-$ENV-api" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION"
+```
+
+`gcloud run deploy`には`--image`以外の設定を渡しません．環境変数・スケール等を変える場合はTerraformを変更します．`compose.deploy.yaml`（`gcloud run compose up`）は別のサービスを作成するため，Terraform管理の環境では使いません．Supabase実接続とCloud Run実行は接続情報の用意後に検証します．
 
 ## 開発時の確認と今後の拡張
 
