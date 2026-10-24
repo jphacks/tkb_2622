@@ -16,6 +16,7 @@ extern void FocusLinkQuit(void);
     NSStatusItem *_statusItem;
     NSMenu *_menu;
     NSPopover *_popover;
+    id _outsideClickMonitor;
 }
 
 - (void)installStatusItem;
@@ -24,6 +25,7 @@ extern void FocusLinkQuit(void);
 - (void)showWindow:(id)sender;
 - (void)presentPopover;
 - (void)closePopover;
+- (void)closePopoverForOutsideClick;
 - (void)quitApplication:(id)sender;
 
 @end
@@ -67,9 +69,19 @@ static FocusLinkStatusController *focusLinkStatusController;
 
     _popover = [[NSPopover alloc] init];
     FocusLinkConfigurePopover(_popover);
+    _outsideClickMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown | NSEventMaskOtherMouseDown) handler:^(NSEvent *event) {
+        if (event == nil) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [focusLinkStatusController closePopoverForOutsideClick];
+        });
+    }];
 }
 
 - (void)removeStatusItem {
+    if (_outsideClickMonitor != nil) {
+        [NSEvent removeMonitor:_outsideClickMonitor];
+        _outsideClickMonitor = nil;
+    }
     if (_statusItem != nil) {
         [[NSStatusBar systemStatusBar] removeStatusItem:_statusItem];
         [_statusItem release];
@@ -83,10 +95,15 @@ static FocusLinkStatusController *focusLinkStatusController;
 - (void)statusItemPressed:(id)sender {
     NSEvent *event = [NSApp currentEvent];
     if (event.type == NSEventTypeRightMouseUp) {
+        [self closePopover];
         [NSMenu popUpContextMenu:_menu withEvent:event forView:_statusItem.button];
         return;
     }
-    FocusLinkShowPopover();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            FocusLinkShowPopover();
+        }
+    });
 }
 
 - (void)showWindow:(id)sender {
@@ -107,6 +124,12 @@ static FocusLinkStatusController *focusLinkStatusController;
 
 - (void)closePopover {
     [_popover close];
+}
+
+- (void)closePopoverForOutsideClick {
+    if (_popover.isShown) {
+        [_popover close];
+    }
 }
 
 - (void)quitApplication:(id)sender {

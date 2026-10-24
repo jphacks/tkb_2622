@@ -247,10 +247,12 @@ func formatPopoverClock(seconds int) string {
 
 //export FocusLinkShowPopover
 func FocusLinkShowPopover() {
-	host, _ := currentTrayHost()
-	if host != nil {
-		updateNativePopover(host.CurrentSnapshot())
+	host, ctx := currentTrayHost()
+	if host == nil || ctx == nil {
+		return
 	}
+	wailsruntime.WindowHide(ctx)
+	updateNativePopover(host.CurrentSnapshot())
 	C.FocusLinkPresentPopover()
 }
 
