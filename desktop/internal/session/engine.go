@@ -238,6 +238,17 @@ func (e *Engine) SetCloudSession(current *CloudSession, now time.Time) {
 	e.touch(now)
 }
 
+func (e *Engine) SetIPhoneRestrictionState(state *IPhoneRestrictionState, failure string, now time.Time) {
+	if state == nil {
+		e.state.IPhoneRestriction = nil
+	} else {
+		copy := *state
+		e.state.IPhoneRestriction = &copy
+	}
+	e.state.IPhoneRestrictionError = failure
+	e.touch(now)
+}
+
 func (e *Engine) SetFailure(code, message string, retryable bool, now time.Time) {
 	e.fail(code, message, retryable)
 	e.touch(now)

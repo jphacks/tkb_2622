@@ -113,6 +113,19 @@ type Balance struct {
 	EvaluatedThroughSeq int64
 }
 
+type RestrictionState struct {
+	SessionID        string
+	DeviceID         string
+	ControlRevision  int64
+	DesiredMode      string
+	AppliedRevision  int64
+	ShieldStatus     string
+	PermissionStatus string
+	LastAppliedAt    *time.Time
+	LastReportedAt   *time.Time
+	FailureReason    string
+}
+
 type SessionResult struct {
 	Session   Session
 	Discarded int64
@@ -563,6 +576,49 @@ func (c *Client) GetBalance(ctx context.Context, auth AuthSession) (Balance, err
 		return Balance{}, errors.New("API omitted the reward balance")
 	}
 	return balanceFromMessage(*response.Balance), nil
+}
+
+func (c *Client) GetRestrictionState(ctx context.Context, auth AuthSession) (RestrictionState, error) {
+	var response struct {
+		State *struct {
+			SessionID        string     `json:"sessionId"`
+			DeviceID         string     `json:"deviceId"`
+			ControlRevision  protoInt64 `json:"controlRevision"`
+			DesiredMode      string     `json:"desiredMode"`
+			AppliedRevision  protoInt64 `json:"appliedRevision"`
+			ShieldStatus     string     `json:"shieldStatus"`
+			PermissionStatus string     `json:"permissionStatus"`
+			LastAppliedAt    string     `json:"lastAppliedAt"`
+			LastReportedAt   string     `json:"lastReportedAt"`
+			FailureReason    string     `json:"failureReason"`
+		} `json:"state"`
+	}
+	if err := c.Connect(ctx, "restriction.v1.RestrictionService/GetRestrictionState", auth.AccessToken, struct{}{}, &response); err != nil {
+		return RestrictionState{}, err
+	}
+	if response.State == nil {
+		return RestrictionState{}, errors.New("APIからiPhone制限状態が返りませんでした")
+	}
+	state := response.State
+	return RestrictionState{
+		SessionID: state.SessionID, DeviceID: state.DeviceID,
+		ControlRevision: int64(state.ControlRevision), DesiredMode: strings.TrimPrefix(state.DesiredMode, "DESIRED_MODE_"),
+		AppliedRevision: int64(state.AppliedRevision), ShieldStatus: strings.TrimPrefix(state.ShieldStatus, "SHIELD_STATUS_"),
+		PermissionStatus: strings.TrimPrefix(state.PermissionStatus, "PERMISSION_STATUS_"),
+		LastAppliedAt:    parseOptionalTime(state.LastAppliedAt), LastReportedAt: parseOptionalTime(state.LastReportedAt),
+		FailureReason: state.FailureReason,
+	}, nil
+}
+
+func parseOptionalTime(value string) *time.Time {
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }
 
 type activitySegmentMessage struct {

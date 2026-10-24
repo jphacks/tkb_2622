@@ -162,6 +162,20 @@ func (h *Host) DomReady(ctx context.Context) {
 			}
 		}
 	}()
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(loop, 10*time.Second)
+				a.syncIPhoneRestrictionState(ctx)
+				cancel()
+			case <-loop.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (h *Host) Shutdown(context.Context) {
