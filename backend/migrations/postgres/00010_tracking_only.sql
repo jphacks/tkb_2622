@@ -1,4 +1,5 @@
 -- +goose Up
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -11,8 +12,10 @@ BEGIN
     END IF;
 END;
 $$;
+-- +goose StatementEnd
 
 -- +goose Down
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF (
@@ -24,3 +27,4 @@ BEGIN
     END IF;
 END;
 $$;
+-- +goose StatementEnd
