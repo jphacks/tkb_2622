@@ -98,40 +98,48 @@ struct ConfiguredDeviceSettingsRepository {
         )
         defaults.set(device.id, forKey: "mobile.device.id")
 
-        let currentPolicy = try await currentPolicy(client: client, deviceID: device.id)
-        if let currentPolicy,
-           currentPolicy.targetMode == settings.targetMode,
-           currentPolicy.enabled == settings.enabled,
-           currentPolicy.configured == settings.configured,
-           currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion {
-            return SyncedDevicePolicy(
-                deviceID: device.id,
-                deviceName: deviceName,
-                policyVersion: currentPolicy.version.value,
-                policyStatus: currentPolicy.status
-            )
+        for attempt in 0..<3 {
+            let currentPolicy = try await currentPolicy(client: client, deviceID: device.id)
+            if let currentPolicy,
+               currentPolicy.targetMode == settings.targetMode,
+               currentPolicy.enabled == settings.enabled,
+               currentPolicy.configured == settings.configured,
+               currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion {
+                return SyncedDevicePolicy(
+                    deviceID: device.id,
+                    deviceName: deviceName,
+                    policyVersion: currentPolicy.version.value,
+                    policyStatus: currentPolicy.status
+                )
+            }
+
+            do {
+                let response: UpdatePolicyResponse = try await client.call(
+                    service: "restriction.v1.RestrictionService",
+                    method: "UpdateRestrictionPolicy",
+                    requestBody: UpdatePolicyRequest(
+                        operationId: UUID().uuidString.lowercased(),
+                        deviceId: device.id,
+                        expectedVersion: String(currentPolicy?.version.value ?? 0),
+                        enabled: settings.enabled,
+                        targetMode: settings.targetMode,
+                        deviceConfigVersion: String(settings.deviceConfigVersion),
+                        configured: settings.configured
+                    ),
+                    responseType: UpdatePolicyResponse.self
+                )
+                return SyncedDevicePolicy(
+                    deviceID: response.policy.deviceId,
+                    deviceName: deviceName,
+                    policyVersion: response.policy.version.value,
+                    policyStatus: response.policy.status
+                )
+            } catch ConnectJSONClient.ClientError.connect(code: "aborted") {
+                if attempt == 2 { throw DeviceSettingsRepositoryError.policyConflict }
+            }
         }
 
-        let response: UpdatePolicyResponse = try await client.call(
-            service: "restriction.v1.RestrictionService",
-            method: "UpdateRestrictionPolicy",
-            requestBody: UpdatePolicyRequest(
-                operationId: UUID().uuidString.lowercased(),
-                deviceId: device.id,
-                expectedVersion: String(currentPolicy?.version.value ?? 0),
-                enabled: settings.enabled,
-                targetMode: settings.targetMode,
-                deviceConfigVersion: String(settings.deviceConfigVersion),
-                configured: settings.configured
-            ),
-            responseType: UpdatePolicyResponse.self
-        )
-        return SyncedDevicePolicy(
-            deviceID: response.policy.deviceId,
-            deviceName: deviceName,
-            policyVersion: response.policy.version.value,
-            policyStatus: response.policy.status
-        )
+        throw DeviceSettingsRepositoryError.policyConflict
     }
 
     private func registerDevice(
@@ -213,6 +221,7 @@ enum DeviceSettingsRepositoryError: Error {
     case missingConfiguration
     case invalidConfiguration
     case deviceNotActive
+    case policyConflict
 }
 
 extension DeviceSettingsRepositoryError: LocalizedError {
@@ -224,6 +233,8 @@ extension DeviceSettingsRepositoryError: LocalizedError {
             "Supabase URL・公開用キー・API URLを確認してください。"
         case .deviceNotActive:
             "この端末の登録が無効です。端末管理で状態を確認してください。"
+        case .policyConflict:
+            "制限設定が続けて更新されました。少し待ってからもう一度同期してください。"
         }
     }
 }

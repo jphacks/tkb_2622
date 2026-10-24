@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var screenTime: MobileScreenTimeController
     @State private var isFamilyActivityPickerPresented = false
     @State private var isSyncingDeviceSettings = false
+    @State private var needsDeviceSettingsSync = false
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncStatus = "未同期"
     @State private var deviceSyncError: String?
@@ -246,9 +247,21 @@ struct SettingsView: View {
 
     @MainActor
     private func syncDeviceSettings() async {
-        guard !isSyncingDeviceSettings else { return }
+        guard !isSyncingDeviceSettings else {
+            needsDeviceSettingsSync = true
+            return
+        }
         isSyncingDeviceSettings = true
         defer { isSyncingDeviceSettings = false }
+
+        repeat {
+            needsDeviceSettingsSync = false
+            await performDeviceSettingsSync()
+        } while needsDeviceSettingsSync
+    }
+
+    @MainActor
+    private func performDeviceSettingsSync() async {
         do {
             let synced = try await ConfiguredDeviceSettingsRepository().sync(
                 settings: screenTime.backendRestrictionSettings
