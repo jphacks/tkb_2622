@@ -1,19 +1,14 @@
 import SwiftUI
 
 struct RootTabView: View {
-  private enum EntryState {
-    case checking
-    case welcome
-    case authenticated
-    case localOnly
-  }
-
   @Environment(\.scenePhase) private var scenePhase
   @StateObject private var screenTime = MobileScreenTimeController()
   @AppStorage("mobile.auth.loginDeferred") private var loginDeferred = false
   @State private var selectedTab = 0
   @State private var pendingInvitationToken: String?
-  @State private var entryState: EntryState = .checking
+  @State private var entryState: AuthenticationEntryState = .checking
+  @State private var identitySyncError: String?
+  @State private var isRestoringAuthentication = false
 
   var body: some View {
     Group {
@@ -31,6 +26,8 @@ struct RootTabView: View {
         mainTabs(isAuthenticated: true)
       case .localOnly:
         mainTabs(isAuthenticated: false)
+      case .identitySyncRequired:
+        identitySyncRequiredView
       }
     }
     .task { await restoreAuthentication() }
@@ -45,6 +42,36 @@ struct RootTabView: View {
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { Task { await restoreAuthentication() } }
     }
+  }
+
+  private var identitySyncRequiredView: some View {
+    VStack(spacing: 16) {
+      Label("アカウントを同期できませんでした", systemImage: "exclamationmark.triangle.fill")
+        .font(.headline)
+        .foregroundStyle(.orange)
+      Text(identitySyncError ?? "保存済みのログインはありますが、サーバー上のアカウント情報を確認できませんでした。")
+        .font(.subheadline)
+        .foregroundStyle(AppTheme.secondaryInk)
+        .multilineTextAlignment(.center)
+      Button("再試行") {
+        entryState = .checking
+        Task { await restoreAuthentication() }
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(AppTheme.primary)
+      Button("端末内で続ける") {
+        loginDeferred = true
+        entryState = .localOnly
+      }
+      .font(.footnote)
+      Button("別のアカウントでログイン") {
+        Task { await signOutAndShowWelcome() }
+      }
+      .font(.footnote)
+    }
+    .padding(24)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(AppTheme.background.ignoresSafeArea())
   }
 
   private func mainTabs(isAuthenticated: Bool) -> some View {
@@ -100,16 +127,26 @@ struct RootTabView: View {
 
   @MainActor
   private func restoreAuthentication() async {
-    let hasSession = await hasAuthenticatedSession()
+    guard !isRestoringAuthentication else { return }
+    isRestoringAuthentication = true
+    defer { isRestoringAuthentication = false }
 
-    if hasSession {
-      loginDeferred = false
-      entryState = .authenticated
-    } else if loginDeferred {
-      entryState = .localOnly
-    } else {
-      entryState = .welcome
+    let hasSession = await hasAuthenticatedSession()
+    let needsIdentitySync = entryState == .checking || entryState == .identitySyncRequired
+    var identityReady = !needsIdentitySync
+    if hasSession && needsIdentitySync {
+      identitySyncError = await synchronizeBusinessIdentity()
+      identityReady = identitySyncError == nil
+    } else if !hasSession {
+      identitySyncError = nil
     }
+    let nextState = AuthenticationEntryState.resolve(
+      hasValidSession: hasSession,
+      businessUserReady: identityReady,
+      loginDeferred: loginDeferred
+    )
+    if nextState == .authenticated { loginDeferred = false }
+    entryState = nextState
   }
 
   @MainActor
@@ -130,6 +167,50 @@ struct RootTabView: View {
     guard let auth = MobileAppConfiguration.makeAuthService() else { return false }
     if let session = auth.client.auth.currentSession, !session.isExpired { return true }
     return (try? await auth.accessToken()) != nil
+  }
+
+  @MainActor
+  private func synchronizeBusinessIdentity() async -> String? {
+    guard let auth = MobileAppConfiguration.makeAuthService(),
+      let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL,
+      let baseURL = URL(string: apiBaseURLText),
+      let scheme = baseURL.scheme?.lowercased(),
+      ["http", "https"].contains(scheme),
+      baseURL.host != nil
+    else {
+      return "接続先を確認してください。"
+    }
+
+    do {
+      let session = try await auth.client.auth.session
+      let operationKey = "mobile.identity.ensureUser.operation.\(session.user.id.uuidString)"
+      let defaults = UserDefaults.standard
+      let operationID = (defaults.string(forKey: operationKey) ?? UUID().uuidString).lowercased()
+      defaults.set(operationID, forKey: operationKey)
+      let repository = IdentityAPIRepository(baseURL: baseURL, auth: auth)
+      _ = try await repository.ensureUserAndFetchCurrentUser(operationID: operationID)
+      defaults.removeObject(forKey: operationKey)
+      return nil
+    } catch {
+      return "アカウント情報の確認に失敗しました: \(error.localizedDescription)"
+    }
+  }
+
+  @MainActor
+  private func signOutAndShowWelcome() async {
+    guard let auth = MobileAppConfiguration.makeAuthService() else {
+      loginDeferred = false
+      entryState = .welcome
+      return
+    }
+    do {
+      try await auth.signOutFromThisDevice()
+      loginDeferred = false
+      identitySyncError = nil
+      entryState = .welcome
+    } catch {
+      identitySyncError = "ログアウトできませんでした: \(error.localizedDescription)"
+    }
   }
 
   @MainActor

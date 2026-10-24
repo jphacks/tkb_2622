@@ -11,8 +11,19 @@
 - `RootTabView`は保存済みSupabase sessionを復元し、有効なら起動時のログイン画面を省略する。sessionがなく、ログインを後回しにした記録もなければ歓迎／ログイン画面を出す。
 - Mobile／DesktopともメールOTPを使い、Mobileは新規Auth user作成を許可する。OTP成功後、Mobileは`EnsureUser`と`GetMe`を呼び、Desktopも認証後に業務Userの確認を行う。同じSupabase project・backend環境・アカウントであれば同じsubjectから同じ業務Userへ対応する設計で、端末ペアリングコードはない。
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plist／Build Settingsから公開設定値を読み、利用者の手入力を要求しない構造。Desktopは起動時の`FOCUS_LINK_*`環境変数を読む。Release値の実際の配布設定・環境一致は未確認。
-- 認証と業務User同期が分離している。起動時の`RootTabView`はSupabase sessionがあれば業務APIの`EnsureUser`／`GetMe`成功前でもauthenticated tabへ入れる。一方、業務User同期はアカウント画面で行われる。この場合、保存済みログインに見えてもGroup／History等でAPIエラーとなり得るため、起動時同期・再試行・状態表示のテスト対象にする。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できるが、現状XCTest target／shared schemeはない。通知画面のrefreshは画面表示、APNs token受信、認証変更、foreground復帰、手動再同期から別々に開始される。重複通信が実際にAPI失敗を起こすかは未検証で、テストなしに単一flight化などの変更はしない。
+- 認証と業務User同期が分離していた。起動時の`RootTabView`はSupabase sessionだけでauthenticated tabへ進めていたため、今回`EnsureUser`／`GetMe`成功を起動条件に追加した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のテストを追加し、同期失敗後の実backend復旧は今後Simulatorで確認する。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestが追加され、SimulatorでAPI通信・起動状態テスト5件が通過した。通知画面のrefreshは画面表示、APNs token受信、認証変更、foreground復帰、手動再同期から別々に開始される。重複通信が実際にAPI失敗を起こすかは未検証で、テストなしに単一flight化などの変更はしない。
+- 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
+
+| 画面／目的 | 実装API経路 | 確認状況 |
+| --- | --- | --- |
+| 起動・アカウント | Supabase OTP／refresh、Identity `EnsureUser`・`GetMe`・`UpdateDisplayName`・`UpdateAvatar` | 起動時業務User同期とAuth状態の分離を要確認 |
+| Home | Focus `GetCurrentSession`、Reward `GetBalance`、Restriction `GetRestrictionState` | 3 API間のsession ID／version整合・部分失敗時の表示を要確認 |
+| Groups | Group `ListGroups`・`CreateGroup`・`CreateInvitation`・`AcceptInvitation`・`LeaveGroup`、REST `v1/group/work-starts` | 作成・更新後reload、空状態・エラー状態を要確認 |
+| History | Focus `ListSessions`、Reward `ListTransactions` | ページング・片方だけの失敗・reloadを要確認 |
+| 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
+| 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
+| 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | APNs token／認証／DB失敗を分離して再現。過去ログにはregister時の`internal`とSQLSTATE 2201Bがあるが、現ブランチでの再発は未確認 |
 
 ## 優先順位
 
@@ -36,9 +47,9 @@
    - 各呼び出しについて、利用画面、request/response DTO、認証、エラー表示、retry、空状態を一覧化する。
 
 2. **再現・テスト基盤**
-   - mobileにXCTestのtarget／schemeがあるか確認し、なければ最小のSimulator向けテストtargetを追加する。
-   - Connect JSON clientは`URLSession`を注入でき、transport test seamとして利用可能。初回test targetはAPI request／response境界に置く。
-   - 認証起動導線は`RootTabView`がSession有無だけで選択している。Supabase session復元と業務User同期は現在別画面に分かれており、起動時の失敗表示・再試行の一貫性を追加調査してから、必要ならstate/repository境界へ分ける。
+   - iOS Simulator向けXCTest packageと`ConnectJSONClient` schemeを追加した。
+   - `ConnectJSONClient`は`URLSession`を注入でき、transport seamでBearer header／Connect error／session欠落の3件を確認する。
+   - 認証起動状態を`AuthenticationEntryState`へ分け、業務User同期成功の要件と新規未認証・ローカル利用への分岐を2件テストした。RootView／Supabase／Connect APIの結合状態遷移は別途確認する。
    - 1つの失敗シナリオごとに、テストを先に追加して失敗を確認し、修正後に通す。
    - test用stubは通信応答を決定的に再現する目的だけに使い、アプリ機能でモックデータへ切り替える経路は作らない。
 
@@ -99,9 +110,21 @@
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`に注入可能なURLSessionを使うAPI境界から始め、必要に応じて認証状態の公開境界を追加 | 決定 |
-| ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、API依存機能に成功済みと誤認させない。既存のローカル利用は維持 | 調査中 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`を独立Simulator testに使用。必要ならRepository fakeを追加 | 初期分を実装 |
+| ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
 | 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 画面別にログと実装から棚卸しし、特定できない場合は再現手順と必要情報を記録 | 調査中 |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
+
+## テスト実行
+
+API transport／起動状態XCTestは`mobile/RewardTimeTests/Package.swift`でアプリ本体の`Data/ConnectJSONClient.swift`と`Data/AuthenticationEntryState.swift`を直接コンパイルする。Simulator UDIDは`xcrun simctl list devices available`で確認する。
+
+```sh
+cd mobile/RewardTimeTests
+xcodebuild -scheme ConnectJSONClient \
+  -destination 'platform=iOS Simulator,id=<Simulator UDID>' \
+  -derivedDataPath /private/tmp/tkb2622-connect-tests-derived \
+  CODE_SIGNING_ALLOWED=NO test
+```
