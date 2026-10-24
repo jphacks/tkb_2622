@@ -138,21 +138,21 @@ final class UsageReservationViewModel: ObservableObject {
                 reservationError = "利用枠は確保しましたが、解除状態をbackendへ報告できませんでした。通信を確認して利用中画面から再同期してください。"
             }
         } catch {
-            if error is UsageGrantRepositoryError {
+            let canDiscardPendingOperation = error is UsageGrantRepositoryError
+                || error is DeviceActivityUsageMonitorError
+                || UsageReservationFailurePolicy.shouldDiscardPendingOperation(after: error)
+            if canDiscardPendingOperation {
                 DeviceActivityUsageMonitor().stop()
                 defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
                 defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
             }
-            if let clientError = error as? ConnectJSONClient.ClientError {
-                switch clientError {
-                case .connect, .httpStatus, .missingAccessToken, .invalidResponse, .unexpectedHealthStatus:
-                    DeviceActivityUsageMonitor().stop()
-                    defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
-                    defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
-                }
+            let detail = (error as? LocalizedError)?.errorDescription
+                ?? "接続状態を確認してください。"
+            if canDiscardPendingOperation {
+                reservationError = detail
+            } else {
+                reservationError = "利用枠の確保結果が未確定です。同じ時間のまま再試行してください。\n\(detail)"
             }
-            reservationError = (error as? LocalizedError)?.errorDescription
-                ?? "利用枠の確保結果を確認できませんでした。同じ時間のまま再試行してください。"
         }
     }
 }

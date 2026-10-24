@@ -196,6 +196,14 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertTrue(viewModel.workStartError?.contains("再ログイン") == true)
     }
 
+    func testAmbiguousReservationFailureRetainsRetryMetadataPolicy() {
+        let ambiguous: Error = ConnectJSONClient.ClientError.httpStatus(502)
+        let rejected: Error = ConnectJSONClient.ClientError.connect(code: "failed_precondition")
+
+        XCTAssertFalse(UsageReservationFailurePolicy.shouldDiscardPendingOperation(after: ambiguous))
+        XCTAssertTrue(UsageReservationFailurePolicy.shouldDiscardPendingOperation(after: rejected))
+    }
+
     private func repository() -> ConfiguredDeviceRevocationRepository {
         ConfiguredDeviceRevocationRepository(defaults: defaults)
     }
