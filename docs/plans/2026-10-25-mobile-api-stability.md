@@ -13,7 +13,7 @@
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。設定画面からの認証状態変更後もRoot側で業務User同期を実行する。さらに、業務User同期失敗後に選んだlocal-only状態を再起動・前景復帰時に維持し、同期を明示的に再開するまで認証済みAPIへ進まないよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。状態resolverのhost testsは3件、local-only時の同期抑止はSimulator testで確認。SwiftUI root／Supabase／Connect APIの結合状態遷移と実backend復旧は未確認。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・認証済みAPI gate・通知の未ログイン判定／登録ゲート／順序・Home更新失敗・Device失効・Group APIエラー表示・利用枠再試行分類の32件が通過した。さらにXcodeの`RewardTimeSimulatorTests` targetを追加し、iPhone 17 Simulator (iOS 27.0) 上でDevice失効、Group API分類・作業フィード・一覧refresh失敗保持、認証入口状態、local-only時の端末API抑止、利用枠再試行方針の11件が通過した。認証入口テストは状態resolverまででありSwiftUI画面・SupabaseへのE2Eではない。端末失効のAPI応答を含むアプリ本体のSimulator buildも成功。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・認証済みAPI gate・通知の未ログイン判定／登録ゲート／順序・Home更新失敗・Device失効・Group APIエラー表示・端末設定APIエラー表示・利用枠再試行分類の34件が通過した。さらにXcodeの`RewardTimeSimulatorTests` targetを追加し、iPhone 17 Simulator (iOS 27.0) 上でDevice失効、Group API分類・作業フィード・一覧refresh失敗保持、認証入口状態、local-only時の端末API抑止、端末設定APIエラー表示、利用枠再試行方針の12件が通過した。認証入口テストは状態resolverまででありSwiftUI画面・SupabaseへのE2Eではない。端末失効のAPI応答を含むアプリ本体のSimulator buildも成功。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -28,12 +28,15 @@
 
 認証入口をコードで照合した結果、初回未ログインでログインを後回しにしていない場合は歓迎／ログイン画面を表示し、保存済みsessionがある場合は通常この画面を省略する。メールOTPの送信は新規Auth user作成を許可しているため、新規／既存メールの入口は共通である。OTP成功だけでAPI利用状態にせず、`EnsureUser`と`GetMe`が成功してから認証済み状態にする。iOSの接続値入力欄はDebug向けで、ReleaseではInfo.plist値を読むが、Release用URL・publishable key・API URLの`.xcconfig`／CI注入はまだない。Desktopも同じSupabase project・backend環境・メールOTP accountを使う構成で、ペアリングコードはない。従って、利用者が接続キーを入力しなくてよい**配布版**はまだ完成していない。新規／既存メールを用いた両アプリの実環境E2Eも未確認。
 
+ユーザー受け入れ時には「初回はログイン画面」「session復元済みの既存利用者はログイン画面を省略」「新規・既存メールとも同じOTP導線」「MobileとDesktopは同一Supabase／backend環境の同一アカウントで連携」「一般利用者は公開接続値を入力しない」を個別に確認する。初回画面は新規Simulatorで目視済みだが、現状の自動テストは状態resolverを検証しておりSwiftUI画面のUI testではない。新規／既存メールでのAuth実接続とMobile・Desktopを並行した同一業務Userの確認、配布構成の接続値自動設定は未完了。Debugは開発者向けに手入力設定を提供する。
+
 ### 既知のエラー報告と再現状況
 
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
 | 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。2026-10-25の読み取り確認では、直近90分にregister要求が9件あったが`operation failed`等のエラー記録はなく、現在の失敗は再現していない。成功完了ログもないため、要求の成否は断定できない。コード上はendpoint登録前のDevice登録が保証されず、backendはregistration IDのDevice検索に失敗するとnot_foundを返すため、この経路も候補だった。また、未ログイン／local-onlyでもrefreshやAPNs token callbackからendpoint APIを呼ぶ経路があった | 同一token重複抑止、「Device登録→通知先登録」の順序、未ログイン／local-only時にrefresh・APNs callbackからendpoint APIを呼ばない判定をhost／Simulator testsで確認済み。以前のnot_foundとDevice未登録経路が同一原因かは未確認。次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
 | 設定タブ再表示時の未ログイン端末APIエラー | 設定画面の`.task`・前景復帰・Screen Time設定変更が、local-only中も`RegisterDevice`／制限ポリシー同期を開始しうる。認証なしの`ConnectJSONClient`はAPI送信前にtoken欠落エラーを返す | `AuthenticatedAPISyncFlow`を端末設定同期前に通し、未ログイン時は要求を実行しない。host testでsigned-out時0件、authenticated時1件のoperationを確認 |
+| 端末設定APIの`not_found`／`internal`が一般的な同期失敗だけに見える | `SettingsView.performDeviceSettingsSync()`は接続エラーの種類を捨て、「端末設定を同期できません。」だけを表示していた | Connect error codeを含むLocalizedErrorの説明を表示し、未分類のエラーだけ安全な汎用文へ戻す。host 2件・Simulator 1件で確認。実API失敗の再発は未確認 |
 | Group API操作時の`internal`／`not_found`／404 | 2026-10-25の再確認でlocal API containerは稼働中、`/healthz`はHTTP 200、認証なし`ListGroups`はHTTP 401／Connect `unauthenticated`。直近2時間のoperation failure／SQLSTATE／ERROR／WARNログはなし。migration statusで1〜14がすべてapplied。これはrouteと認証入口までの確認で、認証付き成功を示さない。以前は一覧取得だけがerror helperを使い、作成・招待発行／受諾・退出は別の汎用表示を使っていたため、操作エラーの説明が揃わなかった | 全操作で共通のerror helperを使用するよう変更。Connect `unimplemented`・`internal`・`not_found`・`unauthenticated`等のhost 5件、Simulator経路1件が通過。実backendでの認証付き操作は未確認。再発時に`CreateGroup`等のoperation failureとSQLSTATEを照合する |
 | 業務User同期失敗後のlocal-only状態が復帰時に解除される | `RootTabView.restoreAuthentication()`が再起動・前景復帰後にSupabase sessionだけを見てlocal-only状態を認証済みに解決し、EnsureUser／GetMe成功なしで業務APIへ進める経路があった。設定のアカウント欄も保存sessionの復元時にbackend同期を自動再試行していた | `loginDeferred`を優先し、明示的に認証を再開するまでlocal-onlyを維持。sessionが残っていてもroot・設定・アカウント欄からbusiness APIを自動同期しない。アカウント欄は保存sessionを表示し、明示的な「アカウント情報を再同期」で同期する。host／Simulator testsで同期gateを確認 |
 | 利用枠予約の結果不明エラー | `UsageReservationViewModel`はHTTP／Connectエラーをすべて確定拒否として扱い、monitorを停止してpending operation ID・秒数を消していた。backend `Sessions.Reserve`はoperation IDでトランザクション結果をreplayするため、HTTP 5xx等の結果不明後に新規IDを作ると二重予約の恐れがある | 結果が不明なHTTP 5xx、Connect `internal`／`unavailable`、不正応答、認証token欠落ではpending requestとmonitorを保持し、同じ利用時間・operation IDで再試行する。明確な拒否4xxと端末内設定エラーは停止・解除する。host 3件とSimulator policy testで確認。実API応答喪失は未確認 |
@@ -77,7 +80,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
    - 各呼び出しについて、利用画面、request/response DTO、認証、エラー表示、retry、空状態を一覧化する。
 
 2. **再現・テスト基盤**
-   - Swift PackageのXCTestはmacOS host上で32件実行する。Xcodeの`RewardTimeSimulatorTests` targetでDevice失効API、Group APIエラー／作業フィード・一覧refresh失敗保持、認証入口状態、local-only時の端末API抑止、利用枠再試行方針の11件をiOS Simulator上で実行する。
+   - Swift PackageのXCTestはmacOS host上で34件実行する。Xcodeの`RewardTimeSimulatorTests` targetでDevice失効API、Group APIエラー／作業フィード・一覧refresh失敗保持、認証入口状態、local-only時の端末API抑止、端末設定APIエラー表示、利用枠再試行方針の12件をiOS Simulator上で実行する。
    - `ConnectJSONClient`は`URLSession`を注入でき、transport seamでBearer header／Connect error／session欠落の3件を確認する。
    - 認証起動状態を`AuthenticationEntryState`へ分け、業務User同期成功の要件と新規未認証・ローカル利用への分岐を2件テストした。RootView／Supabase／Connect APIの結合状態遷移は別途確認する。
    - 1つの失敗シナリオごとに、テストを先に追加して失敗を確認し、修正後に通す。
@@ -141,7 +144,7 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 
 | 項目 | 必要な判断 | 暫定方針 | 状態 |
 | --- | --- | --- | --- |
-| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、認証済みAPI gate、通知未ログイン判定、予約エラー分類・残高減少後の再試行可否をテストするSwift Package、およびiOS SimulatorでDevice失効Repository・Group API error／作業フィード・一覧refresh失敗保持・AuthenticationEntryState・local-only時の端末API抑止・予約再試行方針を実行するtargetを追加 | host 32件・Simulator 11件通過。初回歓迎画面は新規Simulatorで目視。画面全体・認証付き実backend連携は未検証 |
+| XCTestのseam | transport層・Repository/ViewModel層のどこまでをテスト対象とするか | `ConnectJSONClient`の注入URLSessionと`AuthenticationEntryState`、認証済みAPI gate、通知未ログイン判定、予約エラー分類・残高減少後の再試行可否をテストするSwift Package、およびiOS SimulatorでDevice失効Repository・Group API error／作業フィード・一覧refresh失敗保持・AuthenticationEntryState・local-only時の端末API抑止・端末設定エラー表示・予約再試行方針を実行するtargetを追加 | host 34件・Simulator 12件通過。初回歓迎画面は新規Simulatorで目視。画面全体・認証付き実backend連携は未検証 |
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |

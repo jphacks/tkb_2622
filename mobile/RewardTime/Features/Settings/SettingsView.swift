@@ -285,7 +285,7 @@ struct SettingsView: View {
         } catch DeviceSettingsRepositoryError.invalidConfiguration {
             deviceSyncError = "接続設定を確認してください。"
         } catch {
-            deviceSyncError = "端末設定を同期できません。"
+            deviceSyncError = DeviceSettingsSyncErrorMessage.describe(error)
         }
     }
 }

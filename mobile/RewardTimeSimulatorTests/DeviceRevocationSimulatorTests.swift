@@ -194,6 +194,14 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
+    func testDeviceSettingsErrorMessageIncludesConnectCode() {
+        let message = DeviceSettingsSyncErrorMessage.describe(
+            ConnectJSONClient.ClientError.connect(code: "not_found")
+        )
+
+        XCTAssertTrue(message.contains("(not_found)"))
+    }
+
     func testLocalOnlyStateSkipsAuthenticatedSettingsAndSessionRestoreRequests() async throws {
         var requestCount = 0
 
