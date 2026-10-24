@@ -1,11 +1,12 @@
 import Combine
+import Foundation
 
 @MainActor
 final class GroupViewModel: ObservableObject {
     enum State {
         case loading
         case loaded([MobileGroup])
-        case failed
+        case failed(String)
     }
 
     @Published private(set) var state: State = .loading
@@ -20,7 +21,26 @@ final class GroupViewModel: ObservableObject {
         do {
             state = .loaded(try await repository.fetchGroups())
         } catch {
-            state = .failed
+            state = .failed(Self.failureMessage(for: error))
+        }
+    }
+
+    private static func failureMessage(for error: Error) -> String {
+        switch error {
+        case GroupRepositoryError.missingConfiguration:
+            return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。"
+        case GroupRepositoryError.invalidConfiguration:
+            return "設定タブのSupabase接続情報とAPI URLを確認してください。"
+        case ConnectJSONClient.ClientError.httpStatus(404):
+            return "接続先のbackendにグループAPIがありません。backendを最新版に更新して再起動してください。"
+        case ConnectJSONClient.ClientError.connect(code: "internal"):
+            return "backend内部エラーです。グループ用DBマイグレーションが適用済みか確認してください。"
+        case ConnectJSONClient.ClientError.connect(code: "failed_precondition"):
+            return "業務User登録が未完了です。設定タブでアカウント接続を再確認してください。"
+        case let error as LocalizedError:
+            return error.errorDescription ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+        default:
+            return "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
         }
     }
 }

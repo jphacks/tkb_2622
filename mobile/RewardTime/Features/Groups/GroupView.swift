@@ -11,11 +11,11 @@ struct GroupView: View {
                     ProgressView("グループを読み込み中…")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            case .failed:
+            case .failed(let message):
                 SurfaceCard {
                     Label("グループを読み込めませんでした", systemImage: "wifi.exclamationmark")
                         .font(.headline)
-                    Text("ログイン状態とAPI設定を確認して、もう一度お試しください。")
+                    Text(message)
                         .font(.subheadline)
                         .foregroundStyle(AppTheme.secondaryInk)
                     Button("再読み込み") {
