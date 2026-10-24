@@ -24,6 +24,30 @@ final class AuthenticationEntryStateTests: XCTestCase {
         )
     }
 
+    func testSessionRefreshFailureKeepsAuthenticationRetryAvailable() {
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: false,
+                sessionCheckFailed: true
+            ),
+            .identitySyncRequired
+        )
+    }
+
+    func testDeferredLocalOnlyStillWinsWhenSessionRefreshFails() {
+        XCTAssertEqual(
+            AuthenticationEntryState.resolve(
+                hasValidSession: false,
+                businessUserReady: false,
+                loginDeferred: true,
+                sessionCheckFailed: true
+            ),
+            .localOnly
+        )
+    }
+
     func testDeferredLocalOnlySurvivesSavedAuthSessionWithoutCallingBusinessSync() {
         XCTAssertEqual(
             AuthenticationEntryState.resolve(

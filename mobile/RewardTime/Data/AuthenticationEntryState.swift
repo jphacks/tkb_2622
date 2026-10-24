@@ -8,9 +8,11 @@ enum AuthenticationEntryState: Equatable {
   static func resolve(
     hasValidSession: Bool,
     businessUserReady: Bool,
-    loginDeferred: Bool
+    loginDeferred: Bool,
+    sessionCheckFailed: Bool = false
   ) -> Self {
     if loginDeferred { return .localOnly }
+    if sessionCheckFailed { return .identitySyncRequired }
     if hasValidSession {
       return businessUserReady ? .authenticated : .identitySyncRequired
     }

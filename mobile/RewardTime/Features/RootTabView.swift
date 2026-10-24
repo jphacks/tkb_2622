@@ -131,13 +131,17 @@ struct RootTabView: View {
     isRestoringAuthentication = true
     defer { isRestoringAuthentication = false }
 
-    let hasSession = await hasAuthenticatedSession()
+    let sessionCheck = await checkAuthenticatedSession()
+    let hasSession = sessionCheck.hasSession
     let needsIdentitySync = AuthenticationEntryState.needsBusinessIdentitySync(
       currentState: entryState,
       loginDeferred: loginDeferred
     )
     var identityReady = !needsIdentitySync
-    if hasSession && needsIdentitySync {
+    if let sessionError = sessionCheck.errorDescription {
+      identitySyncError = "保存済みのログイン状態を更新できませんでした: \(sessionError)"
+      identityReady = false
+    } else if hasSession && needsIdentitySync {
       identitySyncError = await synchronizeBusinessIdentity()
       identityReady = identitySyncError == nil
     } else if !hasSession {
@@ -146,7 +150,8 @@ struct RootTabView: View {
     let nextState = AuthenticationEntryState.resolve(
       hasValidSession: hasSession,
       businessUserReady: identityReady,
-      loginDeferred: loginDeferred
+      loginDeferred: loginDeferred,
+      sessionCheckFailed: sessionCheck.errorDescription != nil
     )
     if nextState == .authenticated { loginDeferred = false }
     entryState = nextState
@@ -161,10 +166,16 @@ struct RootTabView: View {
   }
 
   @MainActor
-  private func hasAuthenticatedSession() async -> Bool {
-    guard let auth = MobileAppConfiguration.makeAuthService() else { return false }
-    if let session = auth.client.auth.currentSession, !session.isExpired { return true }
-    return (try? await auth.accessToken()) != nil
+  private func checkAuthenticatedSession() async -> (hasSession: Bool, errorDescription: String?) {
+    guard let auth = MobileAppConfiguration.makeAuthService() else { return (false, nil) }
+    if let session = auth.client.auth.currentSession, !session.isExpired { return (true, nil) }
+    do {
+      return (try await auth.accessToken() != nil, nil)
+    } catch {
+      // A refresh/network failure is not proof that the user signed out. Keep the session
+      // recoverable and let the retry view explain the failure instead of showing welcome.
+      return (true, AuthenticationErrorMessage.describe(error))
+    }
   }
 
   @MainActor
