@@ -101,6 +101,7 @@ func groupMessage(group domain.Group) *v1.Group {
 		out.Members = append(out.Members, &v1.GroupMember{
 			IsCurrentUser: member.IsCurrentUser,
 			JoinedAt:      timestamppb.New(member.JoinedAt),
+			DisplayName:   member.DisplayName,
 		})
 	}
 	return out

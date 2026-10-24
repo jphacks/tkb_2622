@@ -48,7 +48,7 @@ Screen Time → MobileScreenTimeController / DeviceActivityMonitorExtension
 | 10 残高を使う | `Features/Usage/UsageReservationView.swift`。一時停止中の作業セッションに対して`ReserveUsageGrant`を呼び、利用枠を確保する。選択アプリのみを対象とし、通信失敗時は同じoperation IDで再試行する |
 | 11 利用中 | 同ファイルの `ActiveUsageView`。DeviceActivityの1分単位イベントをApp Group経由で受け取り、`GetUsageGrant`／`ReportUsage`と制限状態報告で同期する。Monitor extensionとApp Groupsの署名・実機動作確認は未完了 |
 | 12 設定 | `Features/Settings/SettingsView.swift`, `Data/MobileScreenTimeController.swift`, `Data/DeviceSettingsRepository.swift`。FamilyControlsの本人認可とFamilyActivityPickerによる制限対象・常時許可アプリ選択、制限モードの端末内保存、iPhoneの`RegisterDevice`と`GetRestrictionPolicy`／`UpdateRestrictionPolicy`同期を実装。常時許可アプリは両モードのShield・利用時間計測対象から除外する。Safariを選ばないよう案内するが、opaque tokenのため選択内容の名前はアプリ側で検証できない。実機動作は未確認 |
-| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`／`CreateGroup`／`CreateInvitation`／`AcceptInvitation`／`LeaveGroup`に接続。メンバー全員が7日・1回限りの招待リンクを共有でき、最終メンバー退出時はグループを削除する。招待は`rewardtime://invite?token=...`のアプリリンク。複数グループは切替表示。表示名・開始通知の画面表示・APNs配信は未接続。backendには30秒間隔で読む`GET /v1/group/work-starts`を追加済み |
+| 13 グループ | `Features/Groups/GroupView.swift`, `Data/GroupRepository.swift`。認証付き`ListGroups`／`CreateGroup`／`CreateInvitation`／`AcceptInvitation`／`LeaveGroup`に接続。メンバー全員が7日・1回限りの招待リンクを共有でき、最終メンバー退出時はグループを削除する。招待は`rewardtime://invite?token=...`のアプリリンク。複数グループを切替表示し、本人の公開表示名を表示。作業開始の事実・時刻をグループ画面で30秒ごとに取得。PC表示・APNs配信は未接続 |
 | 履歴 | `Features/History/HistoryView.swift`, `Data/HistoryRepository.swift`。`ListSessions`で終了・中止済み作業と報酬要約を、`ListTransactions`で獲得・利用・破棄の台帳をページング表示 |
 | 14 通知設定 | `Features/Notifications/NotificationSettingsView.swift`。iOS通知許可の実状態を取得し、未決定時の許可要求・拒否後の設定画面への誘導を行う。APNs登録・配信は未接続 |
 

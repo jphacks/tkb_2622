@@ -22,12 +22,13 @@ func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Group, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT g.id, g.name, g.created_at, m.user_id = $1 AS is_current_user, m.joined_at
+		SELECT g.id, g.name, g.created_at, m.user_id = $1 AS is_current_user, u.display_name, m.joined_at
 		FROM app.groups AS g
 		JOIN app.group_memberships AS mine
 		  ON mine.group_id = g.id AND mine.user_id = $1 AND mine.status = 'ACTIVE'
 		JOIN app.group_memberships AS m
 		  ON m.group_id = g.id AND m.status = 'ACTIVE'
+		JOIN app.users AS u ON u.id = m.user_id
 		ORDER BY g.created_at DESC, g.id, m.joined_at, m.id`, uuid.MustParse(userID))
 	if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]domain.Gr
 		var id uuid.UUID
 		var group domain.Group
 		var member domain.Member
-		if err := rows.Scan(&id, &group.Name, &group.CreatedAt, &member.IsCurrentUser, &member.JoinedAt); err != nil {
+		if err := rows.Scan(&id, &group.Name, &group.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.JoinedAt); err != nil {
 			return nil, err
 		}
 		if len(groups) == 0 || id != currentID {
@@ -120,7 +121,8 @@ func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name 
 	defer tx.Rollback()
 
 	var status string
-	err = tx.QueryRowContext(ctx, `SELECT status FROM app.users WHERE id = $1 FOR UPDATE`, userIDValue).Scan(&status)
+	var displayName string
+	err = tx.QueryRowContext(ctx, `SELECT status, display_name FROM app.users WHERE id = $1 FOR UPDATE`, userIDValue).Scan(&status, &displayName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Group{}, apperr.ErrNotFound
 	}
@@ -172,7 +174,7 @@ func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name 
 	out.ID = groupID.String()
 	out.Name = name
 	out.CreatedAt = out.CreatedAt.UTC()
-	out.Members = []domain.Member{{IsCurrentUser: true, JoinedAt: joinedAt.Time.UTC()}}
+	out.Members = []domain.Member{{IsCurrentUser: true, DisplayName: displayName, JoinedAt: joinedAt.Time.UTC()}}
 	response, err := json.Marshal(out)
 	if err != nil {
 		return domain.Group{}, err
@@ -410,10 +412,11 @@ func (r *Repository) LeaveGroup(ctx context.Context, userID, operationID, groupI
 
 func groupSnapshot(ctx context.Context, tx *sql.Tx, groupID, currentUserID uuid.UUID) (domain.Group, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT g.id, g.name, g.created_at, m.user_id = $2 AS is_current_user, m.joined_at
+		SELECT g.id, g.name, g.created_at, m.user_id = $2 AS is_current_user, u.display_name, m.joined_at
 		FROM app.groups AS g
 		JOIN app.group_memberships AS m
 		  ON m.group_id = g.id AND m.status = 'ACTIVE'
+		JOIN app.users AS u ON u.id = m.user_id
 		WHERE g.id = $1
 		ORDER BY m.joined_at, m.id`, groupID, currentUserID)
 	if err != nil {
@@ -424,7 +427,7 @@ func groupSnapshot(ctx context.Context, tx *sql.Tx, groupID, currentUserID uuid.
 	for rows.Next() {
 		var id uuid.UUID
 		var member domain.Member
-		if err = rows.Scan(&id, &out.Name, &out.CreatedAt, &member.IsCurrentUser, &member.JoinedAt); err != nil {
+		if err = rows.Scan(&id, &out.Name, &out.CreatedAt, &member.IsCurrentUser, &member.DisplayName, &member.JoinedAt); err != nil {
 			return domain.Group{}, err
 		}
 		out.ID = id.String()

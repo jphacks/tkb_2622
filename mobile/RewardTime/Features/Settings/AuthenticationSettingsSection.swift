@@ -17,6 +17,7 @@ struct AuthenticationSettingsSection: View {
     @State private var auth: SupabaseAuthService?
     @State private var authenticatedEmail: String?
     @State private var identity: MobileIdentity?
+    @State private var displayNameDraft = ""
     @State private var message: String?
     @State private var isError = false
 
@@ -143,6 +144,9 @@ struct AuthenticationSettingsSection: View {
             if email.isEmpty { email = lastEmail }
             Task { await restoreSessionIfPresent() }
         }
+        .onChange(of: identity?.displayName) { _, newValue in
+            if let newValue { displayNameDraft = newValue }
+        }
     }
 
     @ViewBuilder
@@ -160,6 +164,19 @@ struct AuthenticationSettingsSection: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.teal)
 #endif
+            Text("グループに表示する名前")
+                .font(.caption.weight(.semibold))
+            TextField("1〜30文字", text: $displayNameDraft)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("groupDisplayName")
+            Button("表示名を保存") {
+                Task { await saveDisplayName() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking || displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || displayNameDraft == identity.displayName)
+
             HStack {
 #if DEBUG
                 Button("業務Userを再取得") {
@@ -329,6 +346,36 @@ struct AuthenticationSettingsSection: View {
         setMessage("ログインしました。", error: false)
 #endif
         onAuthenticationChanged()
+    }
+
+    @MainActor
+    private func saveDisplayName() async {
+        guard let service = auth ?? makeAuthService(),
+              let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL else {
+            setMessage("表示名を保存できません。ログイン状態とAPI設定を確認してください。", error: true)
+            return
+        }
+        let displayName = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !displayName.isEmpty, displayName.unicodeScalars.count <= 30 else {
+            setMessage("表示名は前後の空白を除いて1〜30文字にしてください。", error: true)
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let repository = IdentityAPIRepository(
+                baseURL: try validatedURL(apiBaseURLText, label: "Connect API URL"),
+                auth: service
+            )
+            let updatedIdentity = try await repository.updateDisplayName(displayName)
+            auth = service
+            identity = updatedIdentity
+            displayNameDraft = updatedIdentity.displayName
+            onAuthenticationChanged()
+            setMessage("表示名を保存しました。グループメンバーに表示されます。", error: false)
+        } catch {
+            setMessage("表示名を保存できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
+        }
     }
 
     @MainActor

@@ -10,8 +10,11 @@ final class GroupViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    @Published private(set) var workStarts: [MobileGroupWorkStart] = []
+    @Published private(set) var workStartError: String?
     private let repository: any GroupRepository
     private var loadGeneration = 0
+    private var isLoadingWorkStarts = false
 
     init(repository: any GroupRepository) {
         self.repository = repository
@@ -28,6 +31,37 @@ final class GroupViewModel: ObservableObject {
         } catch {
             guard requestGeneration == loadGeneration else { return }
             state = .failed(Self.failureMessage(for: error))
+        }
+    }
+
+    func runWorkStartPolling() async {
+        await load()
+        while !Task.isCancelled {
+            await refreshWorkStarts()
+            do {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            } catch {
+                return
+            }
+        }
+    }
+
+    func refreshWorkStarts() async {
+        guard !isLoadingWorkStarts,
+              case .loaded(let groups) = state,
+              !groups.isEmpty else { return }
+        isLoadingWorkStarts = true
+        defer { isLoadingWorkStarts = false }
+        do {
+            let newEvents = try await repository.fetchWorkStarts()
+            workStartError = nil
+            let knownIDs = Set(workStarts.map(\.id))
+            workStarts = Array((newEvents.filter { !knownIDs.contains($0.id) } + workStarts)
+                .sorted { $0.startedAt.date > $1.startedAt.date }
+                .prefix(30))
+        } catch {
+            workStartError = (error as? LocalizedError)?.errorDescription
+                ?? "作業開始フィードを更新できませんでした。"
         }
     }
 

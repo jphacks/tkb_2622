@@ -3,13 +3,15 @@ import Foundation
 struct MobileGroup: Decodable, Identifiable {
     struct Member: Decodable {
         let isCurrentUser: Bool
+        let displayName: String
         let joinedAt: GroupProtoTimestamp?
 
-        private enum CodingKeys: String, CodingKey { case isCurrentUser, joinedAt }
+        private enum CodingKeys: String, CodingKey { case isCurrentUser, displayName, joinedAt }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             isCurrentUser = try container.decodeIfPresent(Bool.self, forKey: .isCurrentUser) ?? false
+            displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? "メンバー"
             joinedAt = try container.decodeIfPresent(GroupProtoTimestamp.self, forKey: .joinedAt)
         }
     }
@@ -54,10 +56,23 @@ struct GroupProtoTimestamp: Decodable {
 
 protocol GroupRepository {
     func fetchGroups() async throws -> [MobileGroup]
+    func fetchWorkStarts() async throws -> [MobileGroupWorkStart]
     func createGroup(name: String, operationID: String) async throws -> MobileGroup
     func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation
     func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup
     func leaveGroup(groupID: String, operationID: String) async throws -> Bool
+}
+
+struct MobileGroupWorkStart: Decodable, Identifiable {
+    let eventID: String
+    let startedAt: GroupProtoTimestamp
+
+    var id: String { eventID }
+
+    private enum CodingKeys: String, CodingKey {
+        case eventID = "event_id"
+        case startedAt = "started_at"
+    }
 }
 
 struct MobileGroupInvitation {
@@ -136,9 +151,36 @@ struct APIGroupRepository: GroupRepository {
         }
     }
 
-    private let client: ConnectJSONClient
+    private struct WorkStartsResponse: Decodable {
+        let events: [MobileGroupWorkStart]
+        let nextStartedAt: String?
+        let nextEventID: String?
 
-    init(baseURL: URL, auth: any AccessTokenProviding) {
+        private enum CodingKeys: String, CodingKey {
+            case events
+            case nextStartedAt = "next_started_at"
+            case nextEventID = "next_event_id"
+        }
+    }
+
+    private struct WorkStartCursor: Codable {
+        let startedAt: String
+        let eventID: String?
+    }
+
+    private static func rfc3339String(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+
+    private let client: ConnectJSONClient
+    private let baseURL: URL
+    private let auth: SupabaseAuthService
+
+    init(baseURL: URL, auth: SupabaseAuthService) {
+        self.baseURL = baseURL
+        self.auth = auth
         client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
     }
 
@@ -150,6 +192,38 @@ struct APIGroupRepository: GroupRepository {
             responseType: ListGroupsResponse.self
         )
         return response.groups
+    }
+
+    func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
+        let userID = auth.authenticatedUserID ?? "unknown"
+        let apiLocation = "\(baseURL.scheme ?? "http")-\(baseURL.host ?? "api")-\(baseURL.port ?? 0)"
+        let cursorKey = "mobile.group.work-start-cursor.\(apiLocation).\(userID)"
+        let defaults = UserDefaults.standard
+        let cursor = defaults.data(forKey: cursorKey)
+            .flatMap { try? JSONDecoder().decode(WorkStartCursor.self, from: $0) }
+            ?? WorkStartCursor(startedAt: Self.rfc3339String(from: Date()), eventID: nil)
+
+        var queryItems = [URLQueryItem(name: "after_started_at", value: cursor.startedAt)]
+        if let eventID = cursor.eventID {
+            queryItems.append(URLQueryItem(name: "after_event_id", value: eventID))
+        }
+        queryItems.append(URLQueryItem(name: "page_size", value: "50"))
+
+        let response: WorkStartsResponse = try await client.get(
+            path: "v1/group/work-starts",
+            queryItems: queryItems,
+            responseType: WorkStartsResponse.self
+        )
+        if let nextStartedAt = response.nextStartedAt {
+            let nextCursor = WorkStartCursor(startedAt: nextStartedAt, eventID: response.nextEventID)
+            if let data = try? JSONEncoder().encode(nextCursor) {
+                defaults.set(data, forKey: cursorKey)
+            }
+        } else if defaults.data(forKey: cursorKey) == nil,
+                  let data = try? JSONEncoder().encode(cursor) {
+            defaults.set(data, forKey: cursorKey)
+        }
+        return response.events
     }
 
     func createGroup(name: String, operationID: String) async throws -> MobileGroup {
@@ -196,6 +270,10 @@ struct APIGroupRepository: GroupRepository {
 struct ConfiguredGroupRepository: GroupRepository {
     func fetchGroups() async throws -> [MobileGroup] {
         try await repository().fetchGroups()
+    }
+
+    func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
+        try await repository().fetchWorkStarts()
     }
 
     func createGroup(name: String, operationID: String) async throws -> MobileGroup {

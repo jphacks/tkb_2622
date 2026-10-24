@@ -4,6 +4,7 @@ import "time"
 
 type Member struct {
 	IsCurrentUser bool
+	DisplayName   string
 	JoinedAt      time.Time
 }
 

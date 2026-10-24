@@ -38,6 +38,9 @@ const (
 	IdentityServiceEnsureUserProcedure = "/identity.v1.IdentityService/EnsureUser"
 	// IdentityServiceGetMeProcedure is the fully-qualified name of the IdentityService's GetMe RPC.
 	IdentityServiceGetMeProcedure = "/identity.v1.IdentityService/GetMe"
+	// IdentityServiceUpdateDisplayNameProcedure is the fully-qualified name of the IdentityService's
+	// UpdateDisplayName RPC.
+	IdentityServiceUpdateDisplayNameProcedure = "/identity.v1.IdentityService/UpdateDisplayName"
 	// IdentityServiceRegisterDeviceProcedure is the fully-qualified name of the IdentityService's
 	// RegisterDevice RPC.
 	IdentityServiceRegisterDeviceProcedure = "/identity.v1.IdentityService/RegisterDevice"
@@ -53,6 +56,7 @@ const (
 type IdentityServiceClient interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
+	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -78,6 +82,11 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			baseURL+IdentityServiceGetMeProcedure,
 			opts...,
 		),
+		updateDisplayName: connect.NewClient[v1.UpdateDisplayNameRequest, v1.UpdateDisplayNameResponse](
+			httpClient,
+			baseURL+IdentityServiceUpdateDisplayNameProcedure,
+			opts...,
+		),
 		registerDevice: connect.NewClient[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse](
 			httpClient,
 			baseURL+IdentityServiceRegisterDeviceProcedure,
@@ -98,11 +107,12 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // identityServiceClient implements IdentityServiceClient.
 type identityServiceClient struct {
-	ensureUser     *connect.Client[v1.EnsureUserRequest, v1.EnsureUserResponse]
-	getMe          *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
-	registerDevice *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
-	listDevices    *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	revokeDevice   *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	ensureUser        *connect.Client[v1.EnsureUserRequest, v1.EnsureUserResponse]
+	getMe             *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
+	updateDisplayName *connect.Client[v1.UpdateDisplayNameRequest, v1.UpdateDisplayNameResponse]
+	registerDevice    *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
+	listDevices       *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeDevice      *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
 }
 
 // EnsureUser calls identity.v1.IdentityService.EnsureUser.
@@ -113,6 +123,11 @@ func (c *identityServiceClient) EnsureUser(ctx context.Context, req *connect.Req
 // GetMe calls identity.v1.IdentityService.GetMe.
 func (c *identityServiceClient) GetMe(ctx context.Context, req *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error) {
 	return c.getMe.CallUnary(ctx, req)
+}
+
+// UpdateDisplayName calls identity.v1.IdentityService.UpdateDisplayName.
+func (c *identityServiceClient) UpdateDisplayName(ctx context.Context, req *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error) {
+	return c.updateDisplayName.CallUnary(ctx, req)
 }
 
 // RegisterDevice calls identity.v1.IdentityService.RegisterDevice.
@@ -134,6 +149,7 @@ func (c *identityServiceClient) RevokeDevice(ctx context.Context, req *connect.R
 type IdentityServiceHandler interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
+	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -153,6 +169,11 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 	identityServiceGetMeHandler := connect.NewUnaryHandler(
 		IdentityServiceGetMeProcedure,
 		svc.GetMe,
+		opts...,
+	)
+	identityServiceUpdateDisplayNameHandler := connect.NewUnaryHandler(
+		IdentityServiceUpdateDisplayNameProcedure,
+		svc.UpdateDisplayName,
 		opts...,
 	)
 	identityServiceRegisterDeviceHandler := connect.NewUnaryHandler(
@@ -176,6 +197,8 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceEnsureUserHandler.ServeHTTP(w, r)
 		case IdentityServiceGetMeProcedure:
 			identityServiceGetMeHandler.ServeHTTP(w, r)
+		case IdentityServiceUpdateDisplayNameProcedure:
+			identityServiceUpdateDisplayNameHandler.ServeHTTP(w, r)
 		case IdentityServiceRegisterDeviceProcedure:
 			identityServiceRegisterDeviceHandler.ServeHTTP(w, r)
 		case IdentityServiceListDevicesProcedure:
@@ -197,6 +220,10 @@ func (UnimplementedIdentityServiceHandler) EnsureUser(context.Context, *connect.
 
 func (UnimplementedIdentityServiceHandler) GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.GetMe is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.UpdateDisplayName is not implemented"))
 }
 
 func (UnimplementedIdentityServiceHandler) RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {

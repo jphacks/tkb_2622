@@ -72,20 +72,19 @@ struct GroupView: View {
                     groupCard(group)
                 }
 
-                SurfaceCard {
-                    Label("未対応のグループ機能", systemImage: "info.circle")
-                        .font(.subheadline.weight(.bold))
-                    Text("作業開始フィードとメンバーの表示名はbackend APIが未対応です。")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                workStartFeed
             }
         }
-        .refreshable { await model.load() }
-        .task { await model.load() }
+        .refreshable {
+            await model.load()
+            await model.refreshWorkStarts()
+        }
+        .task { await model.runWorkStartPolling() }
         .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-            Task { await model.load() }
+            Task {
+                await model.load()
+                await model.refreshWorkStarts()
+            }
         }
         .navigationTitle("グループ")
         .navigationBarTitleDisplayMode(.inline)
@@ -202,6 +201,7 @@ struct GroupView: View {
             let group = try await model.createGroup(name: newGroupName, operationID: operationID)
             selectedGroupID = group.id
             isShowingCreateGroup = false
+            await model.refreshWorkStarts()
         } catch {
             if let clientError = error as? ConnectJSONClient.ClientError,
                case .connect(code: "invalid_argument") = clientError {
@@ -236,6 +236,7 @@ struct GroupView: View {
             let group = try await model.acceptInvitation(token: token, operationID: operationID)
             selectedGroupID = group.id
             clearInvitationToken()
+            await model.refreshWorkStarts()
         } catch {
             acceptError = invitationFailureMessage(error)
             isShowingAcceptInvitation = true
@@ -340,6 +341,40 @@ struct GroupView: View {
         return groups.first
     }
 
+    private var workStartFeed: some View {
+        SurfaceCard {
+            Label("作業開始フィード", systemImage: "clock.arrow.circlepath")
+                .font(.subheadline.weight(.bold))
+
+            if let workStartError = model.workStartError {
+                Text(workStartError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if model.workStarts.isEmpty {
+                Text("新しい作業開始はありません。30秒ごとに確認します。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            } else {
+                ForEach(model.workStarts) { event in
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.2.fill")
+                            .foregroundStyle(AppTheme.primary)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("グループメンバーが作業を開始しました")
+                                .font(.subheadline.weight(.medium))
+                            Text(event.startedAt.date.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.secondaryInk)
+                        }
+                    }
+                }
+                Text("30秒ごとに確認します。")
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            }
+        }
+    }
+
     private func groupCard(_ group: MobileGroup) -> some View {
         SurfaceCard {
             HStack(alignment: .top) {
@@ -369,10 +404,10 @@ struct GroupView: View {
                     Image(systemName: member.isCurrentUser ? "person.crop.circle.fill" : "person.crop.circle")
                         .font(.title2)
                         .foregroundStyle(member.isCurrentUser ? AppTheme.primary : AppTheme.secondaryInk)
-                    Text(member.isCurrentUser ? "あなた" : "メンバー")
+                    Text(member.displayName)
                         .font(.subheadline.weight(.medium))
                     if member.isCurrentUser {
-                        Text("本人")
+                        Text("あなた")
                             .font(.caption)
                             .foregroundStyle(AppTheme.secondaryInk)
                     }
