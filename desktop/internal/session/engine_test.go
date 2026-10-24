@@ -189,6 +189,23 @@ func TestEngineFinishingPendingPauseSyncsAndDiscardsBalance(t *testing.T) {
 	}
 }
 
+func TestEngineClearsCloudBalanceWhenAccountSignsOut(t *testing.T) {
+	now := time.Date(2026, time.October, 24, 16, 30, 0, 0, time.UTC)
+	engine := New("macos", now)
+	engine.state.Session = &WorkSession{ID: "session-1", Status: "RUNNING", ServerVersion: 1}
+	if !engine.SetCloudBalance("session-1", 90, now) {
+		t.Fatal("ログイン中のセッション残高を設定できなかった")
+	}
+	if got := engine.Snapshot().BalanceSeconds; got == nil || *got != 90 {
+		t.Fatalf("設定後残高 = %v、90を期待", got)
+	}
+
+	engine.SetAccount(AccountState{Status: "signedOut"}, now.Add(time.Second))
+	if got := engine.Snapshot().BalanceSeconds; got != nil {
+		t.Fatalf("ログアウト後に前アカウントの残高が残った: %v", *got)
+	}
+}
+
 func TestEngineRequiresPermissionAndNetworkToStart(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -75,6 +75,32 @@ export namespace session {
 	        this.category = source["category"];
 	    }
 	}
+	export class CloudSession {
+	    id: string;
+	    taskId: string;
+	    name: string;
+	    status: string;
+	    version: number;
+	    ownedByThisDevice: boolean;
+	    trackingOnly: boolean;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new CloudSession(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.taskId = source["taskId"];
+	        this.name = source["name"];
+	        this.status = source["status"];
+	        this.version = source["version"];
+	        this.ownedByThisDevice = source["ownedByThisDevice"];
+	        this.trackingOnly = source["trackingOnly"];
+	        this.message = source["message"];
+	    }
+	}
 	export class Settings {
 	    tasks: Task[];
 	    selectedTaskId: string;
@@ -263,6 +289,8 @@ export namespace session {
 	    name: string;
 	    status: string;
 	    task: Task;
+	    serverVersion?: number;
+	    trackingOnly?: boolean;
 	    classifications?: Classification[];
 	    rulesVersion?: string;
 	    elapsedSeconds: number;
@@ -278,6 +306,8 @@ export namespace session {
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.task = this.convertValues(source["task"], Task);
+	        this.serverVersion = source["serverVersion"];
+	        this.trackingOnly = source["trackingOnly"];
 	        this.classifications = this.convertValues(source["classifications"], Classification);
 	        this.rulesVersion = source["rulesVersion"];
 	        this.elapsedSeconds = source["elapsedSeconds"];
@@ -308,6 +338,8 @@ export namespace session {
 	    mode: string;
 	    updatedAt: string;
 	    session?: WorkSession;
+	    cloudSession?: CloudSession;
+	    cloudOperationPending?: boolean;
 	    balanceSeconds?: number;
 	    sync: string;
 	    permission: string;
@@ -333,6 +365,8 @@ export namespace session {
 	        this.mode = source["mode"];
 	        this.updatedAt = source["updatedAt"];
 	        this.session = this.convertValues(source["session"], WorkSession);
+	        this.cloudSession = this.convertValues(source["cloudSession"], CloudSession);
+	        this.cloudOperationPending = source["cloudOperationPending"];
 	        this.balanceSeconds = source["balanceSeconds"];
 	        this.sync = source["sync"];
 	        this.permission = source["permission"];

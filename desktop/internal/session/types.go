@@ -17,10 +17,23 @@ type WorkSession struct {
 	Name            string           `json:"name"`
 	Status          string           `json:"status"`
 	Task            Task             `json:"task"`
+	ServerVersion   int64            `json:"serverVersion,omitempty"`
+	TrackingOnly    bool             `json:"trackingOnly,omitempty"`
 	Classifications []Classification `json:"classifications,omitempty"`
 	RulesVersion    string           `json:"rulesVersion,omitempty"`
 	ElapsedSeconds  int              `json:"elapsedSeconds"`
 	Evaluation      string           `json:"evaluation"`
+}
+
+type CloudSession struct {
+	ID                string `json:"id"`
+	TaskID            string `json:"taskId"`
+	Name              string `json:"name"`
+	Status            string `json:"status"`
+	Version           int64  `json:"version"`
+	OwnedByThisDevice bool   `json:"ownedByThisDevice"`
+	TrackingOnly      bool   `json:"trackingOnly"`
+	Message           string `json:"message"`
 }
 
 type Capability struct {
@@ -76,24 +89,26 @@ type Result struct {
 }
 
 type Snapshot struct {
-	Revision             int                   `json:"revision"`
-	Platform             string                `json:"platform"`
-	Mode                 string                `json:"mode"`
-	UpdatedAt            string                `json:"updatedAt"`
-	Session              *WorkSession          `json:"session"`
-	BalanceSeconds       *int                  `json:"balanceSeconds"`
-	Sync                 string                `json:"sync"`
-	Permission           string                `json:"permission"`
-	Online               bool                  `json:"online"`
-	Monitor              MonitorStatus         `json:"monitor"`
-	RestrictionDesired   string                `json:"restrictionDesired"`
-	RestrictionConfirmed bool                  `json:"restrictionConfirmed"`
-	Settings             Settings              `json:"settings"`
-	History              []Result              `json:"history"`
-	Result               *Result               `json:"result"`
-	Actions              map[string]Capability `json:"actions"`
-	Failure              *Failure              `json:"failure"`
-	Account              AccountState          `json:"account"`
+	Revision              int                   `json:"revision"`
+	Platform              string                `json:"platform"`
+	Mode                  string                `json:"mode"`
+	UpdatedAt             string                `json:"updatedAt"`
+	Session               *WorkSession          `json:"session"`
+	CloudSession          *CloudSession         `json:"cloudSession,omitempty"`
+	CloudOperationPending bool                  `json:"cloudOperationPending,omitempty"`
+	BalanceSeconds        *int                  `json:"balanceSeconds"`
+	Sync                  string                `json:"sync"`
+	Permission            string                `json:"permission"`
+	Online                bool                  `json:"online"`
+	Monitor               MonitorStatus         `json:"monitor"`
+	RestrictionDesired    string                `json:"restrictionDesired"`
+	RestrictionConfirmed  bool                  `json:"restrictionConfirmed"`
+	Settings              Settings              `json:"settings"`
+	History               []Result              `json:"history"`
+	Result                *Result               `json:"result"`
+	Actions               map[string]Capability `json:"actions"`
+	Failure               *Failure              `json:"failure"`
+	Account               AccountState          `json:"account"`
 }
 
 type AccountState struct {

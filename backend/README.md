@@ -115,11 +115,12 @@ gcloud run compose up compose.deploy.yaml --project "$PROJECT_ID" --region "$REG
 Go 1.26.8を使用します．依存バージョンは`go.mod`／`go.sum`で固定します．
 
 ```bash
+go test ./...
 go build ./...
 go vet ./...
 docker compose -f compose.local.yaml config --quiet
 ```
 
-テストコードは今回追加していません．ローカルで起動とヘルスチェックを確認できます．DB状態は`make migrate-status`で確認します．
+ローカルで起動とヘルスチェックを確認できます．DB状態は`make migrate-status`で確認します．
 
 SQLは`migrations/postgres`のgoose SQLをスキーマの正本として，sqlc（`sqlc.yaml`，PostgreSQLエンジン）でGoコードを生成します．APIはProtocol Buffers / BufでConnectのRPCを定義・生成します（`make -C backend generate`）．業務機能の追加時も同じ流れでモジュールごとに追加します．

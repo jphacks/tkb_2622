@@ -6,10 +6,10 @@ info:
     Connect RPC（JSON）のAPI仕様．protoから生成するため直接編集しない（`make -C backend generate`）．
     すべてのRPCに Supabase のアクセストークン（右上の Authorize）が必要．
 
-    **準備**：EnsureUser → 各端末で RegisterDevice（PCは MACOS／WINDOWS，iPhoneは IOS）→ iPhoneで UpdateRestrictionPolicy（enabled=true）→ PCで CreateTask．
+    **準備**：EnsureUser → PCを RegisterDevice（MACOS／WINDOWS）→ CreateTask．iPhone制限を使う場合はiPhoneも登録し，UpdateRestrictionPolicy（enabled=true）を行う．
 
     **基本ループ**
-    1. PC：StartSession（iPhoneへ制限を要求）
+    1. PC：StartSession（有効なiPhoneがなければtracking-onlyで開始）
     2. PC：UploadActivityBatch を seq=1,2,… で定期送信．作業時間（TASK＋RELATED_TRANSITION）の1/3が秒単位切り捨てで残高に付与される
     3. PC：PauseSession（last_seq に最後に送った seq）
     4. iPhone：ReserveUsageGrant で残高から秒数を確保 → ReportRestrictionState（解除適用）→ ReportUsage（累積の実利用秒数）

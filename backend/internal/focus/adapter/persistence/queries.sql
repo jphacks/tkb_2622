@@ -9,8 +9,8 @@ SELECT * FROM app.tasks WHERE user_id = $1 AND id = $2;
 -- name: ListTasks :many
 SELECT * FROM app.tasks WHERE user_id = $1 AND id > $2 ORDER BY id LIMIT $3;
 -- name: CreateSession :exec
-INSERT INTO app.work_sessions (id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+INSERT INTO app.work_sessions (id, user_id, device_id, task_id, task_name, category, mode, planned_seconds, minimum_seconds, status, version, started_at, running_since, tracking_only)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
 -- name: GetSession :one
 SELECT * FROM app.work_sessions WHERE user_id = $1 AND id = $2;
 -- name: CurrentSession :one

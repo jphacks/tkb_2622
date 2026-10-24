@@ -191,4 +191,5 @@ type AppWorkSession struct {
 	UnknownMillis      int64
 	IdleMillis         int64
 	FinalSegments      json.RawMessage
+	TrackingOnly       bool
 }
