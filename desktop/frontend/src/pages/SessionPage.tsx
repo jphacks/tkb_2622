@@ -7,6 +7,7 @@ export interface PageProps {
   state: Snapshot;
   busy: boolean;
   getClassificationCandidates?: () => Promise<ClassificationCandidate[]>;
+  captureCurrentClassificationCandidate?: () => Promise<ClassificationCandidate>;
   execute: (command: Command) => Promise<Snapshot | null>;
   requestEmailOTP: (email: string) => Promise<Snapshot | null>;
   verifyEmailOTP: (email: string, code: string) => Promise<Snapshot | null>;

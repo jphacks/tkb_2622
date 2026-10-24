@@ -29,6 +29,9 @@ export class DesktopStore {
 	async getClassificationCandidates(): Promise<ClassificationCandidate[]> {
 		return this.bridge.getClassificationCandidates();
 	}
+	async captureCurrentClassificationCandidate(): Promise<ClassificationCandidate> {
+		return this.bridge.captureCurrentClassificationCandidate();
+	}
 	async requestEmailOTP(email: string): Promise<Snapshot | null> {
 		return this.perform(() => this.bridge.requestEmailOTP(email));
 	}

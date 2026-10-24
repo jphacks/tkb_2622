@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"sync"
 	"time"
@@ -13,7 +14,10 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const StateEvent = "desktop:state"
+const (
+	StateEvent                 = "desktop:state"
+	classificationCaptureDelay = 5 * time.Second
+)
 
 type App struct {
 	mu                 sync.Mutex
@@ -205,6 +209,37 @@ func (a *App) GetClassificationCandidates() ([]monitor.ClassificationCandidate, 
 		return []monitor.ClassificationCandidate{}, nil
 	}
 	return monitor.ReadClassificationCandidates(state.Session.ID)
+}
+
+func (a *App) CaptureCurrentClassificationCandidate() (monitor.ClassificationCandidate, error) {
+	ctx := a.context()
+	a.mu.Lock()
+	state := a.engine.Snapshot()
+	if state.Session != nil && (state.Session.Status == "RUNNING" || state.Session.Status == "PAUSED") {
+		a.mu.Unlock()
+		return monitor.ClassificationCandidate{}, errors.New("cannot read a candidate during an active work session")
+	}
+	if a.recorder == nil {
+		a.mu.Unlock()
+		return monitor.ClassificationCandidate{}, errors.New("native collector is unavailable")
+	}
+	a.mu.Unlock()
+
+	timer := time.NewTimer(classificationCaptureDelay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		return monitor.ClassificationCandidate{}, ctx.Err()
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	state = a.engine.Snapshot()
+	if state.Session != nil && (state.Session.Status == "RUNNING" || state.Session.Status == "PAUSED") {
+		return monitor.ClassificationCandidate{}, errors.New("cannot read a candidate during an active work session")
+	}
+	return a.recorder.CaptureCurrentCandidate(ctx)
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {

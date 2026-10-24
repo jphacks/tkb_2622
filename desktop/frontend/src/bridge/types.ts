@@ -31,6 +31,7 @@ export type Command =
 export interface DesktopBridge {
   getStartupState(): Promise<Snapshot>;
   getClassificationCandidates(): Promise<ClassificationCandidate[]>;
+  captureCurrentClassificationCandidate(): Promise<ClassificationCandidate>;
   execute(command: Command): Promise<Snapshot>;
   requestEmailOTP(email: string): Promise<Snapshot>;
   verifyEmailOTP(email: string, code: string): Promise<Snapshot>;

@@ -288,6 +288,22 @@ func (r *Recorder) ReadRecords() ([]Record, error) {
 	return records, nil
 }
 
+// CaptureCurrentCandidate reads the foreground app or browser domain without saving a session record.
+func (r *Recorder) CaptureCurrentCandidate(ctx context.Context) (ClassificationCandidate, error) {
+	if !executable(r.helperPath) {
+		return ClassificationCandidate{}, errors.New("native collector is unavailable")
+	}
+	observation, err := r.capture(ctx)
+	if err != nil {
+		return ClassificationCandidate{}, err
+	}
+	candidate, ok := classificationCandidateFromObservation(observation)
+	if !ok {
+		return ClassificationCandidate{}, errors.New("foreground app or browser domain is unavailable")
+	}
+	return candidate, nil
+}
+
 func ReadClassificationCandidates(sessionID string) ([]ClassificationCandidate, error) {
 	if !validSessionID(sessionID) {
 		return nil, errors.New("invalid session id")
@@ -317,30 +333,18 @@ func ReadClassificationCandidates(sessionID string) ([]ClassificationCandidate, 
 		if record.Kind != "sample" || record.Observation == nil {
 			continue
 		}
-		observation := record.Observation
-		appID := stringValue(observation.AppID)
-		domain := stringValue(observation.BrowserDomain)
-		if appID == "" || appID == "com.wails.focus-link" {
+		candidate, ok := classificationCandidateFromObservation(*record.Observation)
+		if !ok {
 			continue
 		}
-		if domain == "" && (strings.EqualFold(appID, "com.google.Chrome") || strings.EqualFold(appID, "com.apple.Safari")) {
-			continue
+		key := strings.ToLower(candidate.AppID) + "\x00" + strings.ToLower(candidate.Domain)
+		stored := candidates[key]
+		if stored == nil {
+			candidate.SampleCount = 0
+			stored = &candidate
+			candidates[key] = stored
 		}
-		appName := stringValue(observation.AppName)
-		name := domain
-		if name == "" {
-			name = appName
-		}
-		if name == "" {
-			name = appID
-		}
-		key := strings.ToLower(appID) + "\x00" + strings.ToLower(domain)
-		candidate := candidates[key]
-		if candidate == nil {
-			candidate = &ClassificationCandidate{Name: name, AppID: appID, AppName: appName, Domain: domain}
-			candidates[key] = candidate
-		}
-		candidate.SampleCount++
+		stored.SampleCount++
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("session capture could not be read: %w", err)
@@ -357,6 +361,29 @@ func ReadClassificationCandidates(sessionID string) ([]ClassificationCandidate, 
 		return result[i].SampleCount > result[j].SampleCount
 	})
 	return result, nil
+}
+
+func classificationCandidateFromObservation(observation Observation) (ClassificationCandidate, bool) {
+	appID := stringValue(observation.AppID)
+	domain := stringValue(observation.BrowserDomain)
+	if appID == "" || strings.EqualFold(appID, "com.wails.focus-link") {
+		return ClassificationCandidate{}, false
+	}
+	if domain == "" && (strings.EqualFold(appID, "com.google.Chrome") || strings.EqualFold(appID, "com.apple.Safari")) {
+		return ClassificationCandidate{}, false
+	}
+
+	appName := stringValue(observation.AppName)
+	name := domain
+	if name == "" {
+		name = appName
+	}
+	if name == "" {
+		name = appID
+	}
+	return ClassificationCandidate{
+		Name: name, AppID: appID, AppName: appName, Domain: domain, SampleCount: 1,
+	}, true
 }
 
 func (r *Recorder) capture(ctx context.Context) (Observation, error) {

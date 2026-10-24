@@ -28,7 +28,7 @@ function validDomain(value: string) {
   );
 }
 
-export function SettingsPage({ state, busy, execute, getClassificationCandidates, requestEmailOTP, verifyEmailOTP, signOut, refreshAccount }: PageProps) {
+export function SettingsPage({ state, busy, execute, getClassificationCandidates, captureCurrentClassificationCandidate: captureCurrentCandidate, requestEmailOTP, verifyEmailOTP, signOut, refreshAccount }: PageProps) {
 	const monitor = state.monitor ?? { state: 'unavailable', appId: '', appName: '', browserName: '', domain: '', lastSample: '', sampleCount: 0, message: '' };
   const account = state.account ?? { status: state.mode === 'demo' ? 'demo' as const : 'signedOut' as const, email: '', deviceRegistered: false, message: '' };
   const [draft, setDraft] = useState<Settings>(() => structuredClone(state.settings));
@@ -43,6 +43,7 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
   const [classificationCandidates, setClassificationCandidates] = useState<ClassificationCandidate[]>([]);
   const [candidatePanelOpen, setCandidatePanelOpen] = useState(false);
   const [candidateLoadState, setCandidateLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [candidateMessage, setCandidateMessage] = useState('');
   const stateSignature = JSON.stringify(state.settings);
   const draftIsValid = draft.tasks.length > 0 && draft.tasks.some(item => item.id === draft.selectedTaskId);
   const hasUnsavedChanges = JSON.stringify(draft) !== stateSignature;
@@ -58,15 +59,47 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
       (classificationAppId && classificationAppId.length <= 256 &&
         (classificationIsBrowser ? validDomain(classificationDomain) : !classificationDomain))),
   );
+  const sessionActive = Boolean(state.session && ['RUNNING', 'PAUSED'].includes(state.session.status));
+  const mergeClassificationCandidate = (candidate: ClassificationCandidate) => {
+    setClassificationCandidates(current => {
+      const index = current.findIndex(item => item.appId.toLowerCase() === candidate.appId.toLowerCase() &&
+        item.domain.toLowerCase() === candidate.domain.toLowerCase());
+      if (index < 0) return [...current, candidate].sort((left, right) => right.sampleCount - left.sampleCount);
+      const next = [...current];
+      next[index] = { ...next[index], sampleCount: next[index].sampleCount + candidate.sampleCount };
+      return next.sort((left, right) => right.sampleCount - left.sampleCount);
+    });
+  };
   const loadClassificationCandidates = async () => {
     if (!getClassificationCandidates) return;
     setCandidateLoadState('loading');
     setCandidatePanelOpen(true);
+    setCandidateMessage('');
     try {
       setClassificationCandidates(await getClassificationCandidates());
       setCandidateLoadState('loaded');
     } catch {
       setCandidateLoadState('error');
+      setCandidateMessage('ログ候補を読み込めませんでした。計測ログが保存されているか確認してください。');
+    }
+  };
+  const readCurrentClassificationCandidate = async () => {
+    if (!captureCurrentCandidate || sessionActive) return;
+    setCandidateLoadState('loading');
+    setCandidatePanelOpen(true);
+    setCandidateMessage(state.mode === 'local-monitor'
+      ? '読み取りを始めます。5秒以内に対象のアプリまたはサイトへ切り替えてください。作業計測は開始しません。'
+      : 'デモ候補を追加します。');
+    try {
+      const candidate = await captureCurrentCandidate();
+      mergeClassificationCandidate(candidate);
+      setCandidateLoadState('loaded');
+      setCandidateMessage('候補を追加しました。分類を選び、「設定に使う」から登録内容を確認してください。');
+    } catch {
+      setCandidateLoadState('error');
+      setCandidateMessage(state.mode === 'local-monitor'
+        ? '読み取れませんでした。5秒後に対象アプリを前面にし、ブラウザーでは対象サイトを表示して再試行してください。'
+        : 'デモ候補を取得できませんでした。');
     }
   };
   const findExistingClassification = (candidate: ClassificationCandidate) => {
@@ -175,12 +208,25 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
         <label className="settings-checkbox-row"><input type="checkbox" checked disabled readOnly /><span>開始と同時に VS Code と前回のフォルダを開く</span><small>未接続</small></label>
       </section>
       <section className="card settings-section">
-        <div className="settings-section-heading"><div><h2>アプリ・サイトの分類</h2><small>実測ログから候補を選ぶと、IDとDomainを自動入力します。</small></div><button type="button" className="button" disabled={busy || candidateLoadState === 'loading' || !getClassificationCandidates} onClick={() => void loadClassificationCandidates()}>{candidateLoadState === 'loading' ? '読み込み中…' : candidateLoadState === 'loaded' ? '候補を再読み込み' : '実測から候補を読み込む'}</button></div>
+        <div className="settings-section-heading classification-section-heading">
+          <div><h2>アプリ・サイトの分類</h2><small>カテゴリごとに登録先を整理します。新しい候補は分類を選んで登録してください。</small></div>
+          <div className="classification-toolbar">
+            <button type="button" className="button primary" disabled={busy || candidateLoadState === 'loading' || !captureCurrentCandidate || sessionActive} onClick={() => void readCurrentClassificationCandidate()}>
+              {candidateLoadState === 'loading' ? '読み取り中…' : '今のアプリ・サイトを読み取る'}
+            </button>
+            <button type="button" className="button" disabled={busy || candidateLoadState === 'loading' || !getClassificationCandidates} onClick={() => void loadClassificationCandidates()}>
+              {candidateLoadState === 'loaded' ? '実測ログを再読み込み' : '実測ログから候補を読み込む'}
+            </button>
+          </div>
+        </div>
+        {state.mode === 'local-monitor' && <p className="settings-note">読み取り開始後、5秒以内に登録したいアプリまたはサイトへ切り替えてください。作業計測は開始しません。</p>}
+        {sessionActive && <p className="settings-note">作業中は現在のアプリを読み取れません。実測ログの候補は読み込めます。</p>}
         {candidatePanelOpen && <div className="classification-candidate-panel" aria-live="polite">
-          {candidateLoadState === 'loading' && <p className="settings-note">直近の実測ログを読み込んでいます…</p>}
-          {candidateLoadState === 'error' && <p className="settings-note" role="alert">候補を読み込めませんでした。実測ログが保存されているか確認してください。</p>}
-          {candidateLoadState === 'loaded' && classificationCandidates.length === 0 && <p className="settings-note">候補がありません。作業を実測してから再読み込みしてください。</p>}
-          {candidateLoadState === 'loaded' && classificationCandidates.map(candidate => {
+          {candidateLoadState === 'loading' && <p className="settings-note" role="status">{candidateMessage || '実測ログを読み込んでいます…'}</p>}
+          {candidateLoadState === 'error' && <p className="settings-note" role="alert">{candidateMessage}</p>}
+          {candidateLoadState === 'loaded' && candidateMessage && <p className="settings-note" role="status">{candidateMessage}</p>}
+          {candidateLoadState === 'loaded' && classificationCandidates.length === 0 && <p className="settings-note">候補はまだありません。現在のアプリを読み取るか、作業を実測してからログを読み込んでください。</p>}
+          {(candidateLoadState === 'loaded' || candidateLoadState === 'error') && classificationCandidates.map(candidate => {
             const existing = findExistingClassification(candidate);
             return <div className="classification-candidate" key={`${candidate.appId}:${candidate.domain}`}>
               <span className="candidate-kind">{candidate.domain ? 'サイト' : 'アプリ'}</span>
@@ -194,11 +240,11 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
         {classificationCategories.map(category => {
           const items = draft.classifications.filter(item => item.category === category);
           return <div className="classification-group" key={category}>
-            <span>{classificationCategoryLabels[category]}</span>
+            <div className="classification-group-heading"><span>{classificationCategoryLabels[category]}</span><small>{items.length}件</small></div>
             <div className="classification-chips">
-              {items.map(item => <div className="classification-item" key={item.name}>
-                <button type="button" className={'classification-chip ' + category} disabled={busy} onClick={() => cycleCategory(item)} title="クリックして分類を切り替え">
-                  {item.name}<small>{item.appId || 'アプリID未設定'}{item.domain ? ' · ' + item.domain : ''}</small>
+              {items.map(item => <div className={`classification-item ${category}`} key={item.name}>
+                <button type="button" className="classification-chip" disabled={busy} onClick={() => cycleCategory(item)} title="クリックして分類を切り替え">
+                  <span>{item.name}</span><small>{[item.appId || 'アプリID未設定', item.domain].filter(Boolean).join(' ・ ')}</small>
                 </button>
                 <button type="button" className="classification-edit" disabled={busy} aria-label={'分類を編集：' + item.name} onClick={() => {
                   setClassification({ ...emptyClassification, ...item, appId: item.appId ?? '', domain: item.domain ?? '' });
@@ -210,23 +256,27 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
                 setClassification({ ...emptyClassification, category });
                 setEditingClassificationName(null);
                 setAddingClassification(category);
-              }}>＋ 追加</button>
+              }}><span aria-hidden="true">＋</span>追加</button>
             </div>
           </div>;
         })}
         {addingClassification && <div className="classification-form">
-          <label>表示名<input autoFocus maxLength={200} placeholder="例：VS Code、github.com" value={classification.name} onChange={event => setClassification({ ...classification, name: event.target.value })} /></label>
-          <label>アプリID（Bundle ID）<input maxLength={256} placeholder="例：com.microsoft.VSCode" value={classification.appId ?? ''} onChange={event => setClassification({ ...classification, appId: event.target.value })} /></label>
-          <label>Domain（Chrome / Safari）<input maxLength={253} placeholder="例：github.com" value={classification.domain ?? ''} onChange={event => setClassification({ ...classification, domain: event.target.value })} /></label>
-          <select aria-label="分類" value={classification.category} onChange={event => setClassification({ ...classification, category: event.target.value as Classification['category'] })}>
-            {classificationCategories.map(category => <option key={category} value={category}>{classificationCategoryLabels[category]}</option>)}
-          </select>
-          <button type="button" className="button" disabled={busy || !classificationFormValid} onClick={addClassification}>{editingClassificationName ? '変更を反映' : '追加'}</button>
-          <button type="button" className="text-button" onClick={() => {
-            setClassification({ ...emptyClassification, category: classification.category });
-            setEditingClassificationName(null);
-            setAddingClassification(null);
-          }}>キャンセル</button>
+          <div className="classification-form-fields">
+            <label>表示名<input autoFocus maxLength={200} placeholder="例：VS Code、github.com" value={classification.name} onChange={event => setClassification({ ...classification, name: event.target.value })} /></label>
+            <label>アプリID（Bundle ID）<input maxLength={256} placeholder="例：com.microsoft.VSCode" value={classification.appId ?? ''} onChange={event => setClassification({ ...classification, appId: event.target.value })} /></label>
+            <label>Domain（Chrome / Safari）<input maxLength={253} placeholder="例：github.com" value={classification.domain ?? ''} onChange={event => setClassification({ ...classification, domain: event.target.value })} /></label>
+            <label>分類<select value={classification.category} onChange={event => setClassification({ ...classification, category: event.target.value as Classification['category'] })}>
+              {classificationCategories.map(category => <option key={category} value={category}>{classificationCategoryLabels[category]}</option>)}
+            </select></label>
+          </div>
+          <div className="classification-form-actions">
+            <button type="button" className="button" disabled={busy || !classificationFormValid} onClick={addClassification}>{editingClassificationName ? '変更を反映' : '追加'}</button>
+            <button type="button" className="text-button" onClick={() => {
+              setClassification({ ...emptyClassification, category: classification.category });
+              setEditingClassificationName(null);
+              setAddingClassification(null);
+            }}>キャンセル</button>
+          </div>
         </div>}
         <p className="settings-note">照合はアプリIDとDomainの完全一致です。ブラウザーのサイトはDomainが必要です。ルールは作業開始時に固定します。既存のID未設定項目はU（不明）になります。設定はこのMacに保存されます。</p>
       </section>

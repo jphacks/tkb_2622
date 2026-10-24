@@ -68,6 +68,10 @@ export class DemoBridge implements DesktopBridge {
     ];
   }
 
+  async captureCurrentClassificationCandidate(): Promise<ClassificationCandidate> {
+    return { name: 'Code', appId: 'com.microsoft.VSCode', appName: 'Code', domain: '', sampleCount: 1 };
+  }
+
   async requestEmailOTP(email: string) {
     this.state.account = { status: 'demo', email, deviceRegistered: false, message: 'ブラウザプレビューではメール認証を行いません。' };
     this.touch();

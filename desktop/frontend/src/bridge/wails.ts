@@ -10,6 +10,7 @@ export async function createWailsBridge(): Promise<DesktopBridge> {
   return {
     async getStartupState() { return await binding.GetStartupState() as Snapshot; },
     async getClassificationCandidates() { return await binding.GetClassificationCandidates() as ClassificationCandidate[]; },
+    async captureCurrentClassificationCandidate() { return await binding.CaptureCurrentClassificationCandidate() as ClassificationCandidate; },
     async execute(command: Command) { return await binding.Execute(command as Parameters<typeof binding.Execute>[0]) as Snapshot; },
     async requestEmailOTP(email: string) { return await binding.RequestEmailOTP(email) as Snapshot; },
     async verifyEmailOTP(email: string, code: string) { return await binding.VerifyEmailOTP(email, code) as Snapshot; },
