@@ -62,6 +62,47 @@ final class GroupRepositorySimulatorTests: XCTestCase {
         }
     }
 
+    func testWorkStartFeedUsesBackendCursorAndPersistsTheNextPagePosition() async throws {
+        let suiteName = "GroupWorkStartsSimulatorTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let requests = LockedGroupRequests()
+        var responseCount = 0
+        GroupRepositoryURLProtocol.handler = { request in
+            requests.append(request)
+            responseCount += 1
+            if responseCount == 1 {
+                return (200, #"{"events":[{"event_id":"event-1","started_at":"2026-10-25T09:01:00.123Z"}],"next_started_at":"2026-10-25T09:01:00.123Z","next_event_id":"event-1"}"#)
+            }
+            return (200, #"{"events":[]}"#)
+        }
+        let repository = APIGroupRepository(
+            baseURL: URL(string: "https://api.example.test")!,
+            client: client(),
+            authenticatedUserID: { "user-1" },
+            defaults: defaults
+        )
+
+        let firstPage = try await repository.fetchWorkStarts()
+        let secondPage = try await repository.fetchWorkStarts()
+
+        let captured = requests.values
+        let timestampFormatter = ISO8601DateFormatter()
+        timestampFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        XCTAssertEqual(firstPage.map { $0.eventID }, ["event-1"])
+        XCTAssertEqual(firstPage.first?.startedAt.date, timestampFormatter.date(from: "2026-10-25T09:01:00.123Z"))
+        XCTAssertTrue(secondPage.isEmpty)
+        XCTAssertEqual(captured.count, 2)
+        XCTAssertEqual(captured[0].url?.path, "/v1/group/work-starts")
+        XCTAssertEqual(captured[0].httpMethod, "GET")
+        XCTAssertEqual(captured[0].value(forHTTPHeaderField: "Authorization"), "Bearer simulator-test-token")
+        XCTAssertEqual(queryValue("page_size", in: captured[0]), "50")
+        XCTAssertEqual(queryValue("after_event_id", in: captured[0]), nil)
+        XCTAssertEqual(queryValue("after_started_at", in: captured[1]), "2026-10-25T09:01:00.123Z")
+        XCTAssertEqual(queryValue("after_event_id", in: captured[1]), "event-1")
+    }
+
     private func repository() -> APIGroupRepository {
         APIGroupRepository(
             baseURL: URL(string: "https://api.example.test")!,
@@ -77,6 +118,12 @@ final class GroupRepositorySimulatorTests: XCTestCase {
             session: URLSession(configuration: configuration),
             tokenProvider: GroupRepositoryTokenProvider()
         )
+    }
+
+    private func queryValue(_ name: String, in request: URLRequest) -> String? {
+        guard let url = request.url else { return nil }
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == name })?.value
     }
 }
 
@@ -95,6 +142,23 @@ private final class LockedGroupMethods {
     }
 
     var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
+
+private final class LockedGroupRequests {
+    private let lock = NSLock()
+    private var storage: [URLRequest] = []
+
+    func append(_ request: URLRequest) {
+        lock.lock()
+        storage.append(request)
+        lock.unlock()
+    }
+
+    var values: [URLRequest] {
         lock.lock()
         defer { lock.unlock() }
         return storage
