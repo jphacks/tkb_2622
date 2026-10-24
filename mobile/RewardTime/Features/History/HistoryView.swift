@@ -185,7 +185,7 @@ struct HistoryView: View {
                             .font(.title3.weight(.bold).monospacedDigit())
                             .foregroundStyle(item.amountSeconds >= 0 ? AppTheme.teal : AppTheme.ink)
                     }
-                    Text("取引後の残高 (formattedDuration(item.balanceAfterSeconds))")
+                    Text("取引後の残高 \(formattedDuration(item.balanceAfterSeconds))")
                         .font(.footnote)
                         .foregroundStyle(AppTheme.secondaryInk)
                 }
