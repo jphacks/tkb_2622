@@ -4,12 +4,18 @@ import FamilyControls
 struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var screenTime: MobileScreenTimeController
+    private let isAuthenticated: Bool
     @State private var isFamilyActivityPickerPresented = false
     @State private var isPickingAlwaysAllowedApps = false
     @State private var isSyncingDeviceSettings = false
     @State private var needsDeviceSettingsSync = false
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncError: String?
+
+    init(screenTime: MobileScreenTimeController, isAuthenticated: Bool = true) {
+        _screenTime = ObservedObject(wrappedValue: screenTime)
+        self.isAuthenticated = isAuthenticated
+    }
 
     var body: some View {
         ScreenContainer {
@@ -205,6 +211,9 @@ struct SettingsView: View {
                 Task { await syncDeviceSettings() }
             }
         }
+        .onChange(of: isAuthenticated) { _, authenticated in
+            if authenticated { Task { await syncDeviceSettings() } }
+        }
         .familyActivityPicker(
             headerText: isPickingAlwaysAllowedApps ? "常時許可するアプリを選択" : "制限するアプリを選択",
             footerText: isPickingAlwaysAllowedApps ? "常時許可するApple標準アプリを選びます。Safariは選択しないでください。" : nil,
@@ -258,9 +267,11 @@ struct SettingsView: View {
 
     @MainActor
     private func performDeviceSettingsSync() async {
-        let isAuthenticated = MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil
+        let hasCurrentAuthUser = MobileAppConfiguration.makeAuthService()?.authenticatedUserID != nil
         do {
-            try await AuthenticatedAPISyncFlow.run(isAuthenticated: isAuthenticated) {
+            try await AuthenticatedAPISyncFlow.run(
+                isAuthenticated: isAuthenticated && hasCurrentAuthUser
+            ) {
                 _ = try await ConfiguredDeviceSettingsRepository().sync(
                     settings: screenTime.backendRestrictionSettings
                 )

@@ -107,7 +107,7 @@ struct RootTabView: View {
       .tag(2)
 
       NavigationStack {
-        SettingsView(screenTime: screenTime)
+        SettingsView(screenTime: screenTime, isAuthenticated: isAuthenticated)
           .toolbar { NotificationToolbarButton() }
       }
       .tabItem { Label("設定", systemImage: "gearshape") }

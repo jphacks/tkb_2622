@@ -180,6 +180,16 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
     }
 
+    func testLocalOnlyStateSkipsAuthenticatedSettingsAPIRequest() async throws {
+        var requestCount = 0
+
+        try await AuthenticatedAPISyncFlow.run(isAuthenticated: false) {
+            requestCount += 1
+        }
+
+        XCTAssertEqual(requestCount, 0)
+    }
+
     @MainActor
     func testGroupWorkStartPollingUsesActionableConnectErrorMessage() async throws {
         let repository = WorkStartFailureGroupRepository(
