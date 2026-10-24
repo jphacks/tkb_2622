@@ -13,7 +13,7 @@
 - Mobile Debugでは開発者向け設定へProject URL・publishable key・Connect API URLを保存する。ReleaseではInfo.plistがBuild Settings値を読む構造だが、現行Xcode projectに3値のRelease設定を渡す`.xcconfig`／CI注入がないため、Release配布設定は未完了。通常利用者へ手入力させない構造自体はあるが、Releaseビルドへ環境別公開値を設定する作業が必要。Desktopも起動時の`FOCUS_LINK_*`環境変数を読むため、配布時の環境設定注入は未整備。
 - Desktop／Mobileは同じSupabase project・メールOTPアカウント・backend環境を使えば、同じJWT subjectから同じ業務Userへ対応する。新規Auth user作成と既存Auth userのOTPログインを両クライアントで許可し、ペアリングコードは使わない。実環境での新規／既存・環境不一致を含むE2Eは未実施。
 - 認証と業務User同期は別段階。`RootTabView`は起動時に`EnsureUser`／`GetMe`成功を要求する。監査で、設定画面からの認証状態変更通知がsessionの有無だけでauthenticatedへ切り替える経路を発見したため、通知後もRoot側で同期を再実行するよう修正した。失敗時は同期エラー・再試行・端末内利用・別アカウントログインを表示する。入口状態のresolver testはあるが、SwiftUI rootの通知連携と実backend復旧はSimulator受け入れ待ち。
-- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート・Home更新失敗の8件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、手動同期・認証変更・APNs token受信では再試行できる。tokenそのものは重複抑止キーとして保存しない。
+- Mobileは`ConnectJSONClient`の`URLSession`を注入できる。`mobile/RewardTimeTests/Package.swift`とXCTestがあり、macOS host上でAPI通信・起動状態・通知登録ゲート／順序・Home更新失敗の10件が通過した。iOS Simulator XCTest targetは未整備だが、アプリのSimulator向けbuildは成功した。通知登録は成功済み同一tokenの通常再読込を抑止し、並行要求をまとめ、Device登録後にendpointを登録する。tokenそのものは重複抑止キーとして保存しない。
 - 現時点のRepository API一覧（呼び出し存在の確認まで。成功応答・DTO互換・画面ごとのretryは引き続き検証）：
 
 | 画面／目的 | 実装API経路 | 確認状況 |
@@ -24,13 +24,13 @@
 | History | Focus `ListSessions`、Reward `ListTransactions` | response DTO（entries/session/reward, transactions）・ProtoJSON int64・timestamp・page tokenをproto／Go handlerと照合し一致。ViewModelは両方の初回取得が成功してから更新し、失敗時は前回値とstale表示を保つ。片方だけの失敗・実API pagingは未確認 |
 | 設定・制限 | Identity `RegisterDevice`、Restriction `GetRestrictionPolicy`・`UpdateRestrictionPolicy`・`GetRestrictionState`／`ReportRestrictionState` | revision競合・再試行を要確認 |
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
-| 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | APNs token／認証／DB失敗を分離して再現。過去ログにはregister時の`internal`とSQLSTATE 2201Bがあるが、現ブランチでの再発は未確認 |
+| 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | 重複登録抑止に加え、endpoint要求の前に同じregistration IDで`RegisterDevice`を実行する順序を追加。旧SQLSTATE 2201B制約障害とは別に、Device未登録時はbackendがnot_foundを返す経路を確認。認証付き実API往復は未確認 |
 
 ### 既知のエラー報告と再現状況
 
 | 報告 | 現在の証拠 | 次の切り分け |
 | --- | --- | --- |
-| 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、今回の読み取り確認でlocal DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない | 成功済み同一tokenの重複要求を抑止するXCTestを追加済み。`not_found`が端末未登録か別原因かは、次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
+| 通知画面の再読込時などにAPI error `not_found`／`internal` | SQLSTATE 2201Bはmigration 00012のAPNs token regex制約で発生した。00014がregexを修正し、local DBはversion 14まで適用済み。利用可能なAPI logには36秒間にregister要求9件があるが、対応するoperation failed行はなく、現在の失敗は再現していない。コード上はendpoint登録前のDevice登録が保証されず、backendはregistration IDのDevice検索に失敗するとnot_foundを返すため、この経路も候補だった | 同一token重複抑止と「Device登録→通知先登録」の順序をXCTestで確認済み。以前のnot_foundとこの欠落が同一原因かは未確認。次の再発時に時刻・画面・Connect code・サーバー失敗operationを対応づける |
 | Group作成時の`internal`／`not_found` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認。MobileのRPC名、camelCase field、Group protobuf Timestamp形式、work-startsのrequest query／snake_case responseはbackend handlerと一致し、明確なDTO不整合は見つからなかった | 発生時刻・画面操作・Connect codeと`CreateGroup`等のAPI要求受信／失敗ログ、migration状態を照合する。該当するbackend failureがない場合は、端末の接続先／ログ取得場所も確認する |
 
 発生時のサーバーログは次で絞る（プロジェクトrootから実行。migration状態は`make -C backend migrate-status`で読み取り確認）：
@@ -129,7 +129,8 @@ docker compose --project-directory backend -f backend/compose.local.yaml logs --
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
-| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | register重複は抑止し、旧regex障害migrationは適用済み。`not_found`の現在原因は未特定のため、再発時にbackend logと画面操作を紐づける | 一部修正、再現待ち |
+| iPhone再ログイン後の端末登録 | Auth sessionを作り直したときに旧Deviceをどう無効化するか。作業中にlogoutできるか | backendはDeviceをAuth sessionへ結び付け、active iPhone 1台を制約する。一方、mobileはlogout時にDeviceをrevokeせず、registration IDも再利用する。新しいAuth sessionでは`RegisterDevice`が競合／preconditionで失敗し得る。backendと合意するまで再ログイン成功を保証しない | 未解決。revoke API／logoutの作業中挙動を決める |
+| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 通知登録重複を抑止し、Device未登録でendpoint登録が先行する順序欠落を修正。旧regex障害migrationも適用済み。過去の`not_found`とDevice未登録経路が同一原因かは未確認 | 一部修正、実APIで再発確認待ち |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
 
 ## テスト実行

@@ -24,13 +24,24 @@ struct ConfiguredNotificationEndpointRepository {
         let client = try makeClient()
         let apnsEnvironment = environment == "development" ? "AP_NS_ENVIRONMENT_DEVELOPMENT" : "AP_NS_ENVIRONMENT_PRODUCTION"
         let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
-        let response: RegisterResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "RegisterNotificationEndpoint",
-            requestBody: RegisterRequest(apnsToken: token, environment: apnsEnvironment, registrationId: registrationID),
-            responseType: RegisterResponse.self
+        try await NotificationEndpointRegistrationFlow.register(
+            ensureDevice: {
+                _ = try await ConfiguredDeviceSettingsRepository().ensureDeviceRegistered(client: client)
+            },
+            registerEndpoint: {
+                let response: RegisterResponse = try await client.call(
+                    service: "identity.v1.IdentityService",
+                    method: "RegisterNotificationEndpoint",
+                    requestBody: RegisterRequest(
+                        apnsToken: token,
+                        environment: apnsEnvironment,
+                        registrationId: registrationID
+                    ),
+                    responseType: RegisterResponse.self
+                )
+                guard response.registered else { throw NotificationEndpointError.registrationRejected }
+            }
         )
-        guard response.registered else { throw NotificationEndpointError.registrationRejected }
     }
 
     func delete() async throws {

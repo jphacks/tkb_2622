@@ -89,24 +89,18 @@ struct ConfiguredDeviceSettingsRepository {
 
         let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
         let client = ConnectJSONClient(baseURL: apiBaseURL, tokenProvider: auth)
-        let registrationID = stableRegistrationID()
         let deviceName = await UIDevice.current.name
-        let device = try await registerDevice(
-            client: client,
-            registrationID: registrationID,
-            deviceName: deviceName
-        )
-        defaults.set(device.id, forKey: "mobile.device.id")
+        let deviceID = try await ensureDeviceRegistered(client: client, deviceName: deviceName)
 
         for attempt in 0..<3 {
-            let currentPolicy = try await currentPolicy(client: client, deviceID: device.id)
+            let currentPolicy = try await currentPolicy(client: client, deviceID: deviceID)
             if let currentPolicy,
                currentPolicy.targetMode == settings.targetMode,
                currentPolicy.enabled == settings.enabled,
                currentPolicy.configured == settings.configured,
                currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion {
                 return SyncedDevicePolicy(
-                    deviceID: device.id,
+                    deviceID: deviceID,
                     deviceName: deviceName,
                     policyVersion: currentPolicy.version.value,
                     policyStatus: currentPolicy.status
@@ -119,7 +113,7 @@ struct ConfiguredDeviceSettingsRepository {
                     method: "UpdateRestrictionPolicy",
                     requestBody: UpdatePolicyRequest(
                         operationId: UUID().uuidString.lowercased(),
-                        deviceId: device.id,
+                        deviceId: deviceID,
                         expectedVersion: String(currentPolicy?.version.value ?? 0),
                         enabled: settings.enabled,
                         targetMode: settings.targetMode,
@@ -140,6 +134,22 @@ struct ConfiguredDeviceSettingsRepository {
         }
 
         throw DeviceSettingsRepositoryError.policyConflict
+    }
+
+    func ensureDeviceRegistered(client: ConnectJSONClient) async throws -> String {
+        let deviceName = await UIDevice.current.name
+        return try await ensureDeviceRegistered(client: client, deviceName: deviceName)
+    }
+
+    private func ensureDeviceRegistered(client: ConnectJSONClient, deviceName: String) async throws -> String {
+        let registrationID = stableRegistrationID()
+        let device = try await registerDevice(
+            client: client,
+            registrationID: registrationID,
+            deviceName: deviceName
+        )
+        defaults.set(device.id, forKey: "mobile.device.id")
+        return device.id
     }
 
     private func registerDevice(
