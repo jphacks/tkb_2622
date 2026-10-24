@@ -25,6 +25,20 @@
 | 利用枠 | Restriction `ReserveUsageGrant`・`GetUsageGrant`・`ReportUsage`・`GetRestrictionOperation` | 再起動・応答喪失・再試行の重複防止を要確認 |
 | 通知 | Identity `RegisterNotificationEndpoint`・`DeleteNotificationEndpoint` | APNs token／認証／DB失敗を分離して再現。過去ログにはregister時の`internal`とSQLSTATE 2201Bがあるが、現ブランチでの再発は未確認 |
 
+### 既知のエラー報告と再現状況
+
+| 報告 | 現在の証拠 | 次の切り分け |
+| --- | --- | --- |
+| 通知画面の再読込時などにAPI error `not_found`／`internal` | 過去のbackend logでは`RegisterNotificationEndpoint`（operation=`register`）とSQLSTATE 2201Bが記録された。現在のcheckoutではbackend logに該当行がなく、エラーを再現できていない | 発生時刻に合わせて以下のAPIログを取得し、画面／操作とConnect codeを対応づける。token・メール・URL・DB接続文字列は含めない |
+| Group作成時の`internal` | 過去の報告。現在のlocal APIでの再現・該当ログは未確認 | `CreateGroup`の要求受信／失敗ログとmigration状態を照合する |
+
+発生時のサーバーログは次で絞る（プロジェクトrootから実行）：
+
+```sh
+docker compose --project-directory backend -f backend/compose.local.yaml logs --since=10m api \
+  | rg 'request received|operation failed|sql_state='
+```
+
 ## 優先順位
 
 ### P0 — エラーを再現して直す
@@ -114,7 +128,7 @@
 | ログイン後の業務User同期失敗 | Supabase Auth成功後、EnsureUser／GetMeが失敗した場合にログイン済みUIへ入れるか | Authの成否と業務User同期を別状態で表示し、失敗時は再試行・ローカル利用・別アカウントログインを提供 | 実装済み、API実機確認待ち |
 | 利用者向け接続設定 | local Debug値・Release環境値をどこで管理するか | Debugは開発者向け。ReleaseはBuild Settings／Info.plistで配布環境を組み込み、公開値だけを含める | コード上の経路あり、配布設定未確認 |
 | Desktopとのアカウント対応 | 同一メール以外のアカウントリンク／統合が必要か | 既存仕様の同一Supabase subject→業務User対応を使う。別アカウント統合はしない | 仕様確認済み、E2E未確認 |
-| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 画面別にログと実装から棚卸しし、特定できない場合は再現手順と必要情報を記録 | 調査中 |
+| 既知のmobile APIエラー | 画面・操作・Connect code・再現条件 | 原因を再現できるbackend logと操作を紐づける。正確な操作が未確定の分は質問・必要ログをこの文書に記録 | 再現待ち |
 | APNs実機受け入れ | sandbox署名、二人以上のrecipient、実機配信 | API安定化後にシミュレータ検証と分けて確認 | 未確認 |
 
 ## テスト実行
