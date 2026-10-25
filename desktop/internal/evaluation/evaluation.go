@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"focuspocket/macos-native/analysis"
@@ -92,18 +93,54 @@ func EvaluateDetailed(records []monitor.Record, workSession session.WorkSession,
 		EvaluatorVersion: evaluated.EvaluatorVersion,
 		B100:             evaluated.B, Q: evaluated.Q, WorkRate: evaluated.WorkRate,
 	}
+	appNames := localAppNames(records)
 	segments := make([]ActivitySegment, 0, len(evaluated.Segments))
+	result.ActivityDetails = make([]session.ActivityDetail, 0, len(evaluated.Segments))
 	for _, segment := range evaluated.Segments {
 		classification, err := activityClass(segment.Class)
 		if err != nil {
 			return session.Result{}, nil, "", err
 		}
+		appID := strings.TrimSpace(stringValue(segment.AppID))
+		appName := appNames[appID]
+		domain := stringValue(segment.BrowserDomain)
+		durationSeconds := int(math.Round(segment.EndAt.Sub(segment.StartAt).Seconds()))
+		if durationSeconds < 0 {
+			durationSeconds = 0
+		}
+		reasons := append([]string(nil), segment.Reasons...)
 		segments = append(segments, ActivitySegment{
-			StartTime: segment.StartAt, EndTime: segment.EndAt, Classification: classification,
-			Reasons: append([]string(nil), segment.Reasons...),
+			StartTime: segment.StartAt, EndTime: segment.EndAt,
+			Classification: classification, Reasons: reasons,
+		})
+		result.ActivityDetails = append(result.ActivityDetails, session.ActivityDetail{
+			AppName: appName, Domain: domain, StartTime: segment.StartAt, EndTime: segment.EndAt,
+			DurationSeconds: durationSeconds, Classification: classification, Reasons: reasons,
 		})
 	}
 	return result, segments, evaluated.EvaluatorVersion, nil
+}
+
+func localAppNames(records []monitor.Record) map[string]string {
+	appNames := make(map[string]string)
+	for _, record := range records {
+		if record.Observation == nil {
+			continue
+		}
+		appID := strings.TrimSpace(stringValue(record.Observation.AppID))
+		appName := strings.TrimSpace(stringValue(record.Observation.AppName))
+		if appID != "" && appName != "" {
+			appNames[appID] = appName
+		}
+	}
+	return appNames
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func hasTerminalRecord(records []monitor.Record) bool {

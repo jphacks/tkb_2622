@@ -78,6 +78,39 @@ const rewardReasonLabels: Record<string, string> = {
   no_reward_granted: 'このセッションでは報酬の付与がありませんでした。',
 };
 
+const activityClassLabels: Record<string, string> = {
+  ACTIVITY_CLASS_TASK: '作業',
+  ACTIVITY_CLASS_RELATED_TRANSITION: '関連作業',
+  ACTIVITY_CLASS_DISTRACTION: '脱線',
+  ACTIVITY_CLASS_UNKNOWN: '不明',
+  ACTIVITY_CLASS_IDLE: '非活動',
+};
+
+function activityReasonLabel(reason: string): string {
+  if (reason.startsWith('matched_rule_')) return '設定した分類ルールと一致';
+  if (reason.startsWith('confirmed_lock:')) return '画面ロックを確認';
+  if (reason.startsWith('confirmed_sleep:')) return 'スリープを確認';
+  if (reason.startsWith('idle_over_threshold_')) return '一定時間の操作なし';
+  const labels: Record<string, string> = {
+    analysis_interval_gap: '観測間隔に空きあり',
+    quality_not_sample_based_estimate: '推定品質の観測',
+    missing_app_id: 'アプリ情報なし',
+    invalid_browser_domain: 'サイト情報を確認できず',
+    missing_browser_domain: 'サイト情報なし',
+    unexpected_browser_domain: 'サイト情報を利用できず',
+    no_matching_rule: '分類ルール未設定',
+  };
+  return labels[reason] ?? reason.replaceAll('_', ' ');
+}
+
+function localDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
 export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'demo' | 'local-monitor' }) {
   const rewardStatus = result?.rewardStatus ?? 'unavailable';
   const hasConfirmedReward = rewardStatus === 'granted' || rewardStatus === 'ineligible';
@@ -107,6 +140,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
   const timeFor = (seconds: number | undefined) => result && seconds !== undefined ? duration(seconds) : '—';
   const percentage = (value: number | undefined, multiplier = 100) =>
     value !== undefined && Number.isFinite(value) ? `${(value * multiplier).toFixed(1)}%` : '—';
+  const activityDetails = result?.activityDetails ?? [];
 
   const calculatedWorkSeconds = (result?.taskSeconds ?? 0) + (result?.relatedSeconds ?? 0);
   const knownSeconds = calculatedWorkSeconds + (result?.distractedSeconds ?? 0);
@@ -200,32 +234,45 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
       <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{hasLocalEvaluation ? `5分類はこのMacで集計しました。非活動（I）は確定した画面ロック・スリープ情報がある場合だけ加算します。${hasConfirmedReward ? '報酬額はサーバー確定値です。' : '報酬額はサーバー確認後に表示します。'}` : mode === 'local-monitor' ? '観測データはこのMacに保存しました。ローカル評価を完了できませんでした。' : '保留の内訳・判定理由は未取得です。実際のアプリ利用状況は計測していません。'}</p>
     </section>
 
-    <section style={{ ...cardStyle, gap: 12 }}>
+    <section style={{ ...cardStyle, gap: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
         <h2 style={headingStyle}>アプリ・サイト別の区間</h2>
-        <span style={metaStyle}>区間一覧の画面表示は未接続</span>
+        <span style={metaStyle}>{activityDetails.length > 0 ? `${activityDetails.length}区間・このMac内の記録` : 'このMacで評価した区間を表示'}</span>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', fontSize: 14, fontVariantNumeric: 'tabular-nums', textAlign: 'left', whiteSpace: 'nowrap' }}>
+      <div style={{ maxHeight: 320, overflow: 'auto', border: `1px solid ${colors.softBorder}`, borderRadius: 10 }}>
+        {activityDetails.length > 0 ? <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 12, fontVariantNumeric: 'tabular-nums', textAlign: 'left' }}>
+          <colgroup>
+            <col style={{ width: '23%' }} /><col style={{ width: '26%' }} /><col style={{ width: '10%' }} />
+            <col style={{ width: '15%' }} /><col style={{ width: '26%' }} />
+          </colgroup>
           <thead>
-            <tr style={{ color: colors.muted, fontSize: 12 }}>
+            <tr style={{ color: colors.muted, fontSize: 11, position: 'sticky', top: 0, background: '#FFFFFF' }}>
               <th scope="col" style={tableHeaderStyle}>アプリ・サイト</th>
+              <th scope="col" style={tableHeaderStyle}>開始 — 終了</th>
               <th scope="col" style={tableHeaderStyle}>時間</th>
               <th scope="col" style={tableHeaderStyle}>判定</th>
               <th scope="col" style={tableHeaderStyle}>根拠</th>
-              <th scope="col" style={tableHeaderStyle}><span className="sr-only">操作</span></th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colSpan={5} style={{ ...tableCellStyle, padding: '18px 6px', textAlign: 'center', color: colors.muted, whiteSpace: 'normal' }}>
-                {hasLocalEvaluation ? '5分類の時間合計を上に表示しています。アプリ・サイト別の区間明細は未表示です。' : 'アプリ・サイト別の判定データは未取得です。'}
-              </td>
-            </tr>
+            {activityDetails.map((detail, index) => {
+              const identity = [detail.domain, detail.appName].filter(Boolean).join(' · ') || 'アプリ名を取得できません';
+              const reasons = (detail.reasons ?? []).map(activityReasonLabel);
+              const durationText = duration(Math.max(0, detail.durationSeconds));
+              return <tr key={`${detail.startTime}-${detail.endTime}-${index}`}>
+                <td title={identity} style={{ ...tableCellStyle, overflowWrap: 'anywhere', fontWeight: 600 }}>{identity}</td>
+                <td style={{ ...tableCellStyle, color: colors.muted, overflowWrap: 'anywhere' }}>{localDateTime(detail.startTime)}<br />{localDateTime(detail.endTime)}</td>
+                <td style={{ ...tableCellStyle, whiteSpace: 'nowrap' }}>{durationText}</td>
+                <td style={{ ...tableCellStyle, overflowWrap: 'anywhere' }}>{activityClassLabels[detail.classification] ?? detail.classification}</td>
+                <td title={(detail.reasons ?? []).join('\n')} style={{ ...tableCellStyle, color: colors.muted, overflowWrap: 'anywhere' }}>{reasons.length > 0 ? reasons.join('、') : '根拠記録なし'}</td>
+              </tr>;
+            })}
           </tbody>
-        </table>
+        </table> : <div style={{ padding: '14px 12px', color: colors.muted, fontSize: 12, lineHeight: 1.6 }}>
+          {hasLocalEvaluation ? 'この結果にはアプリ・サイト別の区間がありません。新しい計測をこのバージョンで完了すると、端末内の明細が表示されます。' : 'ローカル評価の完了後に区間が表示されます。'}
+        </div>}
       </div>
-      <div style={{ fontSize: 12, color: colors.muted }}>分類の修正は、判定データの取得後に利用できます。</div>
+      <div style={{ fontSize: 11, color: colors.muted }}>アプリ名・サイト名はこのMacに保存し、サーバーには送信しません。</div>
     </section>
 
     <section style={{ ...cardStyle, gap: 10 }}>

@@ -265,14 +265,18 @@ func (e *Engine) SetIPhoneRestrictionState(state *IPhoneRestrictionState, failur
 // local-only history entries that have not been uploaded to the server.
 func (e *Engine) SetCloudHistory(history []Result, now time.Time) {
 	merged := append([]Result(nil), history...)
-	known := make(map[string]struct{}, len(history))
-	for _, item := range history {
-		known[item.SessionID] = struct{}{}
+	known := make(map[string]int, len(history))
+	for index, item := range history {
+		known[item.SessionID] = index
 	}
 	for _, item := range e.state.History {
-		if _, exists := known[item.SessionID]; !exists {
-			merged = append(merged, item)
+		if index, exists := known[item.SessionID]; exists {
+			if len(merged[index].ActivityDetails) == 0 && len(item.ActivityDetails) > 0 {
+				merged[index].ActivityDetails = append([]ActivityDetail(nil), item.ActivityDetails...)
+			}
+			continue
 		}
+		merged = append(merged, item)
 	}
 	sort.SliceStable(merged, func(i, j int) bool {
 		if merged[i].StartedAt == "" {
