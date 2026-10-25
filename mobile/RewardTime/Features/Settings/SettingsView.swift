@@ -85,27 +85,8 @@ struct SettingsView: View {
             SurfaceCard {
                 sectionTitle("制限モード", icon: "slider.horizontal.3")
                 VStack(spacing: 8) {
-                    ForEach([LocalRestrictionMode.entireDevice, .selectedApplications]) { mode in
-                        Button {
-                            screenTime.restrictionMode = mode
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: screenTime.restrictionMode == mode ? "largecircle.fill.circle" : "circle")
-                                    .foregroundStyle(screenTime.restrictionMode == mode ? AppTheme.primary : AppTheme.secondaryInk)
-                                Text(mode.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(AppTheme.ink)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(12)
-                            .background(
-                                screenTime.restrictionMode == mode ? AppTheme.lavender : AppTheme.background,
-                                in: RoundedRectangle(cornerRadius: 12)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(hasOpenUsageGrant)
-                    }
+                    restrictionModeButton(.entireDevice)
+                    restrictionModeButton(.selectedApplications)
                 }
 
                 if screenTime.restrictionMode == .selectedApplications {
@@ -118,7 +99,7 @@ struct SettingsView: View {
                             .foregroundStyle(AppTheme.primary)
                     }
                     Button {
-                        isPickingAlwaysAllowedApps = false
+                        isPickingSafari = false
                         isFamilyActivityPickerPresented = true
                     } label: {
                         Label("アプリを選択", systemImage: "plus.app")
@@ -248,6 +229,29 @@ struct SettingsView: View {
     private func sectionTitle(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.subheadline.weight(.bold))
+    }
+
+    private func restrictionModeButton(_ mode: LocalRestrictionMode) -> some View {
+        let isSelected = screenTime.restrictionMode == mode
+        return Button {
+            screenTime.restrictionMode = mode
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(isSelected ? AppTheme.primary : AppTheme.secondaryInk)
+                Text(mode.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(12)
+            .background(
+                isSelected ? AppTheme.lavender : AppTheme.background,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(hasOpenUsageGrant)
     }
 
     private func refreshOpenUsageGrant() {
