@@ -293,7 +293,14 @@ struct AuthenticationSettingsSection: View {
     isWorking = true
     defer { isWorking = false }
     do {
-      try await service.verifyEmailOTP(email: targetEmail, code: code)
+      let hasSession = try await service.verifyEmailOTP(email: targetEmail, code: code)
+      guard hasSession else {
+        setMessage(
+          "確認コードは受理されましたが、ログインセッションが発行されませんでした。確認コードを再送してもう一度ログインしてください。",
+          error: true
+        )
+        return
+      }
     } catch {
       setMessage("確認コードを検証できませんでした: \(AuthenticationErrorMessage.describe(error))", error: true)
       return
