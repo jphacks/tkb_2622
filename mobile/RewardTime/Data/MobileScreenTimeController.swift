@@ -6,32 +6,35 @@ import ManagedSettings
 @MainActor
 final class MobileScreenTimeController: ObservableObject {
     @Published var selection: FamilyActivitySelection {
-        didSet { saveSelection() }
-    }
-    @Published var alwaysAllowedSelection: FamilyActivitySelection {
-        didSet { saveAlwaysAllowedSelection() }
+        didSet {
+            saveSelection()
+            let selectionMatchesShield = Self.hasAppliedSelection(
+                from: settingsStore,
+                selectedApplications: selection.applicationTokens
+            )
+            if hasAppliedRestriction && !selectionMatchesShield {
+                settingsStore.shield.applications = nil
+                settingsStore.shield.applicationCategories = nil
+                hasAppliedRestriction = false
+                ScreenTimeSharedStorage.defaults.set(
+                    "SHIELD_STATUS_UNSHIELDED",
+                    forKey: "mobile.usage.localShieldStatus"
+                )
+            }
+        }
     }
     @Published private(set) var authorizationStatus: AuthorizationStatus
     @Published private(set) var isRequestingAuthorization = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var errorMessage: String?
-    @Published var restrictionMode: LocalRestrictionMode {
-        didSet {
-            defaults.set(restrictionMode.rawValue, forKey: restrictionModeDefaultsKey)
-            errorMessage = nil
-            if oldValue != restrictionMode { advanceDeviceConfigVersion() }
-        }
-    }
     @Published private(set) var deviceConfigVersion: Int64
-    @Published private(set) var appliedRestrictionMode: LocalRestrictionMode?
+    @Published private(set) var hasAppliedRestriction: Bool
 
     private let authorizationCenter: AuthorizationCenter
     private let settingsStore: ManagedSettingsStore
     private let defaults: UserDefaults
     private let selectionDefaultsKey = "mobile.screenTime.selection"
-    private let alwaysAllowedSelectionDefaultsKey = "mobile.screenTime.alwaysAllowedSelection"
     private let selectionConfiguredDefaultsKey = "mobile.screenTime.selectionConfigured"
-    private let restrictionModeDefaultsKey = "mobile.screenTime.restrictionMode"
     private let deviceConfigVersionDefaultsKey = "mobile.screenTime.deviceConfigVersion"
     @Published private(set) var hasSelectionBeenConfigured: Bool
 
@@ -44,9 +47,7 @@ final class MobileScreenTimeController: ObservableObject {
         self.settingsStore = settingsStore
         let resolvedDefaults = defaults ?? ScreenTimeSharedStorage.defaults
         let selectionKey = "mobile.screenTime.selection"
-        let alwaysAllowedSelectionKey = "mobile.screenTime.alwaysAllowedSelection"
         let selectionConfiguredKey = "mobile.screenTime.selectionConfigured"
-        let restrictionModeKey = "mobile.screenTime.restrictionMode"
         let deviceConfigVersionKey = "mobile.screenTime.deviceConfigVersion"
         if defaults == nil,
            resolvedDefaults.data(forKey: selectionKey) == nil,
@@ -55,10 +56,6 @@ final class MobileScreenTimeController: ObservableObject {
             resolvedDefaults.set(
                 UserDefaults.standard.bool(forKey: selectionConfiguredKey),
                 forKey: selectionConfiguredKey
-            )
-            resolvedDefaults.set(
-                UserDefaults.standard.string(forKey: restrictionModeKey),
-                forKey: restrictionModeKey
             )
             resolvedDefaults.set(
                 UserDefaults.standard.integer(forKey: deviceConfigVersionKey),
@@ -70,30 +67,36 @@ final class MobileScreenTimeController: ObservableObject {
         let storedSelection = resolvedDefaults.data(forKey: selectionDefaultsKey)
             .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
             ?? FamilyActivitySelection()
-        let storedAlwaysAllowedSelection = resolvedDefaults.data(forKey: alwaysAllowedSelectionKey)
-            .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
-            ?? FamilyActivitySelection()
         selection = storedSelection
-        alwaysAllowedSelection = storedAlwaysAllowedSelection
         hasSelectionBeenConfigured = resolvedDefaults.bool(forKey: selectionConfiguredDefaultsKey)
             || !storedSelection.applicationTokens.isEmpty
-        restrictionMode = resolvedDefaults.string(forKey: restrictionModeDefaultsKey)
-            .flatMap(LocalRestrictionMode.init(rawValue:)) ?? .selectedApplications
-        deviceConfigVersion = Int64(resolvedDefaults.integer(forKey: deviceConfigVersionDefaultsKey))
-        appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
+        let removedLegacyConfiguration = resolvedDefaults.string(forKey: "mobile.screenTime.restrictionMode") == "entireDevice"
+            || resolvedDefaults.data(forKey: "mobile.screenTime.safariSelection") != nil
+        resolvedDefaults.removeObject(forKey: "mobile.screenTime.restrictionMode")
+        resolvedDefaults.removeObject(forKey: "mobile.screenTime.safariSelection")
+        let configVersion = resolvedDefaults.integer(forKey: deviceConfigVersionDefaultsKey)
+            + (removedLegacyConfiguration ? 1 : 0)
+        deviceConfigVersion = Int64(configVersion)
+        resolvedDefaults.set(configVersion, forKey: deviceConfigVersionDefaultsKey)
+
+        let shieldMatchesSelection = Self.hasAppliedSelection(
+            from: settingsStore,
+            selectedApplications: storedSelection.applicationTokens
+        )
+        hasAppliedRestriction = shieldMatchesSelection
+        if !shieldMatchesSelection,
+           (settingsStore.shield.applications != nil || settingsStore.shield.applicationCategories != nil) {
+            settingsStore.shield.applications = nil
+            settingsStore.shield.applicationCategories = nil
+            ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_UNSHIELDED", forKey: "mobile.usage.localShieldStatus")
+        }
     }
 
     var backendRestrictionSettings: DeviceRestrictionSettings {
-        let configured: Bool
-        switch restrictionMode {
-        case .selectedApplications:
-            configured = isAuthorized && restrictedApplicationCount > 0 && !hasUnsupportedTargets
-        case .entireDevice:
-            configured = isAuthorized && !alwaysAllowedSelection.applicationTokens.isEmpty
-        }
+        let configured = isAuthorized && restrictedApplicationCount > 0 && !hasUnsupportedTargets
         return DeviceRestrictionSettings(
             enabled: configured,
-            targetMode: restrictionMode == .selectedApplications ? "TARGET_MODE_SELECTED_APPS" : "TARGET_MODE_DEVICE_WIDE",
+            targetMode: "TARGET_MODE_SELECTED_APPS",
             configured: configured,
             deviceConfigVersion: deviceConfigVersion
         )
@@ -106,9 +109,7 @@ final class MobileScreenTimeController: ObservableObject {
     }
 
     var selectedApplicationCount: Int { selection.applicationTokens.count }
-    var restrictedApplicationTokens: Set<ApplicationToken> {
-        selection.applicationTokens.subtracting(alwaysAllowedSelection.applicationTokens)
-    }
+    var restrictedApplicationTokens: Set<ApplicationToken> { selection.applicationTokens }
     var restrictedApplicationCount: Int { restrictedApplicationTokens.count }
 
     var hasUnsupportedTargets: Bool {
@@ -121,24 +122,17 @@ final class MobileScreenTimeController: ObservableObject {
                 ? "iPhoneの設定でスクリーンタイムの許可状態を確認してください。"
                 : "先に「本人利用の許可を求める」を押してください。"
         }
-        if restrictionMode == .selectedApplications && hasUnsupportedTargets {
+        if hasUnsupportedTargets {
             return "カテゴリやWebサイトはまだ適用できません。選択内容をアプリだけにしてください。"
         }
-        if restrictionMode == .selectedApplications && restrictedApplicationCount == 0 {
-            return "制限するアプリを1つ以上選んでください。常時許可に選んだアプリは対象外です。"
-        }
-        if restrictionMode == .entireDevice && alwaysAllowedSelection.applicationTokens.isEmpty {
-            return "常時許可する標準アプリを選んでください。Safariは選ばないでください。"
+        if restrictedApplicationCount == 0 {
+            return "制限するアプリを1つ以上選んでください。"
         }
         return nil
     }
 
     var appliedRestrictionLabel: String {
-        switch appliedRestrictionMode {
-        case .selectedApplications: "指定したアプリを制限中"
-        case .entireDevice: "標準以外を制限中"
-        case nil: "制限は適用されていません"
-        }
+        hasAppliedRestriction ? "指定したアプリを制限中" : "制限は適用されていません"
     }
 
     var authorizationStatusLabel: String {
@@ -155,7 +149,10 @@ final class MobileScreenTimeController: ObservableObject {
 
     func refreshAuthorizationStatus() {
         authorizationStatus = authorizationCenter.authorizationStatus
-        appliedRestrictionMode = Self.readAppliedMode(from: settingsStore)
+        hasAppliedRestriction = Self.hasAppliedSelection(
+            from: settingsStore,
+            selectedApplications: selection.applicationTokens
+        )
     }
 
     func requestAuthorization() async {
@@ -180,18 +177,12 @@ final class MobileScreenTimeController: ObservableObject {
             ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_ERROR", forKey: "mobile.usage.localShieldStatus")
             return false
         }
-        switch restrictionMode {
-        case .selectedApplications:
-            settingsStore.shield.applicationCategories = nil
-            settingsStore.shield.applications = restrictedApplicationTokens
-        case .entireDevice:
-            settingsStore.shield.applications = nil
-            settingsStore.shield.applicationCategories = .all(except: alwaysAllowedSelection.applicationTokens)
-        }
-        appliedRestrictionMode = restrictionMode
+        settingsStore.shield.applicationCategories = nil
+        settingsStore.shield.applications = restrictedApplicationTokens
+        hasAppliedRestriction = true
         ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
         errorMessage = nil
-        statusMessage = "\(restrictionMode.appliedDescription)をiPhoneに設定しました。対象アプリを開いてShield画面が表示されるか確認してください。"
+        statusMessage = "指定したアプリをiPhoneに設定しました。対象アプリを開いてShield画面が表示されるか確認してください。"
         return true
     }
 
@@ -199,7 +190,7 @@ final class MobileScreenTimeController: ObservableObject {
     func clearRestriction() -> Bool {
         settingsStore.shield.applications = nil
         settingsStore.shield.applicationCategories = nil
-        appliedRestrictionMode = nil
+        hasAppliedRestriction = false
         ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_UNSHIELDED", forKey: "mobile.usage.localShieldStatus")
         errorMessage = nil
         statusMessage = "このアプリが設定したShieldを解除しました。"
@@ -322,6 +313,9 @@ final class MobileScreenTimeController: ObservableObject {
                 failureReason: failureReason,
                 appliedAt: appliedAt
             )
+            if status != "SHIELD_STATUS_ERROR" {
+                errorMessage = nil
+            }
             shared.removeObject(forKey: operationKey)
             shared.removeObject(forKey: appliedAtKey)
             shared.removeObject(forKey: requestFingerprintKey)
@@ -344,46 +338,16 @@ final class MobileScreenTimeController: ObservableObject {
         }
     }
 
-    private func saveAlwaysAllowedSelection() {
-        do {
-            let data = try JSONEncoder().encode(alwaysAllowedSelection)
-            if defaults.data(forKey: alwaysAllowedSelectionDefaultsKey) != data { advanceDeviceConfigVersion() }
-            defaults.set(data, forKey: alwaysAllowedSelectionDefaultsKey)
-            errorMessage = nil
-        } catch {
-            errorMessage = "常時許可するアプリをこのiPhoneに保存できませんでした。"
-        }
-    }
-
     private func advanceDeviceConfigVersion() {
         deviceConfigVersion += 1
         defaults.set(Int(deviceConfigVersion), forKey: deviceConfigVersionDefaultsKey)
     }
 
-    private static func readAppliedMode(from store: ManagedSettingsStore) -> LocalRestrictionMode? {
-        if store.shield.applicationCategories != nil { return .entireDevice }
-        if let applications = store.shield.applications, !applications.isEmpty { return .selectedApplications }
-        return nil
-    }
-}
-
-enum LocalRestrictionMode: String, CaseIterable, Identifiable {
-    case selectedApplications
-    case entireDevice
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .selectedApplications: "指定したアプリのみ制限"
-        case .entireDevice: "標準アプリ以外を制限"
-        }
-    }
-
-    var appliedDescription: String {
-        switch self {
-        case .selectedApplications: "指定アプリのみ制限"
-        case .entireDevice: "標準アプリ以外を制限"
-        }
+    private static func hasAppliedSelection(
+        from store: ManagedSettingsStore,
+        selectedApplications: Set<ApplicationToken>
+    ) -> Bool {
+        guard let applications = store.shield.applications else { return false }
+        return !selectedApplications.isEmpty && applications == selectedApplications
     }
 }

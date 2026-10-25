@@ -1,6 +1,7 @@
 import DeviceActivity
 import FamilyControls
 import Foundation
+import ManagedSettings
 
 enum ScreenTimeSharedStorage {
     static let appGroup = "group.com.example.tkb2622.mobile"
@@ -19,13 +20,11 @@ struct DeviceActivityUsageMonitor {
     func start(
         operationID: String,
         reservedSeconds: Int,
-        selection: FamilyActivitySelection,
-        alwaysAllowedSelection: FamilyActivitySelection
+        applications: Set<ApplicationToken>
     ) throws {
         guard reservedSeconds > 0, reservedSeconds.isMultiple(of: 60) else {
             throw DeviceActivityUsageMonitorError.invalidDuration
         }
-        let applications = selection.applicationTokens.subtracting(alwaysAllowedSelection.applicationTokens)
         guard !applications.isEmpty else {
             throw DeviceActivityUsageMonitorError.noSelectedApplications
         }
