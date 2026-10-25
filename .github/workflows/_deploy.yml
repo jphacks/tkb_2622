@@ -61,8 +61,8 @@ jobs:
       - name: Deploy API
         run: gcloud run deploy "tkb-$ENV-api" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION"
 
-      # Cloud Run では /healthz が予約されているため /health を使う
+      # run.app への直接アクセスは X-Origin-Auth がないため 403 になる．Cloudflare Worker 経由で確認する
       - name: Health check
-        run: |
-          url=$(gcloud run services describe "tkb-$ENV-api" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
-          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/health"
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: curl --fail --silent --show-error --retry 5 --retry-all-errors "$API_URL/healthz"

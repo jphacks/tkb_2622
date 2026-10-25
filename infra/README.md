@@ -173,7 +173,7 @@ bootstrap → envs/shared/gcp → envs/<env>/gcp → (Secret 投入・初回デ�
 
 ### GitHub Actions の設定
 
-main に backend の変更が push されると，`.github/workflows/deploy-backend.yml` が dev へデプロイする（イメージのビルド・公開 → マイグレーション Job → API 更新 → `/health` の確認）．Actions のタブから `workflow_dispatch` で手動実行もできる．
+main に backend の変更が push されると，`.github/workflows/deploy-backend.yml` が dev へデプロイする（イメージのビルド・公開 → マイグレーション Job → API 更新 → Worker 経由で `/healthz` の確認）．Actions のタブから `workflow_dispatch` で手動実行もできる．
 
 リポジトリの Settings → Environments で `dev` を作り，次の Environment variables を登録する（Secret ではなく Variables）．
 
@@ -183,6 +183,7 @@ main に backend の変更が push されると，`.github/workflows/deploy-back
 | `GCP_REGION` | `asia-northeast1` |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform -chdir=infra/envs/shared/gcp output -raw workload_identity_provider` |
 | `GCP_DEPLOYER_SERVICE_ACCOUNT` | `terraform -chdir=infra/envs/shared/gcp output -raw deployer_service_account_email` |
+| `API_URL` | `terraform -chdir=infra/envs/dev/cloudflare output -raw api_url`（Worker の URL．Cloud Run の `run.app` へ直接アクセスすると 403 になるため，ヘルスチェックはこちらを使う） |
 
 Workload Identity 連携は `jphacks/tkb_2622` のトークンしか受け付けないため，fork からは実行できない．
 
