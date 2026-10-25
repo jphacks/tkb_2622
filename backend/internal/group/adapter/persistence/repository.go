@@ -104,6 +104,37 @@ func (r *Repository) ListWorkStarts(ctx context.Context, userID string, after ti
 	return out, rows.Err()
 }
 
+func (r *Repository) ListFocusedGroupMembers(ctx context.Context, userID string) ([]domain.FocusedMember, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT u.display_name, u.avatar_id, s.started_at
+		FROM app.group_memberships AS mine
+		JOIN app.group_memberships AS member
+		  ON member.group_id = mine.group_id AND member.status = 'ACTIVE'
+		JOIN app.users AS u
+		  ON u.id = member.user_id AND u.status = 'ACTIVE'
+		JOIN app.work_sessions AS s
+		  ON s.user_id = member.user_id AND s.status = 'RUNNING'
+		WHERE mine.user_id = $1
+		  AND mine.status = 'ACTIVE'
+		  AND member.user_id <> mine.user_id
+		ORDER BY s.started_at, u.display_name`, uuid.MustParse(userID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.FocusedMember, 0)
+	for rows.Next() {
+		var member domain.FocusedMember
+		if err := rows.Scan(&member.DisplayName, &member.AvatarID, &member.StartedAt); err != nil {
+			return nil, err
+		}
+		member.StartedAt = member.StartedAt.UTC()
+		out = append(out, member)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) CreateGroup(ctx context.Context, userID, operationID, name string) (out domain.Group, err error) {
 	userIDValue := uuid.MustParse(userID)
 	operationIDValue := uuid.MustParse(operationID)

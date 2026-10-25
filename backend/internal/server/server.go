@@ -104,6 +104,7 @@ func Handler(d Deps) http.Handler {
 	}
 	mux.Handle(groupv1connect.NewGroupServiceHandler(groupconnect.New(resolveGroupUser, d.Groups), auth, connect.WithReadMaxBytes(64*1024)))
 	mux.Handle("GET /v1/group/work-starts", grouphttp.NewWorkStartsHandler(d.Verifier, d.Identity, d.Groups))
+	mux.Handle("GET /v1/group/focus-status", grouphttp.NewFocusStatusHandler(d.Verifier, d.Identity, d.Groups))
 	mux.Handle(rewardv1connect.NewRewardServiceHandler(rewardconnect.New(func(ctx context.Context) (string, error) {
 		a, err := resolve(ctx)
 		if err != nil {

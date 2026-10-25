@@ -496,6 +496,7 @@ private final class SimulatorGroupRepository: GroupRepository {
     }
 
     func fetchWorkStarts() async throws -> [MobileGroupWorkStart] { [] }
+    func fetchFocusedMembers() async throws -> [MobileGroupFocusMember] { [] }
     func createGroup(name: String, operationID: String) async throws -> MobileGroup { groups[0] }
     func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
         fatalError("Not used by this test")
@@ -515,6 +516,7 @@ private struct WorkStartFailureGroupRepository: GroupRepository {
     func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
         throw ConnectJSONClient.ClientError.connect(code: "unauthenticated")
     }
+    func fetchFocusedMembers() async throws -> [MobileGroupFocusMember] { [] }
     func createGroup(name: String, operationID: String) async throws -> MobileGroup { group }
     func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation {
         throw ConnectJSONClient.ClientError.connect(code: "unimplemented")
