@@ -80,7 +80,7 @@ func run(logger *slog.Logger) error {
 	rewardWallets := reward.New(rewardRepository)
 	if os.Getenv("APP_ENV") == "local" && os.Getenv("REWARD_POLICY_TEST_MODE") == "true" {
 		rewardWallets = reward.NewWithPolicy(rewardRepository, reward.PolicyTest)
-		logger.Warn("local reward test policy enabled", "work_block_seconds", 60, "reward_seconds", 20)
+		logger.Warn("local reward test policy enabled", "work_block_seconds", 60, "reward_seconds", 20, "initial_balance_seconds", 60)
 	}
 	handler := server.Handler(server.Deps{
 		Identity:      identityService,

@@ -15,6 +15,7 @@ type Policy struct {
 	WorkBlockMillis          int64
 	RewardBlockSeconds       int64
 	MinimumKnownActiveMillis int64
+	InitialBalanceSeconds    int64
 }
 
 var (
@@ -23,7 +24,7 @@ var (
 	// PolicyV2 follows the provisional MVP rule: five minutes of related work earns one minute.
 	PolicyV2 = Policy{Version: 2, WorkBlockMillis: 300_000, RewardBlockSeconds: 60, MinimumKnownActiveMillis: 300_000}
 	// PolicyTest is enabled only by the local Compose API for iPhone usage-grant testing.
-	PolicyTest    = Policy{Version: 3, WorkBlockMillis: 60_000, RewardBlockSeconds: 20, MinimumKnownActiveMillis: 60_000}
+	PolicyTest    = Policy{Version: 3, WorkBlockMillis: 60_000, RewardBlockSeconds: 20, MinimumKnownActiveMillis: 60_000, InitialBalanceSeconds: 60}
 	CurrentPolicy = PolicyV2
 )
 

@@ -74,6 +74,15 @@ func (r *Repository) SaveWallet(ctx context.Context, w domain.Wallet) error {
 	return nil
 }
 
+func (r *Repository) HasTransactionSource(ctx context.Context, userID, sourceID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM app.reward_transactions WHERE user_id = $1 AND source_id = $2)`,
+		uuid.MustParse(userID), sourceID,
+	).Scan(&exists)
+	return exists, err
+}
+
 func (r *Repository) AddTransaction(ctx context.Context, t application.Transaction) error {
 	return r.q.AddTransaction(ctx, q.AddTransactionParams{ID: uuid.MustParse(t.ID), UserID: uuid.MustParse(t.UserID), SessionID: uuid.MustParse(t.SessionID), Type: t.Type, AmountSeconds: t.AmountSeconds, SourceID: t.SourceID, BalanceAfter: t.BalanceAfter})
 }
