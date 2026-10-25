@@ -334,7 +334,7 @@ struct AuthenticationSettingsSection: View {
       let didSync = try await AuthenticatedAPISyncFlow.run(
         isAuthenticated: allowsAutomaticAPISync
       ) {
-        try await loadBusinessIdentity(using: service)
+        try await loadBusinessIdentity(using: service, origin: .automaticSessionRestore)
       }
       if !didSync {
         setMessage(
@@ -363,7 +363,10 @@ struct AuthenticationSettingsSection: View {
   }
 
   @MainActor
-  private func loadBusinessIdentity(using service: SupabaseAuthService) async throws {
+  private func loadBusinessIdentity(
+    using service: SupabaseAuthService,
+    origin: IdentitySyncOrigin = .userInitiated
+  ) async throws {
     let session = try await service.client.auth.session
     guard let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL else {
       throw SettingsInputError.invalidURL("Connect API URL")
@@ -389,7 +392,9 @@ struct AuthenticationSettingsSection: View {
     #else
       setMessage("ログインしました。", error: false)
     #endif
-    onAuthenticationChanged()
+    if origin.notifiesRootAuthenticationState {
+      onAuthenticationChanged()
+    }
   }
 
   @MainActor

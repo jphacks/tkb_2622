@@ -34,3 +34,15 @@ struct AuthenticationSessionRestoreGate {
     return true
   }
 }
+
+enum IdentitySyncOrigin {
+  case automaticSessionRestore
+  case userInitiated
+
+  var notifiesRootAuthenticationState: Bool {
+    switch self {
+    case .automaticSessionRestore: false
+    case .userInitiated: true
+    }
+  }
+}
