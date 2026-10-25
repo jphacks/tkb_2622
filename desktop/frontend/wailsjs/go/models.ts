@@ -279,6 +279,8 @@ export namespace session {
 	    sessionId: string;
 	    name: string;
 	    status: string;
+	    startedAt?: string;
+	    endedAt?: string;
 	    elapsedSeconds: number;
 	    taskSeconds: number;
 	    relatedSeconds: number;
@@ -307,6 +309,8 @@ export namespace session {
 	        this.sessionId = source["sessionId"];
 	        this.name = source["name"];
 	        this.status = source["status"];
+	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
 	        this.elapsedSeconds = source["elapsedSeconds"];
 	        this.taskSeconds = source["taskSeconds"];
 	        this.relatedSeconds = source["relatedSeconds"];
@@ -395,6 +399,7 @@ export namespace session {
 	    restrictionConfirmed: boolean;
 	    settings: Settings;
 	    history: Result[];
+	    historyError?: string;
 	    result?: Result;
 	    actions: Record<string, Capability>;
 	    failure?: Failure;
@@ -424,6 +429,7 @@ export namespace session {
 	        this.restrictionConfirmed = source["restrictionConfirmed"];
 	        this.settings = this.convertValues(source["settings"], Settings);
 	        this.history = this.convertValues(source["history"], Result);
+	        this.historyError = source["historyError"];
 	        this.result = this.convertValues(source["result"], Result);
 	        this.actions = this.convertValues(source["actions"], Capability, true);
 	        this.failure = this.convertValues(source["failure"], Failure);
