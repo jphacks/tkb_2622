@@ -145,6 +145,7 @@ mobile/build-release-simulator.sh
 ## 確認方法
 
 - Widgetのアバターは`FocusWidgetExtension/FocusWidgetAvatar.swift`で最大162×162 px（最大54 pt・3x表示）へ縮小し、独立したビットマップとして描画へ渡す。元の1254 px画像をそのままWidgetKitの描画データへ含めない。同梱画像は変更せず、読み込めない画像は標準の人物アイコンで表示する。Simulator testは全10種類のアバターのビットマップ寸法を検証する。
+- 2026-10-26の画像処理追加後は、Simulator test 86件と実機向けDebug buildが通過した。iPhone SE（第3世代）・iOS 27.0.1で、プレースホルダー表示から「集中ルーム」のタイトルとキャラクターが表示されることを利用者が確認した。修正前は実機ログに`WidgetKit.WidgetArchiver.ArchivingError Code=2`と`timelineReloadFailed`が記録されていた。
 - 集中ルームWidgetはホーム画面の小・中サイズで確認する。グループの友達がDesktopで作業を開始した後、iPhoneアプリを前景へ戻し、ホーム画面でキャラが表示されることを確認する。作業終了・一時停止後は次の成功同期でキャラが消える。Debugのサンプル表示では通信せず描画を確認できる。キャラの移動・揺れは更新時の1.4秒だけで、「視差効果を減らす」や常時表示の低輝度状態では抑制する。
 - 背景移行時はOSの有限の実行時間内に最後の取得を試み、次の`BGAppRefreshTask`を15分以降に要求する。実行時刻・頻度はOSが決めるため、15分おきの同期や即時反映は保証しない。iPhoneの「Appのバックグラウンド更新」が無効な場合、低電力モード、アプリの強制終了などでは更新が遅れる／実行されない場合がある。12分の有効期限を超えるとキャラを隠すため、背景更新まで案内表示になる時間があり得る。アプリ復帰時には待機タイマーをリセットして即時取得する。[Appleの背景タスク仕様](https://developer.apple.com/documentation/uikit/using-background-tasks-to-update-your-app)、[Widgetの更新と予算](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date)、[更新アニメーションの制約](https://developer.apple.com/documentation/widgetkit/animating-data-updates-in-widgets-and-live-activities)
 - 背景更新の受け入れでは、実機でアプリを背景に置き、友達の作業開始／終了後の同期時刻・ウィジェット表示を記録する。未同期のまま12分経過した場合の案内表示、通信断からの前景復帰、ログアウト／アカウント変更も確認する。Simulatorのstubテストは取得成功／失敗、空の応答、キャンセル、アカウント変更、古い応答の抑止を確認するが、OSによる背景タスク起動やホーム画面上のアニメーションを保証しない。
