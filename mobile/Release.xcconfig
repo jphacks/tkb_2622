@@ -1,0 +1,4 @@
+SUPABASE_PROJECT_URL =
+SUPABASE_PUBLISHABLE_KEY =
+CONNECT_API_BASE_URL =
+#include? "Release.local.xcconfig"

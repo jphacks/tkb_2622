@@ -52,7 +52,7 @@ Supabase側ではメールOTPのテンプレートに`{{ .Token }}`を含め，�
 3. Windows担当者が共通基盤を取得し，Windowsで起動・Go呼び出し・イベントを確認する．両担当がOS別UIを実装し，共通ファイルは作業ごとに編集担当を一人に決める．
 4. 共通Go bridgeから認証・PC登録・タスクAPIを接続する．続いて計測・セッション／報酬同期を接続する．トレイ・配布の実機確認は画面デモと分ける．
 
-macOSではメニューバーのStatus Itemからウィンドウを表示できる．ウィンドウを閉じてもアプリと計測は継続し，メニューの「終了」でアプリを終了する．Windowsのトレイ対応は未実装である．
+macOSではメニューバーのStatus Itemをクリックすると，開始・一時停止・再開・終了・中止を操作するネイティブポップオーバーを表示する．「ダッシュボード」「これまでの記録」「設定」から既存のWails画面を開ける．ポップオーバーの操作は既存のGoセッションAPIへ渡す．Wailsウィンドウを閉じてもアプリと計測は継続し，メニューバーの右クリックメニューから「終了」を選ぶとアプリを終了する．Windowsのトレイ対応は未実装である．
 
 ### 起動手順の整備
 
@@ -80,11 +80,13 @@ make -C desktop up-win      # wails devで起動（終了はCtrl+C）
 | 実行場所 | 動作 |
 | --- | --- |
 | Windows（PowerShell） | Windows側にcloneしたリポジトリでそのまま実行する |
-| WSL | `desktop/`をWindows側（既定は`%LOCALAPPDATA%\tkb_2622\desktop`．`WIN_DESKTOP_DIR`で変更可）へ同期し，`powershell.exe`でそこから実行する．`up-win`の実行中はWSLでの編集を1秒ごとに同期し，ホットリロードに反映する |
+| WSL | `desktop/`をWindows側（既定は`%LOCALAPPDATA%\tkb_2622\desktop`．`WIN_DESKTOP_DIR`で変更可）へ同期し，go.modの`replace`が参照する`poc/macos-native`も同じ相対位置へ同期して，`powershell.exe`でそこから実行する．`up-win`の実行中はWSLでの編集を1秒ごとに同期し，ホットリロードに反映する |
 
 WSLのリポジトリをWindowsから直接動かさないのは，Windowsのnpmが`\\wsl.localhost\...`上でスクリプトを実行できず，`node_modules`のネイティブ部品もOSごとに異なるためである．同期先の`node_modules`・`wailsjs`等はWindows側で生成し，同期で上書き・削除しない．同期先で編集した内容はWSLへ戻らないため，編集はWSL側で行う．
 
 `setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加する．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．`package-lock.json`を変更したら`setup-win`を再実行する．処理は`scripts/windows/`（PowerShellの`setup.ps1`・`up.ps1`，WSL用の`wsl.sh`）にある．
+
+配布用のWindowsアプリは，Windows側の`desktop`（WSLから使う場合は同期先）で`wails build`を実行してビルドする．`build/bin/focus-link.exe`が生成される．アイコン・バージョン情報・マニフェストは`build/windows/`に置く．
 
 ```sh
 cd desktop
@@ -100,7 +102,7 @@ sh build/build-macos-app.sh
 
 対応ブラウザーのドメイン取得にはmacOSのオートメーション許可が必要になる場合がある．許可しない場合もアプリ名とアイドル時間の観測を続け，取得できなかったサンプルは報酬評価に使わない．
 
-共通基盤の過去確認ではmacOS arm64のWails起動・Go呼び出し・イベント購読とアプリビルドが通っている．このローカル計測モードを追加した後のWailsビルドとmacOS権限の実機確認は，ビルド環境で確認する．Windowsは共通UIのブラウザプレビューのみで，Wails実機起動・ビルドは未確認．
+共通基盤の過去確認ではmacOS arm64のWails起動・Go呼び出し・イベント購読とアプリビルドが通っている．このローカル計測モードを追加した後のWailsビルドとmacOS権限の実機確認は，ビルド環境で確認する．Windows 11 amd64では，WSLからの`make -C desktop setup-win`・`up-win`によるWails起動・Go呼び出し・イベント受信，`go test ./internal/...`，`wails build`が通っている．Windowsの計測はデモモードのままである．
 
 一時的な実行ログ・実機検証結果はPRなどに記録し，本READMEには継続利用する手順を残す．
 

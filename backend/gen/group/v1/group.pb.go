@@ -27,6 +27,7 @@ type GroupMember struct {
 	IsCurrentUser bool                   `protobuf:"varint,1,opt,name=is_current_user,json=isCurrentUser,proto3" json:"is_current_user,omitempty"`
 	JoinedAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarId      string                 `protobuf:"bytes,4,opt,name=avatar_id,json=avatarId,proto3" json:"avatar_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78,6 +79,13 @@ func (x *GroupMember) GetJoinedAt() *timestamppb.Timestamp {
 func (x *GroupMember) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *GroupMember) GetAvatarId() string {
+	if x != nil {
+		return x.AvatarId
 	}
 	return ""
 }
@@ -634,11 +642,12 @@ var File_group_v1_group_proto protoreflect.FileDescriptor
 
 const file_group_v1_group_proto_rawDesc = "" +
 	"\n" +
-	"\x14group/v1/group.proto\x12\bgroup.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x91\x01\n" +
+	"\x14group/v1/group.proto\x12\bgroup.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xae\x01\n" +
 	"\vGroupMember\x12&\n" +
 	"\x0fis_current_user\x18\x01 \x01(\bR\risCurrentUser\x127\n" +
 	"\tjoined_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x97\x01\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12\x1b\n" +
+	"\tavatar_id\x18\x04 \x01(\tR\bavatarId\"\x97\x01\n" +
 	"\x05Group\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +

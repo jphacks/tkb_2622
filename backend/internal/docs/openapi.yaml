@@ -902,6 +902,9 @@ components:
         displayName:
           type: string
           title: display_name
+        avatarId:
+          type: string
+          title: avatar_id
       title: GroupMember
       additionalProperties: false
     group.v1.LeaveGroupRequest:
@@ -936,6 +939,29 @@ components:
             $ref: '#/components/schemas/group.v1.Group'
           title: groups
       title: ListGroupsResponse
+      additionalProperties: false
+    identity.v1.APNsEnvironment:
+      type: string
+      title: APNsEnvironment
+      enum:
+        - AP_NS_ENVIRONMENT_UNSPECIFIED
+        - AP_NS_ENVIRONMENT_DEVELOPMENT
+        - AP_NS_ENVIRONMENT_PRODUCTION
+    identity.v1.DeleteNotificationEndpointRequest:
+      type: object
+      properties:
+        registrationId:
+          type: string
+          title: registration_id
+      title: DeleteNotificationEndpointRequest
+      additionalProperties: false
+    identity.v1.DeleteNotificationEndpointResponse:
+      type: object
+      properties:
+        deleted:
+          type: boolean
+          title: deleted
+      title: DeleteNotificationEndpointResponse
       additionalProperties: false
     identity.v1.Device:
       type: object
@@ -1052,6 +1078,29 @@ components:
           title: device
       title: RegisterDeviceResponse
       additionalProperties: false
+    identity.v1.RegisterNotificationEndpointRequest:
+      type: object
+      properties:
+        apnsToken:
+          type: string
+          title: apns_token
+        environment:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.APNsEnvironment'
+          title: environment
+        registrationId:
+          type: string
+          title: registration_id
+      title: RegisterNotificationEndpointRequest
+      additionalProperties: false
+    identity.v1.RegisterNotificationEndpointResponse:
+      type: object
+      properties:
+        registered:
+          type: boolean
+          title: registered
+      title: RegisterNotificationEndpointResponse
+      additionalProperties: false
     identity.v1.RevokeDeviceRequest:
       type: object
       properties:
@@ -1075,6 +1124,23 @@ components:
             - $ref: '#/components/schemas/identity.v1.Device'
           title: device
       title: RevokeDeviceResponse
+      additionalProperties: false
+    identity.v1.UpdateAvatarRequest:
+      type: object
+      properties:
+        avatarId:
+          type: string
+          title: avatar_id
+      title: UpdateAvatarRequest
+      additionalProperties: false
+    identity.v1.UpdateAvatarResponse:
+      type: object
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/identity.v1.User'
+          title: user
+      title: UpdateAvatarResponse
       additionalProperties: false
     identity.v1.UpdateDisplayNameRequest:
       type: object
@@ -1108,6 +1174,9 @@ components:
         displayName:
           type: string
           title: display_name
+        avatarId:
+          type: string
+          title: avatar_id
       title: User
       additionalProperties: false
     restriction.v1.DesiredMode:
@@ -2416,6 +2485,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/group.v1.ListGroupsResponse'
+  /identity.v1.IdentityService/DeleteNotificationEndpoint:
+    post:
+      tags:
+        - IdentityService
+      summary: DeleteNotificationEndpoint
+      operationId: identity.v1.IdentityService.DeleteNotificationEndpoint
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.DeleteNotificationEndpointRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.DeleteNotificationEndpointResponse'
   /identity.v1.IdentityService/EnsureUser:
     post:
       tags:
@@ -2568,6 +2675,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RegisterDeviceResponse'
+  /identity.v1.IdentityService/RegisterNotificationEndpoint:
+    post:
+      tags:
+        - IdentityService
+      summary: RegisterNotificationEndpoint
+      operationId: identity.v1.IdentityService.RegisterNotificationEndpoint
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.RegisterNotificationEndpointRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.RegisterNotificationEndpointResponse'
   /identity.v1.IdentityService/RevokeDevice:
     post:
       tags:
@@ -2606,6 +2751,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/identity.v1.RevokeDeviceResponse'
+  /identity.v1.IdentityService/UpdateAvatar:
+    post:
+      tags:
+        - IdentityService
+      summary: UpdateAvatar
+      operationId: identity.v1.IdentityService.UpdateAvatar
+      parameters:
+        - name: Connect-Protocol-Version
+          in: header
+          description: Define the version of the Connect protocol
+          schema:
+            $ref: '#/components/schemas/connect-protocol-version'
+          example: 1
+        - name: Connect-Timeout-Ms
+          in: header
+          description: Define the timeout, in ms
+          schema:
+            $ref: '#/components/schemas/connect-timeout-header'
+          example: 1000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/identity.v1.UpdateAvatarRequest'
+        required: true
+      responses:
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/connect.error'
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/identity.v1.UpdateAvatarResponse'
   /identity.v1.IdentityService/UpdateDisplayName:
     post:
       tags:

@@ -1,16 +1,16 @@
 export namespace monitor {
-
+	
 	export class ClassificationCandidate {
 	    name: string;
 	    appId: string;
 	    appName: string;
 	    domain: string;
 	    sampleCount: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ClassificationCandidate(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -24,17 +24,17 @@ export namespace monitor {
 }
 
 export namespace session {
-
+	
 	export class AccountState {
 	    status: string;
 	    email: string;
 	    deviceRegistered: boolean;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AccountState(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.status = source["status"];
@@ -46,11 +46,11 @@ export namespace session {
 	export class Capability {
 	    allowed: boolean;
 	    reason: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Capability(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.allowed = source["allowed"];
@@ -62,11 +62,11 @@ export namespace session {
 	    appId?: string;
 	    domain?: string;
 	    category: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Classification(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -84,11 +84,11 @@ export namespace session {
 	    ownedByThisDevice: boolean;
 	    trackingOnly: boolean;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CloudSession(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -105,18 +105,18 @@ export namespace session {
 	    tasks: Task[];
 	    selectedTaskId: string;
 	    classifications: Classification[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tasks = this.convertValues(source["tasks"], Task);
 	        this.selectedTaskId = source["selectedTaskId"];
 	        this.classifications = this.convertValues(source["classifications"], Classification);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -145,11 +145,11 @@ export namespace session {
 	    version: number;
 	    pendingOperationId?: string;
 	    pendingSettingsHash?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Task(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -170,11 +170,11 @@ export namespace session {
 	    task: Task;
 	    classification: Classification;
 	    settings: Settings;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Command(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.action = source["action"];
@@ -184,7 +184,7 @@ export namespace session {
 	        this.classification = this.convertValues(source["classification"], Classification);
 	        this.settings = this.convertValues(source["settings"], Settings);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -207,16 +207,46 @@ export namespace session {
 	    code: string;
 	    message: string;
 	    retryable: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Failure(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
 	        this.message = source["message"];
 	        this.retryable = source["retryable"];
+	    }
+	}
+	export class IPhoneRestrictionState {
+	    sessionId: string;
+	    deviceId: string;
+	    controlRevision: number;
+	    desiredMode: string;
+	    appliedRevision: number;
+	    shieldStatus: string;
+	    permissionStatus: string;
+	    lastAppliedAt?: string;
+	    lastReportedAt?: string;
+	    failureReason?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new IPhoneRestrictionState(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.deviceId = source["deviceId"];
+	        this.controlRevision = source["controlRevision"];
+	        this.desiredMode = source["desiredMode"];
+	        this.appliedRevision = source["appliedRevision"];
+	        this.shieldStatus = source["shieldStatus"];
+	        this.permissionStatus = source["permissionStatus"];
+	        this.lastAppliedAt = source["lastAppliedAt"];
+	        this.lastReportedAt = source["lastReportedAt"];
+	        this.failureReason = source["failureReason"];
 	    }
 	}
 	export class MonitorStatus {
@@ -228,11 +258,11 @@ export namespace session {
 	    lastSample: string;
 	    sampleCount: number;
 	    message: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MonitorStatus(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.state = source["state"];
@@ -257,14 +287,17 @@ export namespace session {
 	    uncertainSeconds: number;
 	    inactiveSeconds: number;
 	    evaluatorVersion?: string;
+	    b100?: number;
+	    q?: number;
+	    workRate?: number;
 	    earnedSeconds: number;
 	    usedSeconds: number;
 	    discardedSeconds: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
@@ -278,12 +311,15 @@ export namespace session {
 	        this.uncertainSeconds = source["uncertainSeconds"];
 	        this.inactiveSeconds = source["inactiveSeconds"];
 	        this.evaluatorVersion = source["evaluatorVersion"];
+	        this.b100 = source["b100"];
+	        this.q = source["q"];
+	        this.workRate = source["workRate"];
 	        this.earnedSeconds = source["earnedSeconds"];
 	        this.usedSeconds = source["usedSeconds"];
 	        this.discardedSeconds = source["discardedSeconds"];
 	    }
 	}
-
+	
 	export class WorkSession {
 	    id: string;
 	    name: string;
@@ -295,11 +331,11 @@ export namespace session {
 	    rulesVersion?: string;
 	    elapsedSeconds: number;
 	    evaluation: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WorkSession(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -313,7 +349,7 @@ export namespace session {
 	        this.elapsedSeconds = source["elapsedSeconds"];
 	        this.evaluation = source["evaluation"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -339,6 +375,8 @@ export namespace session {
 	    updatedAt: string;
 	    session?: WorkSession;
 	    cloudSession?: CloudSession;
+	    iPhoneRestriction?: IPhoneRestrictionState;
+	    iPhoneRestrictionError?: string;
 	    cloudOperationPending?: boolean;
 	    balanceSeconds?: number;
 	    sync: string;
@@ -353,11 +391,11 @@ export namespace session {
 	    actions: Record<string, Capability>;
 	    failure?: Failure;
 	    account: AccountState;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Snapshot(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.revision = source["revision"];
@@ -366,6 +404,8 @@ export namespace session {
 	        this.updatedAt = source["updatedAt"];
 	        this.session = this.convertValues(source["session"], WorkSession);
 	        this.cloudSession = this.convertValues(source["cloudSession"], CloudSession);
+	        this.iPhoneRestriction = this.convertValues(source["iPhoneRestriction"], IPhoneRestrictionState);
+	        this.iPhoneRestrictionError = source["iPhoneRestrictionError"];
 	        this.cloudOperationPending = source["cloudOperationPending"];
 	        this.balanceSeconds = source["balanceSeconds"];
 	        this.sync = source["sync"];
@@ -381,7 +421,7 @@ export namespace session {
 	        this.failure = this.convertValues(source["failure"], Failure);
 	        this.account = this.convertValues(source["account"], AccountState);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -400,7 +440,7 @@ export namespace session {
 		    return a;
 		}
 	}
-
+	
 
 }
 

@@ -2,8 +2,6 @@ name: tkb-backend-local
 services:
   postgres:
     image: postgres:17.7-bookworm
-    ports:
-      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: tkb
       POSTGRES_USER: postgres
@@ -38,10 +36,21 @@ services:
       SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
       AUTH_ALLOW_LOCAL_HTTP: ${AUTH_ALLOW_LOCAL_HTTP:-false}
       API_DOCS_ENABLED: "true"
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_AUTH_KEY_PATH: ${APNS_AUTH_KEY_FILE:+/run/secrets/apns_auth_key}
+    volumes:
+      - type: bind
+        source: ${APNS_AUTH_KEY_FILE:-/dev/null}
+        target: /run/secrets/apns_auth_key
+        read_only: true
+        bind:
+          create_host_path: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${API_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${API_BIND_ADDRESS:-0.0.0.0}:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully

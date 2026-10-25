@@ -3,6 +3,7 @@ import type { Classification, ClassificationCandidate, Settings, Task } from '..
 import type { PageProps } from './SessionPage';
 import { minimumDuration, plannedDuration } from '../components/format';
 import { taskPurposes } from '../fixtures';
+import { iPhoneIntegrationStatus } from './iphoneIntegrationStatus';
 
 const emptyTask: Task = { id: '', name: '', category: 'OTHER', mode: 'NORMAL', minimumSeconds: 300, plannedSeconds: 1500 };
 const emptyClassification: Classification = { name: '', appId: '', domain: '', category: 'work' };
@@ -293,7 +294,7 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
           {account.message && <p className="settings-note" role="status">{account.message}</p>}
         </>}
       </section>
-      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}{monitor.appId ? ' · AppID ' + monitor.appId : ''}{monitor.domain ? ' · Domain ' + monitor.domain : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>iPhone・通知<small>StartSessionと利用枠の反映</small></span><span className="unavailable">未接続</span></div></section>
+      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}{monitor.appId ? ' · AppID ' + monitor.appId : ''}{monitor.domain ? ' · Domain ' + monitor.domain : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>iPhone連携<small>作業状態はサーバー経由で共有。制限の実適用はiPhone側で別に確認</small></span><span>{iPhoneIntegrationStatus(account, state.iPhoneRestriction, state.iPhoneRestrictionError)}</span></div></section>
       <section className="card settings-section compact-settings"><h2>通知</h2><div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>このMacとiPhoneに届きます</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div></section>
       <section className="card settings-section"><h2>プライバシー</h2><div className="settings-row"><span>観測する情報<small>前面アプリ名・アプリID、入力アイドル、対応ブラウザーのドメインをこのMacへ保存します</small></span><span>ローカル</span></div><p className="settings-note">キー入力の内容、raw URL、ページタイトル、画面画像、ブラウザーのタブIDは取得・保存しません。分類結果はローカル評価し、報酬換算はサーバー接続後に扱います。</p></section>
       <div className="settings-save"><button type="submit" className="button primary" disabled={busy || !canSaveDraft || !draftIsValid || !hasUnsavedChanges}>保存</button></div>

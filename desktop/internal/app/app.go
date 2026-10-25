@@ -18,6 +18,7 @@ import (
 
 const (
 	StateEvent                 = "desktop:state"
+	StartupStateReadyEvent     = "desktop:startup-state-ready"
 	classificationCaptureDelay = 5 * time.Second
 )
 
@@ -130,6 +131,9 @@ func clearStaleTerminalEvaluationFailure(snapshot *session.Snapshot) {
 
 func (h *Host) Startup(ctx context.Context) { h.API.ctx = ctx }
 
+// CurrentSnapshot はメニューバーUIへ現在の端末状態を渡す。
+func (h *Host) CurrentSnapshot() session.Snapshot { return h.API.snapshot() }
+
 func (h *Host) DomReady(ctx context.Context) {
 	a := h.API
 	if h.cancel != nil {
@@ -157,6 +161,20 @@ func (h *Host) DomReady(ctx context.Context) {
 			select {
 			case <-ticker.C:
 				a.syncActivity(loop)
+			case <-loop.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				ctx, cancel := context.WithTimeout(loop, 10*time.Second)
+				a.syncIPhoneRestrictionState(ctx)
+				cancel()
 			case <-loop.Done():
 				return
 			}
@@ -223,9 +241,11 @@ func (a *App) shutdown() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := a.queueAndPrepareCloudOperation("pause", time.Now()); err == nil {
-			_ = a.flushActivitySync(ctx)
+			if err := a.flushActivitySync(ctx); err != nil {
+				a.markActivitySyncPending(err)
+			}
 		} else {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		}
 	}
 }
@@ -235,12 +255,14 @@ func (a *App) GetStartupState() session.Snapshot {
 	defer cancel()
 	a.syncCloud(ctx)
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	now := time.Now()
 	if a.engine.Tick(now) {
 		a.persistLocked(now)
 	}
-	return a.engine.Snapshot()
+	state := a.engine.Snapshot()
+	a.mu.Unlock()
+	a.emitStartupStateReady()
+	return state
 }
 
 func (a *App) GetClassificationCandidates() ([]monitor.ClassificationCandidate, error) {
@@ -285,6 +307,12 @@ func (a *App) CaptureCurrentClassificationCandidate() (monitor.ClassificationCan
 }
 
 func (a *App) Execute(command session.Command) session.Snapshot {
+	if command.Action == "retryCloudSync" {
+		ctx, cancel := context.WithTimeout(a.context(), 20*time.Second)
+		defer cancel()
+		a.syncActivity(ctx)
+		return a.snapshot()
+	}
 	if command.Action == "abortCloudSession" {
 		return a.abortCloudSessionFromUI()
 	}
@@ -294,7 +322,8 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 	if command.Action == "abort" {
 		a.mu.Lock()
 		current := a.engine.Snapshot()
-		shouldConfirm := current.Mode == "local-monitor" && current.Actions["abort"].Allowed
+		// Windowsはデモモードでも，画面内に収まらないWebViewの確認ではなくOSのダイアログで確認する．
+		shouldConfirm := (current.Mode == "local-monitor" || current.Platform == "windows") && current.Actions["abort"].Allowed
 		a.mu.Unlock()
 		if shouldConfirm {
 			confirmed, err := a.confirmAbort()
@@ -349,9 +378,9 @@ func (a *App) Execute(command session.Command) session.Snapshot {
 		ctx, cancel := context.WithTimeout(a.context(), 20*time.Second)
 		defer cancel()
 		if err := a.queueAndPrepareCloudOperation(command.Action, time.Now()); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		} else if err := a.flushActivitySync(ctx); err != nil {
-			a.markActivitySyncPending()
+			a.markActivitySyncPending(err)
 		}
 		state = a.snapshot()
 	}
@@ -548,7 +577,23 @@ func (a *App) emitState(state session.Snapshot) {
 	}
 }
 
+func (a *App) emitStartupStateReady() {
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, StartupStateReadyEvent)
+	}
+}
+
 func (a *App) confirmAbort() (bool, error) {
+	if runtime.GOOS == "windows" {
+		// WindowsのMessageBoxはボタン名を変えられず「はい／いいえ」を返すため，文言で操作を示し既定を「いいえ」にする．
+		result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
+			Type:          wailsruntime.QuestionDialog,
+			Title:         "作業を中止しますか？",
+			Message:       "作業を中止します。未使用の報酬は破棄され、報酬は付与されません。\n\n「はい」で中止し、「いいえ」で作業に戻ります。",
+			DefaultButton: "No",
+		})
+		return result == "Yes", err
+	}
 	result, err := wailsruntime.MessageDialog(a.context(), wailsruntime.MessageDialogOptions{
 		Type:          wailsruntime.QuestionDialog,
 		Title:         "作業を中止しますか？",
@@ -652,6 +697,10 @@ func (a *App) finishMonitoring(outcome string, now time.Time) {
 }
 
 func (a *App) persistLocked(now time.Time) {
+	// デモモード（ローカル計測のないWindows等）は作業状態を保存しない．
+	if a.engine.Snapshot().Mode != "local-monitor" {
+		return
+	}
 	if a.store == nil || !a.stateLoaded {
 		a.engine.SetLocalStorageReady(false, now)
 		a.engine.SetFailure("local_storage_unavailable", "作業状態を読み込み・保存できません。保存先の権限と状態ファイルを確認してください。", false, now)

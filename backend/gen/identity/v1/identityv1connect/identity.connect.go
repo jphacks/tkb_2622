@@ -41,6 +41,9 @@ const (
 	// IdentityServiceUpdateDisplayNameProcedure is the fully-qualified name of the IdentityService's
 	// UpdateDisplayName RPC.
 	IdentityServiceUpdateDisplayNameProcedure = "/identity.v1.IdentityService/UpdateDisplayName"
+	// IdentityServiceUpdateAvatarProcedure is the fully-qualified name of the IdentityService's
+	// UpdateAvatar RPC.
+	IdentityServiceUpdateAvatarProcedure = "/identity.v1.IdentityService/UpdateAvatar"
 	// IdentityServiceRegisterDeviceProcedure is the fully-qualified name of the IdentityService's
 	// RegisterDevice RPC.
 	IdentityServiceRegisterDeviceProcedure = "/identity.v1.IdentityService/RegisterDevice"
@@ -50,6 +53,12 @@ const (
 	// IdentityServiceRevokeDeviceProcedure is the fully-qualified name of the IdentityService's
 	// RevokeDevice RPC.
 	IdentityServiceRevokeDeviceProcedure = "/identity.v1.IdentityService/RevokeDevice"
+	// IdentityServiceRegisterNotificationEndpointProcedure is the fully-qualified name of the
+	// IdentityService's RegisterNotificationEndpoint RPC.
+	IdentityServiceRegisterNotificationEndpointProcedure = "/identity.v1.IdentityService/RegisterNotificationEndpoint"
+	// IdentityServiceDeleteNotificationEndpointProcedure is the fully-qualified name of the
+	// IdentityService's DeleteNotificationEndpoint RPC.
+	IdentityServiceDeleteNotificationEndpointProcedure = "/identity.v1.IdentityService/DeleteNotificationEndpoint"
 )
 
 // IdentityServiceClient is a client for the identity.v1.IdentityService service.
@@ -57,9 +66,12 @@ type IdentityServiceClient interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
 	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
+	UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	RegisterNotificationEndpoint(context.Context, *connect.Request[v1.RegisterNotificationEndpointRequest]) (*connect.Response[v1.RegisterNotificationEndpointResponse], error)
+	DeleteNotificationEndpoint(context.Context, *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error)
 }
 
 // NewIdentityServiceClient constructs a client for the identity.v1.IdentityService service. By
@@ -87,6 +99,11 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			baseURL+IdentityServiceUpdateDisplayNameProcedure,
 			opts...,
 		),
+		updateAvatar: connect.NewClient[v1.UpdateAvatarRequest, v1.UpdateAvatarResponse](
+			httpClient,
+			baseURL+IdentityServiceUpdateAvatarProcedure,
+			opts...,
+		),
 		registerDevice: connect.NewClient[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse](
 			httpClient,
 			baseURL+IdentityServiceRegisterDeviceProcedure,
@@ -102,17 +119,30 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			baseURL+IdentityServiceRevokeDeviceProcedure,
 			opts...,
 		),
+		registerNotificationEndpoint: connect.NewClient[v1.RegisterNotificationEndpointRequest, v1.RegisterNotificationEndpointResponse](
+			httpClient,
+			baseURL+IdentityServiceRegisterNotificationEndpointProcedure,
+			opts...,
+		),
+		deleteNotificationEndpoint: connect.NewClient[v1.DeleteNotificationEndpointRequest, v1.DeleteNotificationEndpointResponse](
+			httpClient,
+			baseURL+IdentityServiceDeleteNotificationEndpointProcedure,
+			opts...,
+		),
 	}
 }
 
 // identityServiceClient implements IdentityServiceClient.
 type identityServiceClient struct {
-	ensureUser        *connect.Client[v1.EnsureUserRequest, v1.EnsureUserResponse]
-	getMe             *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
-	updateDisplayName *connect.Client[v1.UpdateDisplayNameRequest, v1.UpdateDisplayNameResponse]
-	registerDevice    *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
-	listDevices       *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	revokeDevice      *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	ensureUser                   *connect.Client[v1.EnsureUserRequest, v1.EnsureUserResponse]
+	getMe                        *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
+	updateDisplayName            *connect.Client[v1.UpdateDisplayNameRequest, v1.UpdateDisplayNameResponse]
+	updateAvatar                 *connect.Client[v1.UpdateAvatarRequest, v1.UpdateAvatarResponse]
+	registerDevice               *connect.Client[v1.RegisterDeviceRequest, v1.RegisterDeviceResponse]
+	listDevices                  *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeDevice                 *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	registerNotificationEndpoint *connect.Client[v1.RegisterNotificationEndpointRequest, v1.RegisterNotificationEndpointResponse]
+	deleteNotificationEndpoint   *connect.Client[v1.DeleteNotificationEndpointRequest, v1.DeleteNotificationEndpointResponse]
 }
 
 // EnsureUser calls identity.v1.IdentityService.EnsureUser.
@@ -130,6 +160,11 @@ func (c *identityServiceClient) UpdateDisplayName(ctx context.Context, req *conn
 	return c.updateDisplayName.CallUnary(ctx, req)
 }
 
+// UpdateAvatar calls identity.v1.IdentityService.UpdateAvatar.
+func (c *identityServiceClient) UpdateAvatar(ctx context.Context, req *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error) {
+	return c.updateAvatar.CallUnary(ctx, req)
+}
+
 // RegisterDevice calls identity.v1.IdentityService.RegisterDevice.
 func (c *identityServiceClient) RegisterDevice(ctx context.Context, req *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
 	return c.registerDevice.CallUnary(ctx, req)
@@ -145,14 +180,27 @@ func (c *identityServiceClient) RevokeDevice(ctx context.Context, req *connect.R
 	return c.revokeDevice.CallUnary(ctx, req)
 }
 
+// RegisterNotificationEndpoint calls identity.v1.IdentityService.RegisterNotificationEndpoint.
+func (c *identityServiceClient) RegisterNotificationEndpoint(ctx context.Context, req *connect.Request[v1.RegisterNotificationEndpointRequest]) (*connect.Response[v1.RegisterNotificationEndpointResponse], error) {
+	return c.registerNotificationEndpoint.CallUnary(ctx, req)
+}
+
+// DeleteNotificationEndpoint calls identity.v1.IdentityService.DeleteNotificationEndpoint.
+func (c *identityServiceClient) DeleteNotificationEndpoint(ctx context.Context, req *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
+	return c.deleteNotificationEndpoint.CallUnary(ctx, req)
+}
+
 // IdentityServiceHandler is an implementation of the identity.v1.IdentityService service.
 type IdentityServiceHandler interface {
 	EnsureUser(context.Context, *connect.Request[v1.EnsureUserRequest]) (*connect.Response[v1.EnsureUserResponse], error)
 	GetMe(context.Context, *connect.Request[v1.GetMeRequest]) (*connect.Response[v1.GetMeResponse], error)
 	UpdateDisplayName(context.Context, *connect.Request[v1.UpdateDisplayNameRequest]) (*connect.Response[v1.UpdateDisplayNameResponse], error)
+	UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error)
 	RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	RegisterNotificationEndpoint(context.Context, *connect.Request[v1.RegisterNotificationEndpointRequest]) (*connect.Response[v1.RegisterNotificationEndpointResponse], error)
+	DeleteNotificationEndpoint(context.Context, *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error)
 }
 
 // NewIdentityServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -176,6 +224,11 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		svc.UpdateDisplayName,
 		opts...,
 	)
+	identityServiceUpdateAvatarHandler := connect.NewUnaryHandler(
+		IdentityServiceUpdateAvatarProcedure,
+		svc.UpdateAvatar,
+		opts...,
+	)
 	identityServiceRegisterDeviceHandler := connect.NewUnaryHandler(
 		IdentityServiceRegisterDeviceProcedure,
 		svc.RegisterDevice,
@@ -191,6 +244,16 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		svc.RevokeDevice,
 		opts...,
 	)
+	identityServiceRegisterNotificationEndpointHandler := connect.NewUnaryHandler(
+		IdentityServiceRegisterNotificationEndpointProcedure,
+		svc.RegisterNotificationEndpoint,
+		opts...,
+	)
+	identityServiceDeleteNotificationEndpointHandler := connect.NewUnaryHandler(
+		IdentityServiceDeleteNotificationEndpointProcedure,
+		svc.DeleteNotificationEndpoint,
+		opts...,
+	)
 	return "/identity.v1.IdentityService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IdentityServiceEnsureUserProcedure:
@@ -199,12 +262,18 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceGetMeHandler.ServeHTTP(w, r)
 		case IdentityServiceUpdateDisplayNameProcedure:
 			identityServiceUpdateDisplayNameHandler.ServeHTTP(w, r)
+		case IdentityServiceUpdateAvatarProcedure:
+			identityServiceUpdateAvatarHandler.ServeHTTP(w, r)
 		case IdentityServiceRegisterDeviceProcedure:
 			identityServiceRegisterDeviceHandler.ServeHTTP(w, r)
 		case IdentityServiceListDevicesProcedure:
 			identityServiceListDevicesHandler.ServeHTTP(w, r)
 		case IdentityServiceRevokeDeviceProcedure:
 			identityServiceRevokeDeviceHandler.ServeHTTP(w, r)
+		case IdentityServiceRegisterNotificationEndpointProcedure:
+			identityServiceRegisterNotificationEndpointHandler.ServeHTTP(w, r)
+		case IdentityServiceDeleteNotificationEndpointProcedure:
+			identityServiceDeleteNotificationEndpointHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -226,6 +295,10 @@ func (UnimplementedIdentityServiceHandler) UpdateDisplayName(context.Context, *c
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.UpdateDisplayName is not implemented"))
 }
 
+func (UnimplementedIdentityServiceHandler) UpdateAvatar(context.Context, *connect.Request[v1.UpdateAvatarRequest]) (*connect.Response[v1.UpdateAvatarResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.UpdateAvatar is not implemented"))
+}
+
 func (UnimplementedIdentityServiceHandler) RegisterDevice(context.Context, *connect.Request[v1.RegisterDeviceRequest]) (*connect.Response[v1.RegisterDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.RegisterDevice is not implemented"))
 }
@@ -236,4 +309,12 @@ func (UnimplementedIdentityServiceHandler) ListDevices(context.Context, *connect
 
 func (UnimplementedIdentityServiceHandler) RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.RevokeDevice is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) RegisterNotificationEndpoint(context.Context, *connect.Request[v1.RegisterNotificationEndpointRequest]) (*connect.Response[v1.RegisterNotificationEndpointResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.RegisterNotificationEndpoint is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) DeleteNotificationEndpoint(context.Context, *connect.Request[v1.DeleteNotificationEndpointRequest]) (*connect.Response[v1.DeleteNotificationEndpointResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("identity.v1.IdentityService.DeleteNotificationEndpoint is not implemented"))
 }

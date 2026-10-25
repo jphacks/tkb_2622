@@ -1,11 +1,42 @@
 import Foundation
 import UIKit
 
-struct DeviceRestrictionSettings {
+struct DeviceRestrictionSettings: Equatable {
     let enabled: Bool
     let targetMode: String
     let configured: Bool
     let deviceConfigVersion: Int64
+}
+
+struct DeviceSettingsSyncRequestKey: Equatable {
+    let isAuthenticated: Bool
+    let authenticatedUserID: String?
+    let settings: DeviceRestrictionSettings
+}
+
+struct DeviceSettingsSyncGate {
+    private(set) var activeRequest: DeviceSettingsSyncRequestKey?
+    private var pendingRequest: DeviceSettingsSyncRequestKey?
+
+    mutating func begin(_ request: DeviceSettingsSyncRequestKey) -> Bool {
+        guard let activeRequest else {
+            self.activeRequest = request
+            return true
+        }
+
+        if request == activeRequest {
+            pendingRequest = nil
+        } else if request != pendingRequest {
+            pendingRequest = request
+        }
+        return false
+    }
+
+    mutating func finish() -> DeviceSettingsSyncRequestKey? {
+        activeRequest = pendingRequest
+        pendingRequest = nil
+        return activeRequest
+    }
 }
 
 struct SyncedDevicePolicy {
@@ -21,6 +52,21 @@ struct ConfiguredDeviceSettingsRepository {
         let registrationId: String
         let platform: String
         let name: String
+    }
+
+    private struct ProtoJSONInt64: Decodable {
+        let value: Int64
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let string = try? container.decode(String.self), let value = Int64(string) {
+                self.value = value
+            } else if let value = try? container.decode(Int64.self) {
+                self.value = value
+            } else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected a protobuf JSON int64")
+            }
+        }
     }
 
     private struct RegisterDeviceResponse: Decodable {
@@ -89,24 +135,26 @@ struct ConfiguredDeviceSettingsRepository {
 
         let auth = SupabaseAuthService(projectURL: projectURL, publishableKey: publishableKey)
         let client = ConnectJSONClient(baseURL: apiBaseURL, tokenProvider: auth)
-        let registrationID = stableRegistrationID()
         let deviceName = await UIDevice.current.name
-        let device = try await registerDevice(
-            client: client,
-            registrationID: registrationID,
-            deviceName: deviceName
-        )
-        defaults.set(device.id, forKey: "mobile.device.id")
+        return try await sync(settings: settings, client: client, deviceName: deviceName)
+    }
+
+    func sync(
+        settings: DeviceRestrictionSettings,
+        client: ConnectJSONClient,
+        deviceName: String
+    ) async throws -> SyncedDevicePolicy {
+        let deviceID = try await ensureDeviceRegistered(client: client, deviceName: deviceName)
 
         for attempt in 0..<3 {
-            let currentPolicy = try await currentPolicy(client: client, deviceID: device.id)
+            let currentPolicy = try await currentPolicy(client: client, deviceID: deviceID)
             if let currentPolicy,
                currentPolicy.targetMode == settings.targetMode,
                currentPolicy.enabled == settings.enabled,
                currentPolicy.configured == settings.configured,
                currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion {
                 return SyncedDevicePolicy(
-                    deviceID: device.id,
+                    deviceID: deviceID,
                     deviceName: deviceName,
                     policyVersion: currentPolicy.version.value,
                     policyStatus: currentPolicy.status
@@ -114,20 +162,30 @@ struct ConfiguredDeviceSettingsRepository {
             }
 
             do {
-                let response: UpdatePolicyResponse = try await client.call(
-                    service: "restriction.v1.RestrictionService",
-                    method: "UpdateRestrictionPolicy",
-                    requestBody: UpdatePolicyRequest(
-                        operationId: UUID().uuidString.lowercased(),
-                        deviceId: device.id,
-                        expectedVersion: String(currentPolicy?.version.value ?? 0),
-                        enabled: settings.enabled,
-                        targetMode: settings.targetMode,
-                        deviceConfigVersion: String(settings.deviceConfigVersion),
-                        configured: settings.configured
-                    ),
-                    responseType: UpdatePolicyResponse.self
-                )
+                let response: UpdatePolicyResponse
+                do {
+                    response = try await client.call(
+                        service: "restriction.v1.RestrictionService",
+                        method: "UpdateRestrictionPolicy",
+                        requestBody: UpdatePolicyRequest(
+                            operationId: UUID().uuidString.lowercased(),
+                            deviceId: deviceID,
+                            expectedVersion: String(currentPolicy?.version.value ?? 0),
+                            enabled: settings.enabled,
+                            targetMode: settings.targetMode,
+                            deviceConfigVersion: String(settings.deviceConfigVersion),
+                            configured: settings.configured
+                        ),
+                        responseType: UpdatePolicyResponse.self
+                    )
+                } catch ConnectJSONClient.ClientError.connect(code: "aborted") {
+                    throw ConnectJSONClient.ClientError.connect(code: "aborted")
+                } catch {
+                    throw DeviceSettingsRepositoryError.requestFailed(
+                        operation: "restriction.v1.RestrictionService/UpdateRestrictionPolicy",
+                        underlying: error
+                    )
+                }
                 return SyncedDevicePolicy(
                     deviceID: response.policy.deviceId,
                     deviceName: deviceName,
@@ -142,6 +200,27 @@ struct ConfiguredDeviceSettingsRepository {
         throw DeviceSettingsRepositoryError.policyConflict
     }
 
+    func ensureDeviceRegistered(client: ConnectJSONClient) async throws -> String {
+        let deviceName = await UIDevice.current.name
+        return try await ensureDeviceRegistered(client: client, deviceName: deviceName)
+    }
+
+    private func ensureDeviceRegistered(client: ConnectJSONClient, deviceName: String) async throws -> String {
+        let registrationID = stableRegistrationID()
+        let device = try await registerDevice(
+            client: client,
+            registrationID: registrationID,
+            deviceName: deviceName
+        )
+        defaults.set(device.id, forKey: "mobile.device.id")
+        return device.id
+    }
+
+    func revokeRegisteredDevice(client: ConnectJSONClient) async throws {
+        try await ConfiguredDeviceRevocationRepository(defaults: defaults)
+            .revokeRegisteredDevice(client: client)
+    }
+
     private func registerDevice(
         client: ConnectJSONClient,
         registrationID: String,
@@ -150,17 +229,25 @@ struct ConfiguredDeviceSettingsRepository {
         let key = "mobile.device.register.operation.\(registrationID)"
         let operationID = (defaults.string(forKey: key) ?? UUID().uuidString).lowercased()
         defaults.set(operationID, forKey: key)
-        let response: RegisterDeviceResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "RegisterDevice",
-            requestBody: RegisterDeviceRequest(
-                operationId: operationID,
-                registrationId: registrationID,
-                platform: "PLATFORM_IOS",
-                name: deviceName
-            ),
-            responseType: RegisterDeviceResponse.self
-        )
+        let response: RegisterDeviceResponse
+        do {
+            response = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "RegisterDevice",
+                requestBody: RegisterDeviceRequest(
+                    operationId: operationID,
+                    registrationId: registrationID,
+                    platform: "PLATFORM_IOS",
+                    name: deviceName
+                ),
+                responseType: RegisterDeviceResponse.self
+            )
+        } catch {
+            throw DeviceSettingsRepositoryError.requestFailed(
+                operation: "identity.v1.IdentityService/RegisterDevice",
+                underlying: error
+            )
+        }
         defaults.removeObject(forKey: key)
         guard response.device.status == "ACTIVE" else {
             throw DeviceSettingsRepositoryError.deviceNotActive
@@ -170,19 +257,27 @@ struct ConfiguredDeviceSettingsRepository {
 
     private func currentPolicy(client: ConnectJSONClient, deviceID: String) async throws -> PolicyDTO? {
         do {
-            let response: GetPolicyResponse = try await client.call(
-                service: "restriction.v1.RestrictionService",
-                method: "GetRestrictionPolicy",
-                requestBody: GetPolicyRequest(deviceId: deviceID),
-                responseType: GetPolicyResponse.self
-            )
+            let response: GetPolicyResponse
+            do {
+                response = try await client.call(
+                    service: "restriction.v1.RestrictionService",
+                    method: "GetRestrictionPolicy",
+                    requestBody: GetPolicyRequest(deviceId: deviceID),
+                    responseType: GetPolicyResponse.self
+                )
+            } catch ConnectJSONClient.ClientError.connect(code: "not_found") {
+                return nil
+            } catch {
+                throw DeviceSettingsRepositoryError.requestFailed(
+                    operation: "restriction.v1.RestrictionService/GetRestrictionPolicy",
+                    underlying: error
+                )
+            }
             return response.policy
-        } catch ConnectJSONClient.ClientError.connect(code: "not_found") {
-            return nil
         }
     }
 
-    private func stableRegistrationID() -> String {
+    func stableRegistrationID() -> String {
         let key = "mobile.device.registrationID"
         if let stored = defaults.string(forKey: key) {
             let normalized = stored.lowercased()
@@ -199,42 +294,5 @@ struct ConfiguredDeviceSettingsRepository {
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               url.host != nil else { return nil }
         return url
-    }
-}
-
-private struct ProtoJSONInt64: Decodable {
-    let value: Int64
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let string = try? container.decode(String.self), let value = Int64(string) {
-            self.value = value
-        } else if let value = try? container.decode(Int64.self) {
-            self.value = value
-        } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Expected a protobuf JSON int64")
-        }
-    }
-}
-
-enum DeviceSettingsRepositoryError: Error {
-    case missingConfiguration
-    case invalidConfiguration
-    case deviceNotActive
-    case policyConflict
-}
-
-extension DeviceSettingsRepositoryError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .missingConfiguration:
-            "設定タブでSupabaseとAPIの接続情報を設定してください。"
-        case .invalidConfiguration:
-            "Supabase URL・公開用キー・API URLを確認してください。"
-        case .deviceNotActive:
-            "この端末の登録が無効です。端末管理で状態を確認してください。"
-        case .policyConflict:
-            "制限設定が続けて更新されました。少し待ってからもう一度同期してください。"
-        }
     }
 }

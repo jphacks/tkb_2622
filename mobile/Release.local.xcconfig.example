@@ -1,0 +1,6 @@
+# Copy to Release.local.xcconfig and replace these example values.
+# This file is for public client configuration only; never put service_role or secret keys here.
+# `$()` expands to an empty string so xcconfig does not treat `//` as a comment.
+SUPABASE_PROJECT_URL = https:/$()/YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_REPLACE_WITH_PROJECT_PUBLISHABLE_KEY
+CONNECT_API_BASE_URL = https:/$()/api.example.com

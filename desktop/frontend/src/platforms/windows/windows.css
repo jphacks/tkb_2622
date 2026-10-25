@@ -1,2 +1,26 @@
-.windows { font-family: 'Noto Sans JP', 'Yu Gothic UI', 'Segoe UI', sans-serif; }
-.windows .nav-item { border-radius: 10px; }
+/* Windows 11（Fluent）の見た目へ読み替える．色・文言・配置はdocs/UI/01〜07の共通デザインに従う．
+   app.cssより先に読み込まれるため，`.windows`を付けて共通指定より優先させる． */
+.windows { font-family: 'Segoe UI Variable Text', 'Yu Gothic UI', 'Segoe UI', 'Noto Sans JP', sans-serif; }
+.windows .brand, .windows .panel-brand, .windows .panel-timer { font-family: 'Segoe UI Variable Display', 'Yu Gothic UI', 'Segoe UI', sans-serif; }
+
+/* 角丸：操作部品は4px，カード・パネルは8px */
+.windows .button, .windows .popup-start, .windows .task-choice, .windows .brand-symbol,
+.windows .popup-form input, .windows .panel-label input, .windows input, .windows select { border-radius: 4px; }
+.windows .card, .windows .popup-pending, .windows .pause-balance, .windows .sidebar-balance { border-radius: 8px; }
+.windows .button:focus-visible, .windows .popup-start:focus-visible, .windows .nav-item:focus-visible, .windows .back-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* NavigationView：選択中の項目は左端の縦線で示す */
+.windows .sidebar { gap: 18px; padding: 12px 8px 16px; background: #FBFAFF; }
+.windows .brand { padding: 0 10px; }
+.windows .main-navigation { gap: 2px; }
+.windows .nav-item { position: relative; padding: 9px 14px; border-radius: 4px; }
+.windows .nav-item.selected { background: #ECE9FF; }
+.windows .nav-item.selected::before { content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 16px; margin-top: -8px; border-radius: 2px; background: var(--accent); }
+.windows .back-button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 13px; text-align: left; }
+.windows .back-button:hover { background: #F0EEF8; color: var(--ink); }
+
+/* 作業操作の小さな画面：Macはメニューバーのポップオーバーだが，Windowsでは通常のウィンドウなので外枠を付けず全面に広げる */
+.compact-window.windows .session-panel { width: 100%; min-height: 100vh; border: 0; border-radius: 0; }
+.compact-window.windows .startup-panel { width: 100%; }
+.compact-window.windows .popup-section { border: 0; border-radius: 0; }
+.compact-window.windows .popup-pending { margin: 0 12px 12px; }
