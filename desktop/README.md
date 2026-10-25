@@ -82,6 +82,26 @@ make -C desktop up-win      # wails devで起動（終了はCtrl+C）
 | Windows（PowerShell） | Windows側にcloneしたリポジトリでそのまま実行する |
 | WSL | `desktop/`をWindows側（既定は`%LOCALAPPDATA%\tkb_2622\desktop`．`WIN_DESKTOP_DIR`で変更可）へ同期し，go.modの`replace`が参照する`poc/macos-native`も同じ相対位置へ同期して，`powershell.exe`でそこから実行する．`up-win`の実行中はWSLでの編集を1秒ごとに同期し，ホットリロードに反映する |
 
+実APIへ接続する場合は，`up-win`を実行するシェルで`FOCUS_LINK_*`を設定する．dev環境のAPIは`terraform -chdir=infra/envs/dev/cloudflare output -raw api_url`で得られるCloudflare WorkerのURLを指定する（Cloud Runの`run.app`へ直接接続すると403になる）．WSLの環境変数は`WSLENV`に名前を挙げたものしかWindowsのプロセスへ渡らないため，`wsl.sh`が設定済みの`FOCUS_LINK_*`を`WSLENV`へ追加する．
+
+```sh
+# WSL（bash）
+export FOCUS_LINK_API_BASE_URL="https://tkb-dev-api-proxy.<subdomain>.workers.dev"
+export FOCUS_LINK_SUPABASE_URL="https://<project-ref>.supabase.co"
+read -rs FOCUS_LINK_SUPABASE_PUBLISHABLE_KEY && export FOCUS_LINK_SUPABASE_PUBLISHABLE_KEY
+make -C desktop up-win
+```
+
+```powershell
+# Windows（PowerShell）
+$env:FOCUS_LINK_API_BASE_URL = 'https://tkb-dev-api-proxy.<subdomain>.workers.dev'
+$env:FOCUS_LINK_SUPABASE_URL = 'https://<project-ref>.supabase.co'
+$env:FOCUS_LINK_SUPABASE_PUBLISHABLE_KEY = Read-Host
+make -C desktop up-win
+```
+
+`wails build`で作った`focus-link.exe`をエクスプローラーから起動する場合は，ユーザー環境変数（`[Environment]::SetEnvironmentVariable('<名前>', '<値>', 'User')`）に設定する．設定前に開いていたターミナルには反映されないため，開き直す．
+
 WSLのリポジトリをWindowsから直接動かさないのは，Windowsのnpmが`\\wsl.localhost\...`上でスクリプトを実行できず，`node_modules`のネイティブ部品もOSごとに異なるためである．同期先の`node_modules`・`wailsjs`等はWindows側で生成し，同期で上書き・削除しない．同期先で編集した内容はWSLへ戻らないため，編集はWSL側で行う．
 
 `setup-win`はGo・Node.js・WebView2 Runtimeがなければwingetでインストールし，go.modと同じ版のWails CLI，Goモジュール，npmパッケージを導入して`wails doctor`を表示する．GoのbinをユーザーのPATHへ追加する．Node.jsが未対応の版（22.12未満等）の場合は自動で更新せず停止する．`package-lock.json`を変更したら`setup-win`を再実行する．処理は`scripts/windows/`（PowerShellの`setup.ps1`・`up.ps1`，WSL用の`wsl.sh`）にある．
