@@ -148,7 +148,7 @@ private struct FocusRoomWidgetView: View {
         return HStack(alignment: .bottom, spacing: family == .systemSmall ? -5 : 2) {
             ForEach(Array(visibleMembers.enumerated()), id: \.offset) { index, member in
                 VStack(spacing: 2) {
-                    Image(member.avatarID)
+                    avatarImage(for: member.avatarID)
                         .resizable()
                         .scaledToFit()
                         .frame(width: characterSize, height: characterSize)
@@ -178,6 +178,13 @@ private struct FocusRoomWidgetView: View {
     }
 
     private var characterSize: CGFloat { family == .systemSmall ? 38 : 54 }
+
+    private func avatarImage(for id: String) -> Image {
+        if let image = FocusWidgetAvatar.image(named: id) {
+            return Image(uiImage: image)
+        }
+        return Image(systemName: "person.fill")
+    }
 
     private func movementOffset(for index: Int) -> CGFloat {
         let step = (index + entry.movementPhase) % 4
