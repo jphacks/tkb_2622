@@ -43,6 +43,50 @@ export namespace session {
 	        this.message = source["message"];
 	    }
 	}
+	export class ActivityDetail {
+	    appName?: string;
+	    domain?: string;
+	    // Go type: time
+	    startTime: any;
+	    // Go type: time
+	    endTime: any;
+	    durationSeconds: number;
+	    classification: string;
+	    reasons?: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new ActivityDetail(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appName = source["appName"];
+	        this.domain = source["domain"];
+	        this.startTime = this.convertValues(source["startTime"], null);
+	        this.endTime = this.convertValues(source["endTime"], null);
+	        this.durationSeconds = source["durationSeconds"];
+	        this.classification = source["classification"];
+	        this.reasons = source["reasons"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Capability {
 	    allowed: boolean;
 	    reason: string;
@@ -299,6 +343,7 @@ export namespace session {
 	    rewardReason?: string;
 	    rewardPolicyVersion?: number;
 	    rewardGrantStopped?: boolean;
+	    activityDetails?: ActivityDetail[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -329,7 +374,26 @@ export namespace session {
 	        this.rewardReason = source["rewardReason"];
 	        this.rewardPolicyVersion = source["rewardPolicyVersion"];
 	        this.rewardGrantStopped = source["rewardGrantStopped"];
+	        this.activityDetails = this.convertValues(source["activityDetails"], ActivityDetail);
 	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	export class WorkSession {

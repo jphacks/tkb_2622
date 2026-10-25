@@ -255,24 +255,23 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
 
   return <div className="settings-page">
     <form className="settings-stack" onSubmit={event => { event.preventDefault(); if (canSaveDraft && draftIsValid && hasUnsavedChanges) execute({ action: 'saveSettings', settings: draft }); }}>
-      <header className="page-heading"><div><h1>設定</h1><p>メニューバーの「開始」は、ここで選んだタスクで始まります。変更は次のセッションから反映されます。</p></div></header>
+      <header className="page-heading"><div><h1>設定</h1><p>次の作業で使うタスクと分類を選びます。</p></div></header>
       <section className="card settings-section">
         <div className="settings-section-heading"><h2>タスク</h2><button type="button" className="button" disabled={busy || !canSaveTasks} onClick={() => { setTask(emptyTask); setEditingTaskId(null); setAddingTask(!addingTask); }}>＋ タスクを追加</button></div>
         <div className="settings-task-list" role="radiogroup" aria-label="開始ボタンで使うタスク">{draft.tasks.map(item => <div className="settings-task-row" key={item.id}><button type="button" role="radio" aria-checked={item.id === draft.selectedTaskId} className={`settings-task ${item.id === draft.selectedTaskId ? 'selected' : ''}`} disabled={busy} onClick={() => setDraft(current => ({ ...current, selectedTaskId: item.id }))}><span className={`radio-dot ${item.id === draft.selectedTaskId ? 'checked' : ''}`} aria-hidden="true" /><span className="settings-task-copy"><strong>{item.name}</strong><small>{categoryLabels.get(item.category ?? '') ?? taskPurposes.get(item.id) ?? '作業'} ・ {modeLabels.get(item.mode ?? '') ?? '通常'} ・ 予定 {plannedDuration(item.plannedSeconds)} ・ 最小 {minimumDuration(item.minimumSeconds)}</small></span>{item.id === draft.selectedTaskId && <strong className="selected-label">開始ボタンで使用</strong>}</button><button type="button" className="text-button settings-task-edit" disabled={busy || !canSaveTasks} onClick={() => { setTask({ ...item }); setEditingTaskId(item.id); setAddingTask(true); }}>編集</button></div>)}</div>
         {addingTask && <div className="settings-task-form"><label>タスク名<input required maxLength={80} value={task.name} onChange={event => setTask({ ...task, name: event.target.value })} /></label><label>カテゴリ<select value={task.category ?? 'OTHER'} onChange={event => setTask({ ...task, category: event.target.value })}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>計測モード<select value={task.mode ?? 'NORMAL'} onChange={event => setTask({ ...task, mode: event.target.value })}>{modes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>最小時間（秒）<input type="number" required min={1} max={86400} value={task.minimumSeconds} onChange={event => setTask({ ...task, minimumSeconds: Number(event.target.value) })} /></label><label>予定時間（秒）<input type="number" required min={task.minimumSeconds} max={86400} value={task.plannedSeconds} onChange={event => setTask({ ...task, plannedSeconds: Number(event.target.value) })} /></label><button type="button" className="button primary" disabled={busy || !task.name.trim() || !Number.isInteger(task.minimumSeconds) || task.minimumSeconds < 1 || task.minimumSeconds > 86400 || !Number.isInteger(task.plannedSeconds) || task.plannedSeconds < task.minimumSeconds || task.plannedSeconds > 86400} onClick={addTask}>{editingTaskId ? '変更を反映' : '追加して選択'}</button></div>}
         {state.mode === 'local-monitor' && !canSaveTasks && <p className="settings-note">メール認証とPC登録のあと、サーバー上のタスクを作成・編集できます。</p>}
-        <p className="settings-note">最小作業時間を過ぎると「終了」できます。それより前は「中止（報酬なし）」のみです。予定時間になっても自動では終わりません。</p>
-        <label className="settings-checkbox-row"><input type="checkbox" checked disabled readOnly /><span>開始と同時に VS Code と前回のフォルダを開く</span><small>未接続</small></label>
+        <p className="settings-note">最小時間を過ぎると終了できます。予定時間で自動終了はしません。</p>
       </section>
       <section className="card settings-section">
         <div className="settings-section-heading classification-section-heading">
-          <div><h2>アプリ・サイトの分類</h2><small>カテゴリごとに登録先を整理します。新しい候補は分類を選んで登録してください。</small></div>
+          <div><h2>アプリ・サイトの分類</h2><small>計測結果を作業・関連作業・脱線に分けます。</small></div>
           <div className="classification-toolbar">
             <button type="button" className="button primary" disabled={busy || candidateLoadState === 'loading' || !captureCurrentCandidate || sessionActive} onClick={() => void readCurrentClassificationCandidate()}>
-              {candidateLoadState === 'loading' ? '読み取り中…' : '今のアプリ・サイトを読み取る'}
+              {candidateLoadState === 'loading' ? '読み取り中…' : '現在のアプリを読み取る'}
             </button>
             <button type="button" className="button" disabled={busy || candidateLoadState === 'loading' || !getClassificationCandidates} onClick={() => void loadClassificationCandidates()}>
-              {candidateLoadState === 'loaded' ? '実測ログを再読み込み' : '実測ログから候補を読み込む'}
+              {candidateLoadState === 'loaded' ? '計測ログを更新' : '計測ログから選ぶ'}
             </button>
           </div>
         </div>
@@ -284,8 +283,8 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
             const existing = findExistingClassification(candidate);
             return <div className="classification-candidate" key={`${candidate.appId}:${candidate.domain}`}>
               <span className="candidate-kind">{candidate.domain ? 'サイト' : 'アプリ'}</span>
-              <div className="candidate-copy"><strong>{candidate.name}</strong><small>{candidate.domain ? `${candidate.appName || candidate.appId} ・ ${candidate.appId} ・ ${candidate.domain}` : candidate.appId}</small></div>
-              <span className="candidate-count">{candidate.sampleCount}件</span>
+              <div className="candidate-copy"><strong>{candidate.name}</strong><small>{candidate.domain ? `${candidate.appName || 'ブラウザー'} ・ ${candidate.domain}` : candidate.appName || candidate.name}</small></div>
+              <span className="candidate-count">{candidate.sampleCount}回観測</span>
               {existing && <span className="candidate-category">{classificationCategoryLabels[existing.category]}</span>}
               <button type="button" className="text-button" disabled={busy} onClick={() => useClassificationCandidate(candidate)}>{existing ? '設定を確認' : '設定に使う'}</button>
             </div>;
@@ -298,7 +297,7 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
             <div className="classification-chips">
               {items.map(item => <div className={`classification-item ${category}`} key={item.name}>
                 <button type="button" className="classification-chip" disabled={busy} onClick={() => cycleCategory(item)} title="クリックして分類を切り替え">
-                  <span>{item.name}</span><small>{[item.appId || 'アプリID未設定', item.domain].filter(Boolean).join(' ・ ')}</small>
+                  <span>{item.name}</span><small>{item.domain || (item.appId ? 'アプリ' : '対象なし')}</small>
                 </button>
                 <button type="button" className="classification-edit" disabled={busy} aria-label={'分類を編集：' + item.name} onClick={() => {
                   setClassification({ ...emptyClassification, ...item, appId: item.appId ?? '', domain: item.domain ?? '' });
@@ -332,22 +331,43 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
             </div>}
           </div>;
         })}
-        <p className="settings-note">照合はアプリIDとDomainの完全一致です。ブラウザーのサイトはDomainが必要です。ルールは作業開始時に固定します。既存のID未設定項目はU（不明）になります。設定はこのMacに保存されます。</p>
+        <details className="settings-help">
+          <summary>分類のしくみ</summary>
+          <p>アプリIDとDomainの完全一致で照合します。ルールは作業開始時に固定し、設定はこのMacに保存します。</p>
+        </details>
       </section>
       <section className="card settings-section">
         <h2>アカウント</h2>
         {account.status === 'demo' ? <p className="settings-note">ブラウザプレビューではメール認証を行いません。実アプリで設定してください。</p> : <>
           <div className="settings-row"><span>状態<small>{account.email || 'メールアドレスでログイン'}</small></span><strong>{({ unconfigured: '接続先未設定', storageUnavailable: '資格情報ストア未使用', signedOut: '未ログイン', otpPending: '確認コードを送信済み', signedIn: account.deviceRegistered ? 'ログイン・PC登録済み' : 'ログイン済み', error: '接続エラー' } as Record<string, string>)[account.status] ?? account.status}</strong></div>
-          {account.status === 'unconfigured' ? <p className="settings-note">FOCUS_LINK_API_BASE_URL、FOCUS_LINK_SUPABASE_URL、FOCUS_LINK_SUPABASE_PUBLISHABLE_KEYをアプリ起動時の環境変数に設定してください。</p> : null}
+          {account.status === 'unconfigured' ? <details className="settings-help"><summary>開発者向け接続設定</summary><p>アプリ起動時にFOCUS_LINK_API_BASE_URL、FOCUS_LINK_SUPABASE_URL、FOCUS_LINK_SUPABASE_PUBLISHABLE_KEYを環境変数に設定してください。</p></details> : null}
           {account.status === 'signedOut' || account.status === 'otpPending' ? <div className="account-auth-form"><label>メールアドレス<input type="email" autoComplete="email" value={email} disabled={busy || account.status === 'otpPending'} onChange={event => setEmail(event.target.value)} /></label>{account.status === 'otpPending' && <label>メールの確認コード<input inputMode="numeric" autoComplete="one-time-code" value={otp} disabled={busy} onChange={event => setOtp(event.target.value)} /></label>}<div className="account-auth-actions">{account.status === 'signedOut' ? <button type="button" className="button primary" disabled={busy || !email.trim()} onClick={() => void requestEmailOTP(email)}>確認コードを送信</button> : <><button type="button" className="button primary" disabled={busy || !otp.trim()} onClick={() => void verifyEmailOTP(account.email || email, otp)}>ログイン</button><button type="button" className="text-button" disabled={busy} onClick={() => { setOtp(''); void requestEmailOTP(account.email || email); }}>コードを再送</button></>}</div></div> : null}
           {account.status === 'signedIn' && <div className="account-auth-actions"><button type="button" className="button" disabled={busy} onClick={() => void signOut()}>ログアウト</button></div>}
           {account.status === 'error' && <div className="account-auth-actions"><button type="button" className="button" disabled={busy} onClick={() => void refreshAccount()}>再接続</button><button type="button" className="text-button" disabled={busy} onClick={() => void signOut()}>ログアウト</button></div>}
           {account.message && <p className="settings-note" role="status">{account.message}</p>}
         </>}
       </section>
-      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}{monitor.appId ? ' · AppID ' + monitor.appId : ''}{monitor.domain ? ' · Domain ' + monitor.domain : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>iPhoneの制限<small>{iPhoneRestriction.detail}</small></span><span className={iPhoneRestriction.unavailable ? 'unavailable' : ''}>{iPhoneRestriction.label}</span></div></section>
-      <section className="card settings-section compact-settings"><h2>通知</h2><div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>APNsの本番配信は未接続です</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div></section>
-      <section className="card settings-section"><h2>プライバシー</h2><div className="settings-row"><span>観測する情報<small>前面アプリ名・アプリID、入力アイドル、対応ブラウザーのドメインをこのMacへ保存します</small></span><span>ローカル</span></div><p className="settings-note">キー入力の内容、raw URL、ページタイトル、画面画像、ブラウザーのタブIDは取得・保存しません。分類結果はローカル評価し、報酬換算はサーバー接続後に扱います。</p></section>
+      <details className="card settings-section settings-disclosure">
+        <summary>端末と報酬</summary>
+        <div className="settings-disclosure-content">
+          <div className="settings-row"><span>macOS計測<small>{monitor.message || 'アプリと対応ブラウザーを観測中'}{monitor.domain ? ` · ${monitor.domain}` : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div>
+          <div className="settings-row"><span>iPhoneの制限<small>{iPhoneRestriction.detail}</small></span><span className={iPhoneRestriction.unavailable ? 'unavailable' : ''}>{iPhoneRestriction.label}</span></div>
+        </div>
+      </details>
+      <details className="card settings-section settings-disclosure">
+        <summary>通知</summary>
+        <div className="settings-disclosure-content">
+          <div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>本番配信は未接続です</small></span><span className="unavailable">未接続</span></div>
+          <div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div>
+        </div>
+      </details>
+      <details className="card settings-section settings-disclosure">
+        <summary>プライバシー</summary>
+        <div className="settings-disclosure-content">
+          <div className="settings-row"><span>観測データ<small>アプリ名・アプリID・操作の空き時間・対応ブラウザーのドメイン</small></span><span>このMacに保存</span></div>
+          <p className="settings-note">キー入力、ページタイトル、画面画像、ブラウザーのタブIDは取得しません。アプリ名・サイト名はサーバーへ送りません。</p>
+        </div>
+      </details>
       <div className="settings-save"><button type="submit" className="button primary" disabled={busy || !canSaveDraft || !draftIsValid || !hasUnsavedChanges}>保存</button></div>
     </form>
   </div>;

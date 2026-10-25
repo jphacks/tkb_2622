@@ -10,7 +10,6 @@ const colors = {
   softBorder: '#F2F0FA',
   purple: '#5B4BDB',
   work: '#6D5DF0',
-  distraction: '#FF7A59',
   reward: '#28765F',
   balance: '#78612D',
 };
@@ -50,90 +49,54 @@ const statusColors: Record<SessionStatus, { background: string; foreground: stri
   ABORTED_LOCAL: { background: '#FFF1C2', foreground: '#6E4E00' },
 };
 
-const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
-
 export function HistoryPage({ history, onSelect, onRefresh, mode, cloudConnected, historyError, balanceSeconds }: { history: Result[]; onSelect: (result: Result) => void; onRefresh: () => void; mode: 'demo' | 'local-monitor'; cloudConnected: boolean; historyError?: string; balanceSeconds: number | null }) {
   const hasHistory = history.length > 0;
   const historySynced = cloudConnected && !historyError;
   const recordedWorkSeconds = history.reduce((total, item) => total + item.workSeconds, 0);
   const recordedEarnedSeconds = history.reduce((total, item) => total + item.earnedSeconds, 0);
-  const recordedSessions = hasHistory ? String(history.length) : '—';
+  const recordedSessions = String(history.length);
   const workSummary = hasHistory ? duration(recordedWorkSeconds) : '—';
   const rewardSummary = mode === 'local-monitor' && !historySynced ? '未確定' : hasHistory ? duration(recordedEarnedSeconds) : '—';
-  const scoredSessions = history.filter(item => item.b100 !== undefined);
-  const averageScore = scoredSessions.length === 0 ? '—' : String(Math.round(scoredSessions.reduce((total, item) => total + (item.b100 ?? 0), 0) / scoredSessions.length));
-
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
     <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, color: colors.ink, fontSize: 26, lineHeight: 1.4, fontWeight: 700 }}>これまでの記録</h1>
-        <div style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>{historySynced ? 'サーバーから同期した記録' : 'この端末に保存された記録'} · 期間絞り込み未対応</div>
+        <div style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>{historySynced ? 'サーバー同期済み' : 'この端末に保存された記録'}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div role="group" aria-label="期間（期間絞り込みは未対応です）" style={{ display: 'inline-flex', padding: 4, borderRadius: 12, background: '#ECE9FF', gap: 4 }}>
-          <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>週</button>
-          <button type="button" disabled aria-pressed={false} style={{ minHeight: 36, padding: '0 18px', borderRadius: 9, border: 0, background: 'transparent', color: '#3F2FB8', fontSize: 13 }}>月</button>
-        </div>
-        <button type="button" onClick={onRefresh} style={{ minHeight: 36, padding: '0 14px', borderRadius: 9, border: `1px solid ${colors.border}`, background: '#FFFFFF', color: colors.purple, fontSize: 13 }}>更新</button>
+        <button type="button" onClick={onRefresh} style={{ minHeight: 40, padding: '0 16px', borderRadius: 10, border: `1px solid ${colors.border}`, background: '#FFFFFF', color: colors.purple, fontSize: 14, fontWeight: 600 }}>更新</button>
       </div>
     </header>
 
     <section aria-label="記録の集計" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 13, color: colors.muted }}>記録内の作業時間</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.work, fontVariantNumeric: 'tabular-nums' }}>{workSummary}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>全セッションの合計 · {recordedSessions}件</div>
+        <div style={{ fontSize: 14, color: colors.muted }}>作業時間の合計</div>
+        <div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, color: colors.work, fontVariantNumeric: 'tabular-nums' }}>{workSummary}</div>
+        <div style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{recordedSessions}セッション</div>
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 13, color: colors.muted }}>平均集中スコア</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.ink }}>{averageScore}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>スコア取得済み · {scoredSessions.length}件</div>
+        <div style={{ fontSize: 14, color: colors.muted }}>獲得した報酬</div>
+        <div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, color: colors.reward, fontVariantNumeric: 'tabular-nums' }}>{rewardSummary}</div>
+        <div style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{mode === 'local-monitor' && !historySynced ? '同期後に確定します' : `${recordedSessions}セッション分`}</div>
       </div>
       <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 13, color: colors.muted }}>記録内の獲得報酬</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.reward, fontVariantNumeric: 'tabular-nums' }}>{rewardSummary}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{mode === 'local-monitor' && !historySynced ? 'サーバー未同期の記録は未確定です' : '取得したセッション · ' + recordedSessions + '件'}</div>
-      </div>
-      <div style={{ background: '#FFFFFF', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 13, color: colors.muted }}>現在の報酬残高</div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginTop: 4, color: colors.balance }}>{cloudConnected ? duration(balanceSeconds ?? 0) : '—'}</div>
-        <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{cloudConnected ? '進行中セッションの残高' : 'ログイン後に表示されます'}</div>
+        <div style={{ fontSize: 14, color: colors.muted }}>現在の残高</div>
+        <div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, color: colors.balance, fontVariantNumeric: 'tabular-nums' }}>{cloudConnected && balanceSeconds !== null ? duration(balanceSeconds) : '—'}</div>
+        <div style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{cloudConnected ? '利用できる時間' : 'ログイン後に表示'}</div>
       </div>
     </section>
 
-    <section style={{ ...cardStyle, gap: 16 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
-        <h2 style={headingStyle}>日ごとの作業時間</h2>
-        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: colors.muted }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: colors.work }} />作業</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: colors.distraction }} />脱線</span>
-        </div>
-      </div>
-      <div role="img" aria-label="日別の作業時間と脱線時間は未取得です" style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 12, alignItems: 'end', height: 200, borderBottom: `1px solid ${colors.softBorder}` }}>
-        {weekDays.map(day => <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6, height: '100%' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: colors.muted, fontVariantNumeric: 'tabular-nums' }}>—</span>
-        </div>)}
-        <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, color: colors.muted, fontSize: 13, textAlign: 'center', pointerEvents: 'none' }}>
-          日別値は未取得です
-        </span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 12, textAlign: 'center', fontSize: 12, color: colors.muted }}>
-        {weekDays.map(day => <span key={day}>{day}</span>)}
-      </div>
-    </section>
+    {historyError && <p role="status" style={{ margin: 0, color: colors.muted, fontSize: 14 }}>{historyError}</p>}
 
-    {historyError && <p role="status" style={{ margin: 0, color: colors.muted, fontSize: 13 }}>{historyError}</p>}
-
-    <section style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' }}>
-      <div style={{ ...cardStyle, flex: '3 1 520px', minWidth: 0, gap: 12 }}>
+    <section style={{ ...cardStyle, gap: 12 }}>
         <h2 style={headingStyle}>セッション</h2>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 14, fontVariantNumeric: 'tabular-nums', textAlign: 'left', whiteSpace: 'nowrap' }}>
             <thead>
-              <tr style={{ color: colors.muted, fontSize: 12 }}>
+              <tr style={{ color: colors.muted, fontSize: 14 }}>
                 <th scope="col" style={tableHeaderStyle}>作業名</th>
                 <th scope="col" style={tableHeaderStyle}>作業時間</th>
-                <th scope="col" style={tableHeaderStyle}>スコア</th>
+                <th scope="col" style={tableHeaderStyle}>報酬</th>
                 <th scope="col" style={tableHeaderStyle}>状態</th>
                 <th scope="col" style={tableHeaderStyle}><span className="sr-only">詳細</span></th>
               </tr>
@@ -143,38 +106,31 @@ export function HistoryPage({ history, onSelect, onRefresh, mode, cloudConnected
                 <td colSpan={5} style={{ ...tableCellStyle, padding: '18px 6px', textAlign: 'center', color: colors.muted, whiteSpace: 'normal' }}>記録はありません。</td>
               </tr> : history.map(item => {
                 const statusColor = statusColors[item.status];
+                const rewardText = mode === 'local-monitor' && !historySynced
+                  ? '未確定'
+                  : item.rewardStatus === 'granted'
+                    ? `+${duration(item.earnedSeconds)}`
+                    : item.rewardStatus === 'ineligible'
+                      ? '対象外'
+                      : item.rewardStatus === 'pending' || item.rewardStatus === 'queued'
+                        ? '確認中'
+                        : item.rewardStatus === 'unavailable'
+                          ? '—'
+                          : item.earnedSeconds > 0 ? `+${duration(item.earnedSeconds)}` : '—';
                 return <tr key={item.sessionId}>
                   <td style={tableCellStyle}>
                     <div style={{ fontWeight: 500 }}>{item.name}</div>
-                    <div style={{ fontSize: 12, color: colors.muted }}>{item.startedAt ? new Date(item.startedAt).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' }) : '日時未取得'}</div>
+                    <div style={{ fontSize: 14, color: colors.muted }}>{item.startedAt ? new Date(item.startedAt).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' }) : '日時未取得'}</div>
                   </td>
                   <td style={tableCellStyle}>{duration(item.workSeconds)}</td>
-                  <td style={{ ...tableCellStyle, fontWeight: 700 }} title="集中スコア">{item.b100 === undefined ? '—' : Math.round(item.b100)}</td>
-                  <td style={tableCellStyle}><span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: statusColor.background, color: statusColor.foreground, whiteSpace: 'nowrap' }}>{statusLabels[item.status] ?? '状態未取得'}</span></td>
-                  <td style={{ ...tableCellStyle, textAlign: 'right' }}><button type="button" onClick={() => onSelect(item)} style={{ padding: 0, border: 0, background: 'transparent', color: '#5B4BDB', fontSize: 13 }}>詳しく<span className="sr-only">：{item.name}</span></button></td>
+                  <td style={{ ...tableCellStyle, color: item.rewardStatus === 'granted' ? colors.reward : colors.muted, fontWeight: 700 }}>{rewardText}</td>
+                  <td style={tableCellStyle}><span style={{ fontSize: 14, fontWeight: 700, padding: '4px 10px', borderRadius: 99, background: statusColor.background, color: statusColor.foreground, whiteSpace: 'nowrap' }}>{statusLabels[item.status] ?? '状態未取得'}</span></td>
+                  <td style={{ ...tableCellStyle, textAlign: 'right' }}><button type="button" onClick={() => onSelect(item)} style={{ padding: 0, border: 0, background: 'transparent', color: '#5B4BDB', fontSize: 14, fontWeight: 600 }}>詳しく<span className="sr-only">：{item.name}</span></button></td>
                 </tr>;
               })}
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div style={{ ...cardStyle, flex: '2 1 300px', minWidth: 0, gap: 4 }}>
-        <h2 style={{ ...headingStyle, marginBottom: 8 }}>報酬の履歴</h2>
-        {mode === 'local-monitor' && !historySynced ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>サーバーに未同期の記録は、報酬が未確定です。</p> : history.length === 0 ? <p style={{ margin: '10px 0', fontSize: 13, color: colors.muted }}>報酬に関するセッション記録はありません。</p> : <>
-          {history.map(item => <div key={item.sessionId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${colors.softBorder}`, fontVariantNumeric: 'tabular-nums' }}>
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{item.name} の獲得報酬</span>
-              <span style={{ fontSize: 12, color: colors.muted }}>{item.startedAt ? new Date(item.startedAt).toLocaleString('ja-JP', { dateStyle: 'short' }) : '日時未取得'} · セッション集計</span>
-            </span>
-            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, whiteSpace: 'nowrap' }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: colors.purple }}>+{duration(item.earnedSeconds)}</span>
-              <span style={{ fontSize: 12, color: colors.muted }}>残高 —（未取得）</span>
-            </span>
-          </div>)}
-          <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted }}>取引日時・現在残高を含む明細は未取得です。</p>
-        </>}
-      </div>
     </section>
   </div>;
 }
