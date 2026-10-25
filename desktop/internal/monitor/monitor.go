@@ -279,8 +279,15 @@ func ReadSessionRecords(sessionID string) ([]Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("user config directory unavailable: %w", err)
 	}
-	filePath := filepath.Join(configDirectory, "Focus Link", "sessions", sessionID+".jsonl")
-	return readSessionRecords(filePath, sessionID)
+	return ReadSessionRecordsFromDirectory(filepath.Join(configDirectory, "Focus Link", "sessions"), sessionID)
+}
+
+// ReadSessionRecordsFromDirectory reads a saved capture without attaching or restarting a recorder.
+func ReadSessionRecordsFromDirectory(directory, sessionID string) ([]Record, error) {
+	if !validSessionID(sessionID) {
+		return nil, errors.New("invalid session id")
+	}
+	return readSessionRecords(filepath.Join(directory, sessionID+".jsonl"), sessionID)
 }
 
 func readSessionRecords(filePath, sessionID string) ([]Record, error) {

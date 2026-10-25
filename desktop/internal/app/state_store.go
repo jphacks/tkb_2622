@@ -8,12 +8,17 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jphacks/tkb_2622/desktop/internal/monitor"
 	"github.com/jphacks/tkb_2622/desktop/internal/session"
 )
 
 const maxStateSize = 8 * 1024 * 1024
 
 type stateStore struct{ path string }
+
+func (s *stateStore) ReadSessionRecords(sessionID string) ([]monitor.Record, error) {
+	return monitor.ReadSessionRecordsFromDirectory(filepath.Join(filepath.Dir(s.path), "sessions"), sessionID)
+}
 
 func newStateStore() (*stateStore, error) {
 	configDirectory, err := os.UserConfigDir()

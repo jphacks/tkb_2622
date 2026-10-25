@@ -4,7 +4,7 @@ struct RootTabView: View {
   @Environment(\.scenePhase) private var scenePhase
   @StateObject private var screenTime = MobileScreenTimeController()
   @StateObject private var apiSync = MobileAPISyncCoordinator()
-  @StateObject private var widgetFocusSync = GroupFocusWidgetSyncCoordinator()
+  @StateObject private var widgetFocusSync = GroupFocusWidgetSyncCoordinator.shared
   @AppStorage("mobile.auth.loginDeferred") private var loginDeferred = false
   @State private var selectedTab = 0
   @State private var pendingInvitationToken: String?
@@ -43,6 +43,15 @@ struct RootTabView: View {
     }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { Task { await restoreAuthentication() } }
+      if phase == .background {
+        GroupFocusWidgetBackgroundRefresh.enterBackground(isAuthenticated: entryState == .authenticated)
+      }
+    }
+    .onChange(of: entryState) { _, state in
+      if state != .authenticated {
+        GroupFocusWidgetBackgroundRefresh.schedule(isAuthenticated: false)
+        GroupFocusWidgetCache.clear()
+      }
     }
   }
 
@@ -119,7 +128,9 @@ struct RootTabView: View {
     }
     .tint(AppTheme.primary)
     .task { if isAuthenticated { await synchronizeUsageGrant() } }
-    .task(id: isAuthenticated) { await widgetFocusSync.run(isAuthenticated: isAuthenticated) }
+    .task(id: isAuthenticated && scenePhase == .active) {
+      await widgetFocusSync.run(isAuthenticated: isAuthenticated, isActive: scenePhase == .active)
+    }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active && isAuthenticated { Task { await synchronizeUsageGrant() } }
     }

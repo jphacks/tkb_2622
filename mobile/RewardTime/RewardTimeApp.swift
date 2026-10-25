@@ -31,5 +31,8 @@ struct RewardTimeApp: App {
         WindowGroup {
             RootTabView()
         }
+        .backgroundTask(.appRefresh(GroupFocusWidgetBackgroundRefresh.taskIdentifier)) {
+            await GroupFocusWidgetBackgroundRefresh.run()
+        }
     }
 }
