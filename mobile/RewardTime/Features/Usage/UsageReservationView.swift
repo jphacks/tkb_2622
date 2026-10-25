@@ -12,7 +12,7 @@ struct ActiveUsageGrant: Hashable, Identifiable {
 @MainActor
 final class UsageReservationViewModel: ObservableObject {
     let balanceMinutes: Int
-    let options = [5, 10, 15, 30]
+    let options = [1, 5, 10, 15, 30]
 
     @Published var selectedMinutes = 10
     @Published private(set) var isReserving = false

@@ -387,10 +387,10 @@ struct HomeView: View {
       }
       .buttonStyle(.borderedProminent)
       .tint(AppTheme.primary)
-      .disabled(snapshot.rewardBalanceMinutes < 5)
+      .disabled(snapshot.rewardBalanceMinutes < 1)
 
-      if snapshot.rewardBalanceMinutes < 5 {
-        Label("利用枠は5分からです。あと\(5 - snapshot.rewardBalanceMinutes)分の報酬が必要です。", systemImage: "info.circle")
+      if snapshot.rewardBalanceMinutes < 1 {
+        Label("利用枠は1分からです。あと1分の報酬が必要です。", systemImage: "info.circle")
           .font(.footnote)
           .foregroundStyle(AppTheme.secondaryInk)
       }
@@ -406,7 +406,7 @@ struct HomeView: View {
 
       Label {
         Text(snapshot.sessionStatus == .working
-          ? "Macで作業を一時停止すると使えます。利用枠は5分からで、集中判定された作業15分が約5分の目安です。"
+          ? "Macで作業を一時停止すると使えます。利用枠は1分からです。集中判定された作業15分が約5分の目安です。"
           : "Macで作業を開始すると、作業中に貯めた報酬を利用できます。")
       } icon: {
         Image(systemName: "info.circle")
