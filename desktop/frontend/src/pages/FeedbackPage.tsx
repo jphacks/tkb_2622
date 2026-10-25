@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { Result, RewardStatus } from '../bridge/types';
+import type { ActivityDetail, Result, RewardStatus } from '../bridge/types';
 import { duration } from '../components/format';
 import { statusLabels } from './SessionPage';
 
@@ -86,21 +86,68 @@ const activityClassLabels: Record<string, string> = {
   ACTIVITY_CLASS_IDLE: '非活動',
 };
 
+const activityReasonLabels: Record<string, string> = {
+  analysis_interval_gap: '観測間隔に空きあり',
+  quality_not_sample_based_estimate: '推定品質の観測',
+  missing_app_id: 'アプリ情報なし',
+  invalid_browser_domain: 'サイト情報を確認できず',
+  missing_browser_domain: 'サイト情報なし',
+  unexpected_browser_domain: 'サイト情報を利用できず',
+  no_matching_rule: '分類ルール未設定',
+  idle_continuity_unknown: '操作状態を継続判定できず',
+  idle_threshold_bounded_by_elapsed_time: '無操作時間を計測時間で補正',
+  unknown_before_first_observation: '最初の観測より前',
+  unknown_after_last_observation: '最後の観測より後',
+  foreground_app_changed_or_unknown: 'アプリ切替時の状態不明',
+  browser_state_changed_or_unknown: 'ブラウザ切替時の状態不明',
+  sample_based_estimate: 'サンプルに基づく推定',
+};
+
 function activityReasonLabel(reason: string): string {
   if (reason.startsWith('matched_rule_')) return '設定した分類ルールと一致';
   if (reason.startsWith('confirmed_lock:')) return '画面ロックを確認';
   if (reason.startsWith('confirmed_sleep:')) return 'スリープを確認';
   if (reason.startsWith('idle_over_threshold_')) return '一定時間の操作なし';
-  const labels: Record<string, string> = {
-    analysis_interval_gap: '観測間隔に空きあり',
-    quality_not_sample_based_estimate: '推定品質の観測',
-    missing_app_id: 'アプリ情報なし',
-    invalid_browser_domain: 'サイト情報を確認できず',
-    missing_browser_domain: 'サイト情報なし',
-    unexpected_browser_domain: 'サイト情報を利用できず',
-    no_matching_rule: '分類ルール未設定',
-  };
-  return labels[reason] ?? reason.replaceAll('_', ' ');
+  return activityReasonLabels[reason] ?? 'その他の観測根拠';
+}
+
+function groupActivityDetails(details: ActivityDetail[]): ActivityDetail[] {
+  const ordered = [...details].sort((first, second) => {
+    const startDifference = Date.parse(first.startTime) - Date.parse(second.startTime);
+    return Number.isFinite(startDifference) ? startDifference : 0;
+  });
+  const grouped: ActivityDetail[] = [];
+
+  for (const detail of ordered) {
+    const currentStart = Date.parse(detail.startTime);
+    const previous = grouped[grouped.length - 1];
+    const previousEnd = previous ? Date.parse(previous.endTime) : Number.NaN;
+    const canJoin = previous !== undefined
+      && previous.appName === detail.appName
+      && previous.domain === detail.domain
+      && previous.classification === detail.classification
+      && Number.isFinite(currentStart)
+      && Number.isFinite(previousEnd)
+      && currentStart <= previousEnd;
+
+    if (!canJoin) {
+      grouped.push({ ...detail, reasons: [...(detail.reasons ?? [])] });
+      continue;
+    }
+
+    const currentEnd = Date.parse(detail.endTime);
+    if (Number.isFinite(currentEnd) && currentEnd > previousEnd) {
+      previous.endTime = detail.endTime;
+    }
+    const groupStart = Date.parse(previous.startTime);
+    const groupEnd = Date.parse(previous.endTime);
+    if (Number.isFinite(groupStart) && Number.isFinite(groupEnd)) {
+      previous.durationSeconds = Math.max(0, Math.round((groupEnd - groupStart) / 1000));
+    }
+    previous.reasons = [...new Set([...(previous.reasons ?? []), ...(detail.reasons ?? [])])];
+  }
+
+  return grouped;
 }
 
 function localDateTime(value: string): string {
@@ -141,6 +188,7 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
   const percentage = (value: number | undefined, multiplier = 100) =>
     value !== undefined && Number.isFinite(value) ? `${(value * multiplier).toFixed(1)}%` : '—';
   const activityDetails = result?.activityDetails ?? [];
+  const groupedActivityDetails = groupActivityDetails(activityDetails);
 
   const calculatedWorkSeconds = (result?.taskSeconds ?? 0) + (result?.relatedSeconds ?? 0);
   const knownSeconds = calculatedWorkSeconds + (result?.distractedSeconds ?? 0);
@@ -237,10 +285,10 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
     <section style={{ ...cardStyle, gap: 10 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
         <h2 style={headingStyle}>アプリ・サイト別の区間</h2>
-        <span style={metaStyle}>{activityDetails.length > 0 ? `${activityDetails.length}区間・このMac内の記録` : 'このMacで評価した区間を表示'}</span>
+        <span style={metaStyle}>{activityDetails.length > 0 ? `${groupedActivityDetails.length}区間に整理（元${activityDetails.length}区間）` : 'このMacで評価した区間を表示'}</span>
       </div>
       <div style={{ maxHeight: 320, overflow: 'auto', border: `1px solid ${colors.softBorder}`, borderRadius: 10 }}>
-        {activityDetails.length > 0 ? <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 12, fontVariantNumeric: 'tabular-nums', textAlign: 'left' }}>
+        {groupedActivityDetails.length > 0 ? <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 12, fontVariantNumeric: 'tabular-nums', textAlign: 'left' }}>
           <colgroup>
             <col style={{ width: '23%' }} /><col style={{ width: '26%' }} /><col style={{ width: '10%' }} />
             <col style={{ width: '15%' }} /><col style={{ width: '26%' }} />
@@ -255,16 +303,19 @@ export function FeedbackPage({ result, mode }: { result: Result | null; mode: 'd
             </tr>
           </thead>
           <tbody>
-            {activityDetails.map((detail, index) => {
+            {groupedActivityDetails.map((detail, index) => {
               const identity = [detail.domain, detail.appName].filter(Boolean).join(' · ') || 'アプリ名を取得できません';
-              const reasons = (detail.reasons ?? []).map(activityReasonLabel);
+              const reasons = [...new Set((detail.reasons ?? []).map(activityReasonLabel))];
+              const visibleReasons = reasons.slice(0, 2);
               const durationText = duration(Math.max(0, detail.durationSeconds));
               return <tr key={`${detail.startTime}-${detail.endTime}-${index}`}>
                 <td title={identity} style={{ ...tableCellStyle, overflowWrap: 'anywhere', fontWeight: 600 }}>{identity}</td>
                 <td style={{ ...tableCellStyle, color: colors.muted, overflowWrap: 'anywhere' }}>{localDateTime(detail.startTime)}<br />{localDateTime(detail.endTime)}</td>
                 <td style={{ ...tableCellStyle, whiteSpace: 'nowrap' }}>{durationText}</td>
                 <td style={{ ...tableCellStyle, overflowWrap: 'anywhere' }}>{activityClassLabels[detail.classification] ?? detail.classification}</td>
-                <td title={(detail.reasons ?? []).join('\n')} style={{ ...tableCellStyle, color: colors.muted, overflowWrap: 'anywhere' }}>{reasons.length > 0 ? reasons.join('、') : '根拠記録なし'}</td>
+                <td title={reasons.join('、')} style={{ ...tableCellStyle, color: colors.muted, overflowWrap: 'anywhere' }}>
+                  {visibleReasons.length > 0 ? <>{visibleReasons.join('・')}{reasons.length > visibleReasons.length ? ` ほか${reasons.length - visibleReasons.length}件` : ''}</> : '根拠記録なし'}
+                </td>
               </tr>;
             })}
           </tbody>
