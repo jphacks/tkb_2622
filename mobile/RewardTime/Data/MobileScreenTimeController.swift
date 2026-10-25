@@ -132,7 +132,7 @@ final class MobileScreenTimeController: ObservableObject {
     }
 
     var appliedRestrictionLabel: String {
-        hasAppliedRestriction ? "指定したアプリを制限中" : "制限は適用されていません"
+        hasAppliedRestriction ? "選択したアプリを制限中" : "作業セッション中に自動で制限"
     }
 
     var authorizationStatusLabel: String {

@@ -301,7 +301,7 @@ struct HomeView: View {
       .foregroundStyle(
         screenTime.hasAppliedRestriction ? AppTheme.teal : AppTheme.secondaryInk)
 
-      Text("適用状態は設定画面から変更できます。対象アプリを開いてShieldが表示されることも確認してください。")
+      Text("選択したアプリはMacで作業中に自動で制限されます。報酬の利用枠を確保すると一時解除されます。")
         .font(.caption)
         .foregroundStyle(AppTheme.secondaryInk)
     }
