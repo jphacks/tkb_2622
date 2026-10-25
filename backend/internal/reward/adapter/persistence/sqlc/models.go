@@ -21,6 +21,7 @@ type AppActivityBatch struct {
 	EvaluatorVersion string
 	RulesVersion     string
 	Segments         json.RawMessage
+	CollectorHealthy bool
 	ReceivedAt       time.Time
 }
 
@@ -115,12 +116,26 @@ type AppRewardTransaction struct {
 }
 
 type AppRewardWallet struct {
-	UserID         uuid.UUID
-	SessionID      uuid.NullUUID
-	BalanceSeconds int64
-	EvaluatedSeq   int64
-	Version        int64
-	UpdatedAt      time.Time
+	UserID           uuid.UUID
+	SessionID        uuid.NullUUID
+	BalanceSeconds   int64
+	EvaluatedSeq     int64
+	Version          int64
+	UpdatedAt        time.Time
+	PolicyVersion    int32
+	GrantStopped     bool
+	StopReason       string
+	CollectorHealthy bool
+}
+
+type AppRewardSessionOutcome struct {
+	SessionID     uuid.UUID
+	UserID        uuid.UUID
+	PolicyVersion int32
+	Status        string
+	Reason        string
+	GrantStopped  bool
+	UpdatedAt     time.Time
 }
 
 type AppTask struct {

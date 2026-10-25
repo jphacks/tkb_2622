@@ -233,7 +233,16 @@ func clipActivitySegments(segments []evaluation.ActivitySegment, after, through 
 	return clipped
 }
 
-func (a *App) enqueueActivityBatchLocked(state *activitySyncState, workSession session.WorkSession, records []monitor.Record, through time.Time, final bool) (bool, error) {
+func collectorHealthyForBatch(state string) bool {
+	switch state {
+	case "running", "paused", "finished", "aborted":
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *App) enqueueActivityBatchLocked(state *activitySyncState, workSession session.WorkSession, records []monitor.Record, through time.Time, collectorHealthy, final bool) (bool, error) {
 	if through.IsZero() || !through.After(state.ProducedThrough) {
 		return false, nil
 	}
@@ -252,7 +261,8 @@ func (a *App) enqueueActivityBatchLocked(state *activitySyncState, workSession s
 	}
 	batch := activitySyncItem{Kind: "batch", Batch: &cloud.ActivityBatch{
 		SessionID: state.SessionID, BatchID: batchID, Seq: state.NextSequence,
-		EvaluatorVersion: evaluatorVersion, RulesVersion: workSession.RulesVersion, Segments: items,
+		EvaluatorVersion: evaluatorVersion, RulesVersion: workSession.RulesVersion,
+		CollectorHealthy: collectorHealthy, Segments: items,
 	}}
 	if final {
 		for index, item := range state.Items {
@@ -329,7 +339,7 @@ func (a *App) prepareActivitySyncLocked(at time.Time, final bool) error {
 	if !final {
 		through = through.Add(-activityStableDelay)
 	}
-	changed, err := a.enqueueActivityBatchLocked(&syncState, workSession, records, through, final)
+	changed, err := a.enqueueActivityBatchLocked(&syncState, workSession, records, through, collectorHealthyForBatch(monitorStatus.State), final)
 	if err != nil {
 		return err
 	}
@@ -586,7 +596,11 @@ func (a *App) applyCloudOperation(sessionID, kind string, version int64, balance
 	if kind == "finish" || kind == "abort" {
 		a.engine.ClearCloudBalance(now)
 		if reward != nil {
-			a.engine.SetResultReward(sessionID, int(reward.EarnedSeconds), int(reward.SpentSeconds), int(discarded), now)
+			a.engine.SetResultReward(sessionID, session.RewardSummary{
+				EarnedSeconds: int(reward.EarnedSeconds), SpentSeconds: int(reward.SpentSeconds),
+				DiscardedSeconds: int(reward.DiscardedSeconds), Status: reward.Status, Reason: reward.Reason,
+				PolicyVersion: reward.PolicyVersion, GrantStopped: reward.GrantStopped,
+			}, now)
 		}
 	}
 	state := a.engine.Snapshot()

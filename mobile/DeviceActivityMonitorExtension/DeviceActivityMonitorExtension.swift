@@ -26,6 +26,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         if measuredSeconds >= defaults.integer(forKey: "mobile.usage.reservedSeconds") {
             applyShield(using: defaults)
             defaults.set(grantID, forKey: "mobile.usage.completedGrantID")
+            DeviceActivityCenter().stopMonitoring([activity])
         }
     }
 

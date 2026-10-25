@@ -1,0 +1,68 @@
+# backend をビルドし，マイグレーション Job を実行してから API を更新する．
+# 手順は backend/README.md の「Cloud Run向けの準備と実行手順」と同じ．
+name: deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: デプロイ先（dev／prod）
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # マイグレーションを途中で止めないよう，実行中のデプロイはキャンセルしない
+    concurrency:
+      group: deploy-backend-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      ENV: ${{ inputs.environment }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/tkb/backend:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run migration
+        run: |
+          gcloud run jobs update "tkb-$ENV-migrate" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION"
+          gcloud run jobs execute "tkb-$ENV-migrate" --wait --project "$PROJECT_ID" --region "$REGION"
+
+      # --image 以外は渡さない．環境変数・スケール等は Terraform で管理する
+      - name: Deploy API
+        run: gcloud run deploy "tkb-$ENV-api" --image "$IMAGE" --project "$PROJECT_ID" --region "$REGION"
+
+      # run.app への直接アクセスは X-Origin-Auth がないため 403 になる．Cloudflare Worker 経由で確認する
+      - name: Health check
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: curl --fail --silent --show-error --retry 5 --retry-all-errors "$API_URL/healthz"

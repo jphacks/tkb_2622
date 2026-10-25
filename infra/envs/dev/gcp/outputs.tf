@@ -17,3 +17,18 @@ output "secret_ids" {
   description = "値を投入する Secret の ID"
   value       = module.api.secret_ids
 }
+
+output "origin_auth_token_secret_id" {
+  description = "迂回防止用シークレットの Secret ID．envs/<env>/cloudflare が値を読む"
+  value       = module.api.origin_auth_token_secret_id
+}
+
+output "origin_auth_token_secret_version" {
+  description = "迂回防止用シークレットの版番号"
+  value       = module.api.origin_auth_token_secret_version
+}
+
+output "project_id" {
+  description = "GCP プロジェクト ID．envs/<env>/cloudflare が Secret を読むときに使う"
+  value       = var.project_id
+}

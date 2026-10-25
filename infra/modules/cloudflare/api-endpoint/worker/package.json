@@ -1,0 +1,6 @@
+{
+  "name": "tkb-api-proxy-worker",
+  "private": true,
+  "type": "module",
+  "description": "proxy.js のユニットテスト用（node --test）．依存パッケージはない"
+}

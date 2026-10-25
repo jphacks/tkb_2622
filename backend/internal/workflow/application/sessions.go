@@ -30,9 +30,9 @@ type Reward interface {
 	Balance(ctx context.Context, userID string) (reward.Wallet, error)
 	Summary(ctx context.Context, sessionID string) (reward.Summary, error)
 	Open(ctx context.Context, userID, sessionID string) (reward.Wallet, error)
-	Accrue(ctx context.Context, userID, sessionID string, workMillis, throughSeq int64) (int64, reward.Wallet, error)
+	Accrue(ctx context.Context, userID, sessionID string, workMillis int64, eligibility reward.Eligibility, throughSeq int64) (int64, reward.Wallet, error)
 	Spend(ctx context.Context, userID, sessionID, grantID string, seconds int64) (reward.Wallet, error)
-	Discard(ctx context.Context, userID, sessionID string) (int64, reward.Wallet, error)
+	Discard(ctx context.Context, userID, sessionID string, eligibility reward.Eligibility) (int64, reward.Wallet, error)
 }
 
 // Restriction is the subset of restriction operations the workflow needs, bound to the current transaction.
@@ -86,6 +86,14 @@ type Sessions struct {
 
 func New(run Runner, devices Devices) *Sessions {
 	return &Sessions{run: run, devices: devices, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func sessionRewardEligibility(s focus.Session, collectorHealthy *bool) reward.Eligibility {
+	_, quality, _ := s.Totals.Scores()
+	return reward.Eligibility{
+		Quality: quality, KnownActiveMillis: s.Totals.Work() + s.Totals.Distraction,
+		CollectorHealthy: collectorHealthy,
+	}
 }
 
 // requestHash binds a request to the calling device so another device cannot replay its result.
@@ -160,7 +168,8 @@ func (w *Sessions) Upload(ctx context.Context, a focus.Actor, in focus.BatchInpu
 		}
 		out.Receipt = receipt
 		if s.Open() {
-			out.Earned, out.Balance, e = r.Accrue(ctx, a.UserID, s.ID, s.Totals.Work(), s.AcceptedSeq)
+			collectorHealthy := receipt.CollectorHealthy
+			out.Earned, out.Balance, e = r.Accrue(ctx, a.UserID, s.ID, s.Totals.Work(), sessionRewardEligibility(s, &collectorHealthy), s.AcceptedSeq)
 		} else {
 			out.Balance, e = r.Balance(ctx, a.UserID)
 		}
@@ -186,7 +195,7 @@ func (w *Sessions) Pause(ctx context.Context, a focus.Actor, in PauseInput) (Ses
 		if err != nil {
 			return SessionResult{}, err
 		}
-		_, wallet, err := r.Accrue(ctx, a.UserID, s.ID, s.Totals.Work(), s.AcceptedSeq)
+		_, wallet, err := r.Accrue(ctx, a.UserID, s.ID, s.Totals.Work(), sessionRewardEligibility(s, nil), s.AcceptedSeq)
 		if err != nil {
 			return SessionResult{}, err
 		}
@@ -256,7 +265,7 @@ func (w *Sessions) end(ctx context.Context, a focus.Actor, abort bool, in EndInp
 		if err != nil {
 			return SessionResult{}, err
 		}
-		discarded, wallet, err := r.Discard(ctx, a.UserID, s.ID)
+		discarded, wallet, err := r.Discard(ctx, a.UserID, s.ID, sessionRewardEligibility(s, nil))
 		if err != nil {
 			return SessionResult{}, err
 		}
@@ -280,9 +289,44 @@ func (w *Sessions) Detail(ctx context.Context, a focus.Actor, sessionID string) 
 		}
 		out.Session = s
 		out.Reward, e = r.Summary(ctx, s.ID)
+		if e == nil && !out.Reward.Finalized {
+			out.Reward = currentRewardStatus(s, out.Reward)
+		}
 		return e
 	})
 	return
+}
+
+func currentRewardStatus(s focus.Session, summary reward.Summary) reward.Summary {
+	if summary.EarnedSeconds > 0 {
+		summary.Status = reward.StatusGranted
+		return summary
+	}
+	if s.Status == "FINALIZED" || s.Status == "ABORTED" {
+		summary.Status = reward.StatusIneligible
+		if summary.Reason == "" {
+			summary.Reason = "no_reward_granted"
+		}
+		return summary
+	}
+	policy, err := reward.PolicyForVersion(summary.PolicyVersion)
+	if err != nil {
+		policy = reward.CurrentPolicy
+	}
+	if policy.Version == reward.PolicyV1.Version {
+		summary.Status = reward.StatusPending
+		return summary
+	}
+	eligible, reason := sessionRewardEligibility(s, nil).Check(summary.CollectorHealthy)
+	if !eligible {
+		summary.Status, summary.Reason = reward.StatusPending, reason
+		return summary
+	}
+	summary.Status = reward.StatusPending
+	if policy.Due(s.Totals.Work()) == 0 {
+		summary.Reason = "no_reward_block"
+	}
+	return summary
 }
 
 type ReserveInput struct {

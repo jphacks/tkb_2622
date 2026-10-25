@@ -11,6 +11,7 @@ import "C"
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -23,6 +24,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// メニューバー用のテンプレート画像（36px，黒＋透過）．
+//
+//go:embed build/darwin/menubar-icon.png
+var menubarIcon []byte
 
 var trayStateMu sync.RWMutex
 var trayContext context.Context
@@ -55,6 +61,7 @@ type popoverState struct {
 
 func configurePlatform(configuration *options.App, host *app.Host) {
 	configuration.Mac = &mac.Options{TitleBar: mac.TitleBarDefault()}
+	configuration.StartHidden = true
 	configuration.HideWindowOnClose = true
 	applicationMenu := menu.NewMenu()
 	applicationMenu.Append(menu.AppMenu())
@@ -80,7 +87,8 @@ func configurePlatform(configuration *options.App, host *app.Host) {
 			trayStateMu.Unlock()
 			updateNativePopover(host.CurrentSnapshot())
 		})
-		C.FocusLinkInstallStatusItem()
+		// C側で同期的にNSDataへ複製するため，Goのメモリを保持されることはない．
+		C.FocusLinkInstallStatusItem(unsafe.Pointer(&menubarIcon[0]), C.int(len(menubarIcon)))
 		updateNativePopover(host.CurrentSnapshot())
 	}
 }
@@ -311,21 +319,25 @@ func FocusLinkOpenPage(cPage *C.char) {
 	if page != "session" && page != "history" && page != "settings" && page != "feedback" {
 		return
 	}
-	if page == "feedback" {
-		state := host.CurrentSnapshot()
-		if state.Result == nil {
+
+	// AppKitのCコールバック中にWailsのウィンドウ操作へ戻らないよう、Go側で処理を分離する。
+	go func() {
+		if page == "feedback" {
+			state := host.CurrentSnapshot()
+			if state.Result == nil {
+				return
+			}
+			C.FocusLinkClosePopover()
+			wailsruntime.Show(ctx)
+			wailsruntime.WindowShow(ctx)
+			wailsruntime.EventsEmit(ctx, "desktop:show-feedback", state.Result)
 			return
 		}
 		C.FocusLinkClosePopover()
 		wailsruntime.Show(ctx)
 		wailsruntime.WindowShow(ctx)
-		wailsruntime.EventsEmit(ctx, "desktop:show-feedback", state.Result)
-		return
-	}
-	C.FocusLinkClosePopover()
-	wailsruntime.Show(ctx)
-	wailsruntime.WindowShow(ctx)
-	wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
+		wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
+	}()
 }
 
 //export FocusLinkQuit

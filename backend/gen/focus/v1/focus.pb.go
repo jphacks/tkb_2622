@@ -1425,6 +1425,8 @@ type UploadActivityBatchRequest struct {
 	EvaluatorVersion string             `protobuf:"bytes,4,opt,name=evaluator_version,json=evaluatorVersion,proto3" json:"evaluator_version,omitempty"`
 	RulesVersion     string             `protobuf:"bytes,5,opt,name=rules_version,json=rulesVersion,proto3" json:"rules_version,omitempty"`
 	Segments         []*ActivitySegment `protobuf:"bytes,6,rep,name=segments,proto3" json:"segments,omitempty"`
+	// True only when local collection was operating normally for this batch.
+	CollectorHealthy bool `protobuf:"varint,7,opt,name=collector_healthy,json=collectorHealthy,proto3" json:"collector_healthy,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1499,6 +1501,13 @@ func (x *UploadActivityBatchRequest) GetSegments() []*ActivitySegment {
 		return x.Segments
 	}
 	return nil
+}
+
+func (x *UploadActivityBatchRequest) GetCollectorHealthy() bool {
+	if x != nil {
+		return x.CollectorHealthy
+	}
+	return false
 }
 
 type ActivityReceipt struct {
@@ -2719,7 +2728,7 @@ const file_focus_v1_focus_proto_rawDesc = "" +
 	"\x14StartSessionResponse\x12+\n" +
 	"\asession\x18\x01 \x01(\v2\x11.focus.v1.SessionR\asession\x122\n" +
 	"\abalance\x18\x02 \x01(\v2\x18.reward.v1.RewardBalanceR\abalance\x12B\n" +
-	"\vrestriction\x18\x03 \x01(\v2 .restriction.v1.RestrictionStateR\vrestriction\"\xf1\x01\n" +
+	"\vrestriction\x18\x03 \x01(\v2 .restriction.v1.RestrictionStateR\vrestriction\"\x9e\x02\n" +
 	"\x1aUploadActivityBatchRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x19\n" +
@@ -2727,7 +2736,8 @@ const file_focus_v1_focus_proto_rawDesc = "" +
 	"\x03seq\x18\x03 \x01(\x03R\x03seq\x12+\n" +
 	"\x11evaluator_version\x18\x04 \x01(\tR\x10evaluatorVersion\x12#\n" +
 	"\rrules_version\x18\x05 \x01(\tR\frulesVersion\x125\n" +
-	"\bsegments\x18\x06 \x03(\v2\x19.focus.v1.ActivitySegmentR\bsegments\"\xe9\x01\n" +
+	"\bsegments\x18\x06 \x03(\v2\x19.focus.v1.ActivitySegmentR\bsegments\x12+\n" +
+	"\x11collector_healthy\x18\a \x01(\bR\x10collectorHealthy\"\xe9\x01\n" +
 	"\x0fActivityReceipt\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12\x10\n" +
 	"\x03seq\x18\x02 \x01(\x03R\x03seq\x12-\n" +

@@ -8,7 +8,7 @@
 - (void)setBusy:(BOOL)busy;
 @end
 
-void FocusLinkConfigurePopover(NSPopover *popover);
+void FocusLinkConfigureStatusPanel(NSPanel *panel);
 void FocusLinkUpdatePopover(const char *stateJSON);
 void FocusLinkSetPopoverBusy(int busy);
 

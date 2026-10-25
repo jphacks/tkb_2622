@@ -11,7 +11,8 @@ export interface MonitorStatus { state: string; appId?: string; appName: string;
 export interface Classification { name: string; appId?: string; domain?: string; category: 'work' | 'related' | 'distraction' | 'uncertain' }
 export interface ClassificationCandidate { name: string; appId: string; appName: string; domain: string; sampleCount: number }
 export interface Settings { tasks: Task[]; selectedTaskId: string; classifications: Classification[] }
-export interface Result { sessionId: string; name: string; status: SessionStatus; startedAt?: string; endedAt?: string; elapsedSeconds: number; taskSeconds?: number; relatedSeconds?: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; inactiveSeconds?: number; evaluatorVersion?: string; b100?: number; q?: number; workRate?: number; earnedSeconds: number; usedSeconds: number; discardedSeconds: number }
+export type RewardStatus = 'pending' | 'queued' | 'granted' | 'ineligible' | 'unavailable';
+export interface Result { sessionId: string; name: string; status: SessionStatus; startedAt?: string; endedAt?: string; elapsedSeconds: number; taskSeconds?: number; relatedSeconds?: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; inactiveSeconds?: number; evaluatorVersion?: string; b100?: number; q?: number; workRate?: number; earnedSeconds: number; usedSeconds: number; discardedSeconds: number; rewardStatus?: RewardStatus; rewardReason?: string; rewardPolicyVersion?: number; rewardGrantStopped?: boolean }
 export type SessionAction = 'start' | 'pause' | 'resume' | 'finish' | 'abort' | 'retry';
 export interface Snapshot {
   revision: number; platform: Platform; mode: 'demo' | 'local-monitor'; updatedAt: string;

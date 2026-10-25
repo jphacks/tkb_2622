@@ -18,7 +18,7 @@ enum {
     FLPopoverOpenFeedback,
 };
 
-static NSPopover *focusLinkPopover;
+static NSPanel *focusLinkStatusPanel;
 
 static NSStackView *FLStack(NSUserInterfaceLayoutOrientation orientation, CGFloat spacing) {
     NSStackView *stack = [[[NSStackView alloc] init] autorelease];
@@ -37,6 +37,8 @@ static NSTextField *FLLabel(NSString *value, NSFont *font, NSColor *color) {
     label.lineBreakMode = NSLineBreakByTruncatingTail;
     label.cell.usesSingleLineMode = YES;
     label.cell.wraps = NO;
+    [label.widthAnchor constraintLessThanOrEqualToConstant:292].active = YES;
+    [label setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     return label;
 }
 
@@ -77,14 +79,24 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     BOOL _nameEntryExpanded;
 }
 - (void)buttonPressed:(NSButton *)sender;
+- (void)updatePrimaryButtonTextColor;
+- (void)setStatusPanelHeight:(CGFloat)height;
 - (CGFloat)preferredHeightForState:(NSDictionary *)state;
 @end
 
 @implementation FocusLinkPopoverViewController
 
 - (void)loadView {
-    NSView *root = [[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 360, 250)] autorelease];
-    NSStackView *stack = FLStack(NSUserInterfaceLayoutOrientationVertical, 10);
+    NSVisualEffectView *root = [[[NSVisualEffectView alloc] initWithFrame:NSMakeRect(0, 0, 320, 220)] autorelease];
+    [root.widthAnchor constraintEqualToConstant:320].active = YES;
+    root.material = NSVisualEffectMaterialPopover;
+    root.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+    root.state = NSVisualEffectStateActive;
+    root.wantsLayer = YES;
+    root.layer.cornerRadius = 13;
+    root.layer.masksToBounds = YES;
+
+    NSStackView *stack = FLStack(NSUserInterfaceLayoutOrientationVertical, 6);
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     [root addSubview:stack];
 
@@ -112,11 +124,13 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     _nameField.translatesAutoresizingMaskIntoConstraints = NO;
     _nameField.hidden = YES;
     [_nameField.heightAnchor constraintEqualToConstant:32].active = YES;
+    [_nameField.widthAnchor constraintLessThanOrEqualToConstant:292].active = YES;
+    [_nameField setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     [stack addArrangedSubview:_nameField];
 
     _timerCard = FLStack(NSUserInterfaceLayoutOrientationVertical, 3);
     NSTextField *timerTitle = FLLabel(@"作業時間", [NSFont systemFontOfSize:11], NSColor.secondaryLabelColor);
-    _timerLabel = FLLabel(@"0:00:00", [NSFont monospacedDigitSystemFontOfSize:32 weight:NSFontWeightSemibold], NSColor.labelColor);
+    _timerLabel = FLLabel(@"0:00:00", [NSFont monospacedDigitSystemFontOfSize:28 weight:NSFontWeightSemibold], NSColor.labelColor);
     _timerHintLabel = FLLabel(@"", [NSFont systemFontOfSize:12], NSColor.secondaryLabelColor);
     [_timerCard addArrangedSubview:timerTitle];
     [_timerCard addArrangedSubview:_timerLabel];
@@ -129,8 +143,8 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     [stack addArrangedSubview:_detailLabel];
 
     _primaryButton = [self buttonWithTitle:@"開始" tag:FLPopoverActionStart primary:YES];
-    [_primaryButton.heightAnchor constraintEqualToConstant:40].active = YES;
-    [_primaryButton.widthAnchor constraintEqualToConstant:324].active = YES;
+    [_primaryButton.heightAnchor constraintEqualToConstant:34].active = YES;
+    [_primaryButton.widthAnchor constraintEqualToConstant:292].active = YES;
     [stack addArrangedSubview:_primaryButton];
 
     _sessionButtons = FLStack(NSUserInterfaceLayoutOrientationHorizontal, 8);
@@ -158,10 +172,10 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     [stack addArrangedSubview:footer];
 
     [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:18],
-        [stack.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-18],
-        [stack.topAnchor constraintEqualToAnchor:root.topAnchor constant:14],
-        [stack.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-12],
+        [stack.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:14],
+        [stack.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-14],
+        [stack.topAnchor constraintEqualToAnchor:root.topAnchor constant:10],
+        [stack.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-8],
     ]];
     self.view = root;
 }
@@ -179,6 +193,12 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     return button;
 }
 
+- (void)updatePrimaryButtonTextColor {
+    NSColor *textColor = _primaryButton.enabled ? NSColor.whiteColor : NSColor.disabledControlTextColor;
+    NSAttributedString *title = [[[NSAttributedString alloc] initWithString:_primaryButton.title attributes:@{ NSForegroundColorAttributeName: textColor }] autorelease];
+    _primaryButton.attributedTitle = title;
+}
+
 - (NSButton *)linkButtonWithTitle:(NSString *)title tag:(NSInteger)tag {
     NSButton *button = [NSButton buttonWithTitle:title target:self action:@selector(buttonPressed:)];
     button.tag = tag;
@@ -193,13 +213,23 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 - (CGFloat)preferredHeightForState:(NSDictionary *)state {
     NSString *status = state[@"status"] ?: @"idle";
     if ([status isEqualToString:@"idle"]) {
-        CGFloat height = [state[@"detail"] length] ? 250 : 224;
-        if (_nameEntryExpanded) height += 42;
-        if ([state[@"balance"] length]) height += 22;
+        CGFloat height = [state[@"detail"] length] ? 212 : 186;
+        if (_nameEntryExpanded) height += 38;
+        if ([state[@"balance"] length]) height += 18;
         return height;
     }
-    if ([status isEqualToString:@"pending"]) return 340;
-    return 400;
+    if ([status isEqualToString:@"pending"]) return 292;
+    return 350;
+}
+
+- (void)setStatusPanelHeight:(CGFloat)height {
+    if (focusLinkStatusPanel == nil || focusLinkStatusPanel.frame.size.height == height) {
+        return;
+    }
+    NSRect frame = focusLinkStatusPanel.frame;
+    CGFloat top = NSMaxY(frame);
+    [focusLinkStatusPanel setContentSize:NSMakeSize(320, height)];
+    [focusLinkStatusPanel setFrameOrigin:NSMakePoint(NSMinX(frame), top - NSHeight(focusLinkStatusPanel.frame))];
 }
 
 - (void)updateWithState:(NSDictionary *)state {
@@ -217,18 +247,22 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     BOOL canRetry = FLAllowed(state, @"retry");
 
     _statusLabel.stringValue = state[@"statusLabel"] ?: @"作業開始前";
+    _statusLabel.toolTip = _statusLabel.stringValue;
     _statusLabel.textColor = isRunning ? NSColor.systemGreenColor : (isPaused || isPending ? NSColor.systemOrangeColor : NSColor.secondaryLabelColor);
     _taskLabel.stringValue = state[@"taskDescription"] ?: @"タスクがありません";
     _taskLabel.toolTip = _taskLabel.stringValue;
     _taskHintLabel.stringValue = state[@"taskHint"] ?: @"";
+    _taskHintLabel.toolTip = _taskHintLabel.stringValue;
     _taskHintLabel.hidden = _taskHintLabel.stringValue.length == 0;
     _timerLabel.stringValue = state[@"elapsed"] ?: @"0:00:00";
     _timerHintLabel.stringValue = state[@"timerHint"] ?: @"";
+    _timerHintLabel.toolTip = _timerHintLabel.stringValue;
     _timerHintLabel.hidden = _timerHintLabel.stringValue.length == 0;
     _balanceLabel.stringValue = state[@"balance"] ?: @"";
+    _balanceLabel.toolTip = _balanceLabel.stringValue;
     _balanceLabel.hidden = _balanceLabel.stringValue.length == 0;
     _detailLabel.stringValue = detail;
-    _detailLabel.toolTip = detail;
+    _detailLabel.toolTip = state[@"detailTooltip"] ?: detail;
     _detailLabel.hidden = detail.length == 0;
 
     if (!isIdle) {
@@ -243,10 +277,11 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 
     if (isIdle) {
         _primaryButton.hidden = NO;
-        _primaryButton.title = hasTask ? @"作業を開始" : @"設定を開く";
+        BOOL retryableStart = [state[@"startRetryable"] boolValue];
+        _primaryButton.title = hasTask ? (retryableStart ? @"再試行" : @"作業を開始") : @"設定を開く";
         _primaryButton.tag = hasTask ? FLPopoverActionStart : FLPopoverOpenSettings;
         _primaryButton.enabled = !_busy && (hasTask ? FLAllowed(state, @"start") : YES);
-        _primaryButton.toolTip = hasTask ? FLReason(state, @"start") : @"";
+        _primaryButton.toolTip = hasTask ? (retryableStart ? (state[@"detailTooltip"] ?: FLReason(state, @"start")) : FLReason(state, @"start")) : @"";
     } else if (isRunning) {
         _primaryButton.hidden = NO;
         _primaryButton.title = @"一時停止";
@@ -282,12 +317,14 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     _settingsButton.enabled = !_busy;
     _feedbackButton.enabled = !_busy && [state[@"hasResult"] boolValue];
     _feedbackButton.hidden = ![state[@"hasResult"] boolValue];
+    [self updatePrimaryButtonTextColor];
 }
 
 - (void)setBusy:(BOOL)busy {
     _busy = busy;
     if (busy) {
         _detailLabel.stringValue = @"処理しています…";
+        _detailLabel.toolTip = _detailLabel.stringValue;
         _detailLabel.hidden = NO;
         _primaryButton.enabled = NO;
         _secondaryButton.enabled = NO;
@@ -299,6 +336,7 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     } else if (_lastState != nil) {
         [self updateWithState:_lastState];
     }
+    [self updatePrimaryButtonTextColor];
 }
 
 - (void)dealloc {
@@ -317,9 +355,7 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
             if (_nameEntryExpanded) {
                 [[self.view window] makeFirstResponder:_nameField];
             }
-            if (focusLinkPopover != nil) {
-                focusLinkPopover.contentSize = NSMakeSize(360, [self preferredHeightForState:_lastState ?: @{}]);
-            }
+            [self setStatusPanelHeight:[self preferredHeightForState:_lastState ?: @{}]];
             return;
         case FLPopoverActionStart:
             FocusLinkDispatchPopoverAction("start", [_nameField.stringValue UTF8String]);
@@ -367,29 +403,33 @@ static void FLUpdatePopoverOnMainThread(NSDictionary *state) {
     NSDictionary *retainedState = [state copy];
     dispatch_async(dispatch_get_main_queue(), ^{
         FocusLinkPopoverViewController *viewController = focusLinkPopoverViewController;
-        NSPopover *popover = focusLinkPopover;
         if (viewController != nil) {
             [viewController updateWithState:retainedState];
             CGFloat height = [viewController preferredHeightForState:retainedState];
-            if (popover != nil && popover.contentSize.height != height) {
-                popover.contentSize = NSMakeSize(360, height);
-            }
+            [viewController setStatusPanelHeight:height];
         }
         [retainedState release];
     });
 }
 
-void FocusLinkConfigurePopover(NSPopover *popover) {
-    focusLinkPopover = popover;
+void FocusLinkConfigureStatusPanel(NSPanel *panel) {
+    focusLinkStatusPanel = panel;
     focusLinkPopoverViewController = [[FocusLinkPopoverViewController alloc] init];
-    popover.contentViewController = focusLinkPopoverViewController;
-    // アプリを前面化せずにメニューバーのパネルを見やすく保つ。
+    panel.contentViewController = focusLinkPopoverViewController;
+    panel.backgroundColor = NSColor.clearColor;
+    panel.opaque = NO;
+    panel.hasShadow = YES;
+    panel.level = NSStatusWindowLevel;
+    panel.floatingPanel = YES;
+    panel.becomesKeyOnlyIfNeeded = YES;
+    // 非アクティブな常駐アプリでも表示し、外側クリックは監視側で閉じる。
+    panel.hidesOnDeactivate = NO;
+    panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorTransient;
+    // アプリを前面化せず、メニューバーから開く操作パネルとして扱う。
     if (@available(macOS 10.14, *)) {
-        popover.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        panel.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     }
-    popover.behavior = NSPopoverBehaviorTransient;
-    popover.animates = YES;
-    popover.contentSize = NSMakeSize(360, 250);
+    panel.contentSize = NSMakeSize(320, 220);
 }
 
 void FocusLinkUpdatePopover(const char *stateJSON) {

@@ -47,6 +47,11 @@ func run(logger *slog.Logger) error {
 	if err != nil || n < 1 || n > 65535 {
 		return errors.New("PORT must be between 1 and 65535")
 	}
+	// Set on Cloud Run so that only requests proxied by the Cloudflare Worker are served. Empty disables the check for local use.
+	originToken := os.Getenv("ORIGIN_AUTH_TOKEN")
+	if originToken != "" && len(originToken) < 32 {
+		return errors.New("ORIGIN_AUTH_TOKEN must be at least 32 characters")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	audience := os.Getenv("SUPABASE_JWT_AUDIENCE")
@@ -83,13 +88,16 @@ func run(logger *slog.Logger) error {
 		Notifications: notifications,
 		Logger:        logger,
 	})
+	if originToken != "" {
+		handler = server.RequireOriginToken(originToken, handler)
+	}
 	srv := &http.Server{
-		Addr: net.JoinHostPort("", port), Handler: handler,
+		Addr: net.JoinHostPort("", port), Handler: handler, MaxHeaderBytes: 64 << 10,
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
 	}
 	done := make(chan error, 1)
 	go func() { done <- srv.ListenAndServe() }()
-	logger.Info("server starting", "port", port)
+	logger.Info("server starting", "port", port, "origin_auth", originToken != "")
 	select {
 	case err := <-done:
 		return err

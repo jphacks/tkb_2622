@@ -7,6 +7,7 @@ package rewardsql
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
@@ -70,7 +71,7 @@ func (q *Queries) AddTransaction(ctx context.Context, arg AddTransactionParams) 
 }
 
 const getWallet = `-- name: GetWallet :one
-SELECT user_id, session_id, balance_seconds, evaluated_seq, version, updated_at FROM app.reward_wallets WHERE user_id = $1
+SELECT user_id, session_id, balance_seconds, evaluated_seq, version, updated_at, policy_version, grant_stopped, stop_reason, collector_healthy FROM app.reward_wallets WHERE user_id = $1
 `
 
 func (q *Queries) GetWallet(ctx context.Context, userID uuid.UUID) (AppRewardWallet, error) {
@@ -83,20 +84,28 @@ func (q *Queries) GetWallet(ctx context.Context, userID uuid.UUID) (AppRewardWal
 		&i.EvaluatedSeq,
 		&i.Version,
 		&i.UpdatedAt,
+		&i.PolicyVersion,
+		&i.GrantStopped,
+		&i.StopReason,
+		&i.CollectorHealthy,
 	)
 	return i, err
 }
 
 const insertWallet = `-- name: InsertWallet :exec
-INSERT INTO app.reward_wallets (user_id, session_id, balance_seconds, evaluated_seq, version)
-VALUES ($1, $2, $3, $4, 1)
+INSERT INTO app.reward_wallets (user_id, session_id, balance_seconds, evaluated_seq, version, policy_version, grant_stopped, stop_reason, collector_healthy)
+VALUES ($1, $2, $3, $4, 1, $5, $6, $7, $8)
 `
 
 type InsertWalletParams struct {
-	UserID         uuid.UUID
-	SessionID      uuid.NullUUID
-	BalanceSeconds int64
-	EvaluatedSeq   int64
+	UserID           uuid.UUID
+	SessionID        uuid.NullUUID
+	BalanceSeconds   int64
+	EvaluatedSeq     int64
+	PolicyVersion    int32
+	GrantStopped     bool
+	StopReason       string
+	CollectorHealthy bool
 }
 
 func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) error {
@@ -105,42 +114,102 @@ func (q *Queries) InsertWallet(ctx context.Context, arg InsertWalletParams) erro
 		arg.SessionID,
 		arg.BalanceSeconds,
 		arg.EvaluatedSeq,
+		arg.PolicyVersion,
+		arg.GrantStopped,
+		arg.StopReason,
+		arg.CollectorHealthy,
 	)
 	return err
 }
 
 const sessionSummary = `-- name: SessionSummary :one
 SELECT
-    COALESCE(SUM(amount_seconds) FILTER (WHERE type = 'EARN'), 0)::BIGINT AS earned,
-    COALESCE(-SUM(amount_seconds) FILTER (WHERE type = 'SPEND'), 0)::BIGINT AS spent,
-    COALESCE(-SUM(amount_seconds) FILTER (WHERE type = 'DISCARD'), 0)::BIGINT AS discarded
-FROM app.reward_transactions WHERE session_id = $1
+    COALESCE(SUM(t.amount_seconds) FILTER (WHERE t.type = 'EARN'), 0)::BIGINT AS earned,
+    COALESCE(-SUM(t.amount_seconds) FILTER (WHERE t.type = 'SPEND'), 0)::BIGINT AS spent,
+    COALESCE(-SUM(t.amount_seconds) FILTER (WHERE t.type = 'DISCARD'), 0)::BIGINT AS discarded,
+    COALESCE(o.policy_version, w.policy_version, g.policy_version, 1)::INTEGER AS policy_version,
+    COALESCE(o.status, CASE WHEN SUM(t.amount_seconds) FILTER (WHERE t.type = 'EARN') > 0 THEN 'GRANTED' ELSE NULL END)::TEXT AS status,
+    COALESCE(o.reason, w.stop_reason, '')::TEXT AS reason,
+    COALESCE(o.grant_stopped, w.grant_stopped, FALSE)::BOOLEAN AS grant_stopped,
+    COALESCE(w.collector_healthy, FALSE)::BOOLEAN AS collector_healthy,
+    (o.session_id IS NOT NULL)::BOOLEAN AS finalized
+FROM (SELECT $1::UUID AS session_id) target
+LEFT JOIN app.reward_transactions t ON t.session_id = target.session_id
+LEFT JOIN app.reward_session_outcomes o ON o.session_id = target.session_id
+LEFT JOIN app.reward_wallets w ON w.session_id = target.session_id
+LEFT JOIN LATERAL (
+    SELECT MAX(policy_version) AS policy_version FROM app.reward_grants WHERE session_id = target.session_id
+) g ON TRUE
+GROUP BY o.session_id, o.policy_version, o.status, o.reason, o.grant_stopped,
+         w.policy_version, w.stop_reason, w.grant_stopped, w.collector_healthy, g.policy_version
 `
 
 type SessionSummaryRow struct {
-	Earned    int64
-	Spent     int64
-	Discarded int64
+	Earned           int64
+	Spent            int64
+	Discarded        int64
+	PolicyVersion    int32
+	Status           sql.NullString
+	Reason           string
+	GrantStopped     bool
+	CollectorHealthy bool
+	Finalized        bool
+}
+
+const saveOutcome = `-- name: SaveOutcome :exec
+INSERT INTO app.reward_session_outcomes (session_id, user_id, policy_version, status, reason, grant_stopped)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (session_id) DO UPDATE SET
+    user_id = EXCLUDED.user_id, policy_version = EXCLUDED.policy_version,
+    status = EXCLUDED.status, reason = EXCLUDED.reason,
+    grant_stopped = EXCLUDED.grant_stopped, updated_at = now()
+`
+
+type SaveOutcomeParams struct {
+	SessionID     uuid.UUID
+	UserID        uuid.UUID
+	PolicyVersion int32
+	Status        string
+	Reason        string
+	GrantStopped  bool
+}
+
+func (q *Queries) SaveOutcome(ctx context.Context, arg SaveOutcomeParams) error {
+	_, err := q.db.ExecContext(ctx, saveOutcome,
+		arg.SessionID,
+		arg.UserID,
+		arg.PolicyVersion,
+		arg.Status,
+		arg.Reason,
+		arg.GrantStopped,
+	)
+	return err
 }
 
 func (q *Queries) SessionSummary(ctx context.Context, sessionID uuid.UUID) (SessionSummaryRow, error) {
 	row := q.db.QueryRowContext(ctx, sessionSummary, sessionID)
 	var i SessionSummaryRow
-	err := row.Scan(&i.Earned, &i.Spent, &i.Discarded)
+	err := row.Scan(&i.Earned, &i.Spent, &i.Discarded, &i.PolicyVersion, &i.Status, &i.Reason, &i.GrantStopped, &i.CollectorHealthy, &i.Finalized)
 	return i, err
 }
 
 const updateWallet = `-- name: UpdateWallet :execrows
-UPDATE app.reward_wallets SET session_id = $2, balance_seconds = $3, evaluated_seq = $4, version = version + 1, updated_at = now()
-WHERE user_id = $1 AND version = $5
+UPDATE app.reward_wallets SET session_id = $2, balance_seconds = $3, evaluated_seq = $4,
+    policy_version = $5, grant_stopped = $6, stop_reason = $7, collector_healthy = $8,
+    version = version + 1, updated_at = now()
+WHERE user_id = $1 AND version = $9
 `
 
 type UpdateWalletParams struct {
-	UserID         uuid.UUID
-	SessionID      uuid.NullUUID
-	BalanceSeconds int64
-	EvaluatedSeq   int64
-	Version        int64
+	UserID           uuid.UUID
+	SessionID        uuid.NullUUID
+	BalanceSeconds   int64
+	EvaluatedSeq     int64
+	PolicyVersion    int32
+	GrantStopped     bool
+	StopReason       string
+	CollectorHealthy bool
+	Version          int64
 }
 
 func (q *Queries) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (int64, error) {
@@ -149,6 +218,10 @@ func (q *Queries) UpdateWallet(ctx context.Context, arg UpdateWalletParams) (int
 		arg.SessionID,
 		arg.BalanceSeconds,
 		arg.EvaluatedSeq,
+		arg.PolicyVersion,
+		arg.GrantStopped,
+		arg.StopReason,
+		arg.CollectorHealthy,
 		arg.Version,
 	)
 	if err != nil {

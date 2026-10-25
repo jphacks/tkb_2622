@@ -244,8 +244,10 @@ func (a *App) refreshCloudHistory(ctx context.Context, auth cloud.AuthSession) e
 			ElapsedSeconds: int(entry.Session.Durations.ActiveMillis / 1000),
 			TaskSeconds:    int(entry.Session.Durations.TaskMillis / 1000), RelatedSeconds: int(related),
 			WorkSeconds: int(work), DistractedSeconds: int(distracted), UncertainSeconds: int(unknown),
-			InactiveSeconds: int(inactive), EarnedSeconds: int(entry.EarnedSeconds),
-			UsedSeconds: int(entry.SpentSeconds), DiscardedSeconds: int(entry.DiscardedSeconds),
+			InactiveSeconds: int(inactive), EarnedSeconds: int(entry.Reward.EarnedSeconds),
+			UsedSeconds: int(entry.Reward.SpentSeconds), DiscardedSeconds: int(entry.Reward.DiscardedSeconds),
+			RewardStatus: entry.Reward.Status, RewardReason: entry.Reward.Reason,
+			RewardPolicyVersion: entry.Reward.PolicyVersion, RewardGrantStopped: entry.Reward.GrantStopped,
 			B100: entry.Session.FocusScore, Q: entry.Session.Quality, WorkRate: entry.Session.WorkRate,
 		}
 		if !entry.Session.EndedAt.IsZero() {

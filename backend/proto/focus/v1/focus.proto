@@ -160,6 +160,8 @@ message UploadActivityBatchRequest {
   string evaluator_version = 4;
   string rules_version = 5;
   repeated ActivitySegment segments = 6;
+  // True only when local collection was operating normally for this batch.
+  bool collector_healthy = 7;
 }
 message ActivityReceipt {
   string batch_id = 1;

@@ -22,12 +22,14 @@ WHERE user_id = $1 AND id = $2 AND version = $16 AND accepted_seq = $17;
 -- name: SetFinalSegments :exec
 UPDATE app.work_sessions SET final_segments = $2 WHERE id = $1;
 -- name: GetBatch :one
-SELECT * FROM app.activity_batches WHERE session_id = $1 AND seq = $2;
+SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy, received_at
+FROM app.activity_batches WHERE session_id = $1 AND seq = $2;
 -- name: BatchByID :one
-SELECT * FROM app.activity_batches WHERE session_id = $1 AND batch_id = $2;
+SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy, received_at
+FROM app.activity_batches WHERE session_id = $1 AND batch_id = $2;
 -- name: InsertBatch :exec
-INSERT INTO app.activity_batches (session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO app.activity_batches (session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 -- name: SetBatchStatus :exec
 UPDATE app.activity_batches SET status = $3 WHERE session_id = $1 AND seq = $2;
 -- name: DeleteBatch :exec

@@ -42,3 +42,9 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+
+variable "origin_auth_token_version" {
+  description = "迂回防止用シークレットの版．上げると新しい値を生成し，envs/<env>/cloudflare の apply で Worker にも反映する"
+  type        = number
+  default     = 1
+}

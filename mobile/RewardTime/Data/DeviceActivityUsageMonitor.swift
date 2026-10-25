@@ -89,19 +89,22 @@ struct DeviceActivityUsageMonitor {
     }
 
     func stop() {
-        if let rawName = defaults.string(forKey: "mobile.usage.activityName") {
-            center.stopMonitoring([DeviceActivityName(rawName)])
-        }
+        stopMonitoring()
         defaults.removeObject(forKey: "mobile.usage.activeGrantID")
         defaults.removeObject(forKey: "mobile.usage.pendingOperationID")
         defaults.removeObject(forKey: "mobile.usage.activityName")
         defaults.removeObject(forKey: "mobile.usage.reservedSeconds")
-        defaults.removeObject(forKey: "mobile.usage.pendingOperationID")
         defaults.removeObject(forKey: "mobile.usage.measuredSeconds")
         defaults.removeObject(forKey: "mobile.usage.measuredAt")
         defaults.removeObject(forKey: "mobile.usage.completedGrantID")
         defaults.removeObject(forKey: "mobile.usage.monitorIntervalEnded")
         defaults.removeObject(forKey: "mobile.usage.monitorError")
+    }
+
+    func stopMonitoring() {
+        if let rawName = defaults.string(forKey: "mobile.usage.activityName") {
+            center.stopMonitoring([DeviceActivityName(rawName)])
+        }
     }
 }
 
