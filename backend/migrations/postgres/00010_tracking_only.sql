@@ -1,4 +1,6 @@
 -- +goose Up
+-- StatementBegin/End keeps goose from splitting the DO block at its inner semicolons.
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -11,8 +13,10 @@ BEGIN
     END IF;
 END;
 $$;
+-- +goose StatementEnd
 
 -- +goose Down
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF (
@@ -24,3 +28,4 @@ BEGIN
     END IF;
 END;
 $$;
+-- +goose StatementEnd
