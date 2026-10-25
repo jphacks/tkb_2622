@@ -1,7 +1,7 @@
 #ifndef FOCUS_LINK_DARWIN_TRAY_H
 #define FOCUS_LINK_DARWIN_TRAY_H
 
-void FocusLinkInstallStatusItem(void);
+void FocusLinkInstallStatusItem(const void *iconData, int iconLength);
 void FocusLinkPresentPopover(void);
 void FocusLinkClosePopover(void);
 void FocusLinkDispatchPopoverAction(const char *action, const char *name);

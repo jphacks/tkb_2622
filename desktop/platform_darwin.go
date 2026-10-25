@@ -11,6 +11,7 @@ import "C"
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -23,6 +24,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// メニューバー用のテンプレート画像（36px，黒＋透過）．
+//
+//go:embed build/darwin/menubar-icon.png
+var menubarIcon []byte
 
 var trayStateMu sync.RWMutex
 var trayContext context.Context
@@ -81,7 +87,8 @@ func configurePlatform(configuration *options.App, host *app.Host) {
 			trayStateMu.Unlock()
 			updateNativePopover(host.CurrentSnapshot())
 		})
-		C.FocusLinkInstallStatusItem()
+		// C側で同期的にNSDataへ複製するため，Goのメモリを保持されることはない．
+		C.FocusLinkInstallStatusItem(unsafe.Pointer(&menubarIcon[0]), C.int(len(menubarIcon)))
 		updateNativePopover(host.CurrentSnapshot())
 	}
 }
