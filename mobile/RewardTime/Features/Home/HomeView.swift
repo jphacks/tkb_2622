@@ -47,9 +47,9 @@ struct HomeView: View {
           }
           sessionCard(snapshot)
           rewardBalanceCard(snapshot)
+          breakAction(snapshot)
           restrictedAppsCard(snapshot)
           restrictionStateCard(snapshot)
-          breakAction(snapshot)
         case .failed(let message):
           errorCard(message: message)
         }
@@ -406,7 +406,7 @@ struct HomeView: View {
 
       Label {
         Text(snapshot.sessionStatus == .working
-          ? "Macで作業を一時停止すると、報酬を利用できます。"
+          ? "Macで作業を一時停止すると使えます。利用枠は5分からで、集中判定された作業15分が約5分の目安です。"
           : "Macで作業を開始すると、作業中に貯めた報酬を利用できます。")
       } icon: {
         Image(systemName: "info.circle")
