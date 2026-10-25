@@ -53,11 +53,11 @@ export namespace session {
 	    durationSeconds: number;
 	    classification: string;
 	    reasons?: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ActivityDetail(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.appName = source["appName"];
@@ -68,7 +68,7 @@ export namespace session {
 	        this.classification = source["classification"];
 	        this.reasons = source["reasons"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -376,7 +376,7 @@ export namespace session {
 	        this.rewardGrantStopped = source["rewardGrantStopped"];
 	        this.activityDetails = this.convertValues(source["activityDetails"], ActivityDetail);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
