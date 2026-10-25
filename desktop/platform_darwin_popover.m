@@ -402,7 +402,8 @@ void FocusLinkConfigureStatusPanel(NSPanel *panel) {
     panel.level = NSStatusWindowLevel;
     panel.floatingPanel = YES;
     panel.becomesKeyOnlyIfNeeded = YES;
-    panel.hidesOnDeactivate = YES;
+    // 非アクティブな常駐アプリでも表示し、外側クリックは監視側で閉じる。
+    panel.hidesOnDeactivate = NO;
     panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary | NSWindowCollectionBehaviorTransient;
     // アプリを前面化せず、メニューバーから開く操作パネルとして扱う。
     if (@available(macOS 10.14, *)) {
