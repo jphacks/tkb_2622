@@ -42,6 +42,15 @@ sync_to_windows() {
 		"$POC_DIR/" "$WIN_DESKTOP_DIR/../poc/macos-native/"
 }
 
+# WSL の環境変数は WSLENV に名前を挙げたものしか Windows のプロセスへ渡らない．
+# アプリが読む FOCUS_LINK_* のうち設定済みのものを渡す．
+for name in FOCUS_LINK_API_BASE_URL FOCUS_LINK_SUPABASE_URL FOCUS_LINK_SUPABASE_PUBLISHABLE_KEY; do
+	if [[ -n "${!name:-}" ]]; then
+		WSLENV="${WSLENV:+$WSLENV:}$name"
+	fi
+done
+export WSLENV="${WSLENV:-}"
+
 run_powershell() {
 	"$POWERSHELL" -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$WIN_DESKTOP_DIR/scripts/windows/$1")"
 }
