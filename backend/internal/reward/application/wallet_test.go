@@ -30,6 +30,15 @@ func (r *memoryRepository) SaveWallet(_ context.Context, wallet domain.Wallet) e
 	return nil
 }
 
+func (r *memoryRepository) HasTransactionSource(_ context.Context, userID, sourceID string) (bool, error) {
+	for _, transaction := range r.transactions {
+		if transaction.UserID == userID && transaction.SourceID == sourceID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *memoryRepository) AddTransaction(_ context.Context, transaction Transaction) error {
 	r.transactions = append(r.transactions, transaction)
 	switch transaction.Type {
@@ -59,6 +68,37 @@ func (r *memoryRepository) SaveOutcome(_ context.Context, outcome domain.Session
 
 func (r *memoryRepository) ListTransactions(context.Context, string, time.Time, string, int) ([]Transaction, error) {
 	return nil, nil
+}
+
+func TestLocalInitialBalanceDoesNotStopOrOffsetWorkRewards(t *testing.T) {
+	ctx := context.Background()
+	repo := &memoryRepository{}
+	wallets := NewWithPolicy(repo, PolicyTest)
+	wallet, err := wallets.Open(ctx, rewardTestUserID, rewardTestSessionID)
+	if err != nil || wallet.BalanceSeconds != 60 || wallet.PolicyVersion != PolicyTest.Version {
+		t.Fatalf("initial wallet = %+v, err = %v; want 60 seconds on test policy", wallet, err)
+	}
+	quality, healthy := 0.80, true
+	eligibility := domain.Eligibility{Quality: &quality, KnownActiveMillis: 30_000, CollectorHealthy: &healthy}
+	earned, wallet, err := wallets.Accrue(ctx, rewardTestUserID, rewardTestSessionID, 30_000, eligibility, 1)
+	if err != nil || earned != 0 || wallet.BalanceSeconds != 60 || wallet.GrantStopped {
+		t.Fatalf("before first work minute: earned=%d wallet=%+v err=%v", earned, wallet, err)
+	}
+	eligibility.KnownActiveMillis = 60_000
+	earned, wallet, err = wallets.Accrue(ctx, rewardTestUserID, rewardTestSessionID, 60_000, eligibility, 2)
+	if err != nil || earned != 20 || wallet.BalanceSeconds != 80 {
+		t.Fatalf("after first work minute: earned=%d balance=%d err=%v; want 20, 80", earned, wallet.BalanceSeconds, err)
+	}
+	if _, err := wallets.Spend(ctx, rewardTestUserID, rewardTestSessionID, "test-usage", 1); err != nil {
+		t.Fatalf("spend one second: %v", err)
+	}
+	if _, _, err := wallets.Discard(ctx, rewardTestUserID, rewardTestSessionID, eligibility); err != nil {
+		t.Fatal(err)
+	}
+	wallet, err = wallets.Open(ctx, rewardTestUserID, "00000000-0000-4000-8000-000000000013")
+	if err != nil || wallet.BalanceSeconds != 0 {
+		t.Fatalf("second session initial balance = %d, err = %v; want no repeated initial grant", wallet.BalanceSeconds, err)
+	}
 }
 
 func TestV2StopsFurtherAwardsAfterEligibilityDropsWithoutClawback(t *testing.T) {

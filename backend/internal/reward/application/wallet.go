@@ -150,7 +150,7 @@ func (w *Wallets) ensureInitialTestBalance(ctx context.Context, wallet domain.Wa
 	}
 	if err := w.repo.AddTransaction(ctx, Transaction{
 		ID: uuid.NewString(), UserID: wallet.UserID, SessionID: wallet.SessionID,
-		Type: "EARN", SourceID: sourceID, AmountSeconds: w.currentPolicy.InitialBalanceSeconds,
+		Type: "ADJUST", SourceID: sourceID, AmountSeconds: w.currentPolicy.InitialBalanceSeconds,
 		BalanceAfter: wallet.BalanceSeconds,
 	}); err != nil {
 		return domain.Wallet{}, err

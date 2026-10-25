@@ -15,12 +15,19 @@ import (
 	"github.com/jphacks/tkb_2622/backend/internal/workflow/application"
 )
 
-type Runner struct{ db *sql.DB }
+type Runner struct {
+	db           *sql.DB
+	rewardPolicy reward.Policy
+}
 
-func NewRunner(db *sql.DB) *Runner { return &Runner{db: db} }
+func NewRunner(db *sql.DB) *Runner { return NewRunnerWithPolicy(db, reward.CurrentPolicy) }
+
+func NewRunnerWithPolicy(db *sql.DB, policy reward.Policy) *Runner {
+	return &Runner{db: db, rewardPolicy: policy}
+}
 
 func (r *Runner) InUserTx(ctx context.Context, userID string, fn func(application.Focus, application.Reward, application.Restriction) error) error {
 	return database.InUserTx(ctx, r.db, userID, func(tx *sql.Tx) error {
-		return fn(focus.NewLifecycle(focuspersistence.New(tx)), reward.New(rewardpersistence.New(tx)), restriction.NewControl(restrictionpersistence.New(tx)))
+		return fn(focus.NewLifecycle(focuspersistence.New(tx)), reward.NewWithPolicy(rewardpersistence.New(tx), r.rewardPolicy), restriction.NewControl(restrictionpersistence.New(tx)))
 	})
 }
