@@ -31,6 +31,55 @@ type ActivitySegment struct {
 	Reasons        []string
 }
 
+type PauseRange struct {
+	StartAt time.Time
+	EndAt   time.Time
+}
+
+// PauseRanges recovers legacy captures with a resume marker but no matching pause
+// marker. Earlier desktop versions restored active sessions as paused without
+// recording that boundary, which otherwise counted closed-app time as activity.
+func PauseRanges(records []monitor.Record) []PauseRange {
+	var pauseStart *time.Time
+	var lastActivity time.Time
+	pauses := []PauseRange{}
+	closePause := func(end time.Time) {
+		if pauseStart != nil && end.After(*pauseStart) {
+			pauses = append(pauses, PauseRange{StartAt: *pauseStart, EndAt: end})
+		}
+		pauseStart = nil
+	}
+	for _, record := range records {
+		switch record.Kind {
+		case "started", "sample", "sample_error":
+			if record.RecordedAt.After(lastActivity) {
+				lastActivity = record.RecordedAt
+			}
+		case "paused":
+			if pauseStart == nil {
+				at := record.RecordedAt
+				pauseStart = &at
+			}
+		case "resumed":
+			if pauseStart != nil {
+				closePause(record.RecordedAt)
+			} else if !lastActivity.IsZero() && record.RecordedAt.After(lastActivity) {
+				// Prefer a slight undercount to ever treating downtime as eligible activity.
+				pauses = append(pauses, PauseRange{StartAt: lastActivity, EndAt: record.RecordedAt})
+			}
+			if record.RecordedAt.After(lastActivity) {
+				lastActivity = record.RecordedAt
+			}
+		case "finished", "aborted":
+			closePause(record.RecordedAt)
+			if record.RecordedAt.After(lastActivity) {
+				lastActivity = record.RecordedAt
+			}
+		}
+	}
+	return pauses
+}
+
 // EvaluateDetailed は確定済み記録またはクラウド送信用の一時区間を評価する。
 func EvaluateDetailed(records []monitor.Record, workSession session.WorkSession, through time.Time) (session.Result, []ActivitySegment, string, error) {
 	if !through.IsZero() && !hasTerminalRecord(records) {
@@ -175,8 +224,6 @@ func makeCapture(records []monitor.Record) (model.Capture, []poc.TimeRange, []po
 		Snapshots: []model.Snapshot{}, Errors: []model.Failure{},
 	}
 	var startAt, endAt time.Time
-	var pauseStart *time.Time
-	pauses := []poc.TimeRange{}
 	for _, record := range records {
 		switch record.Kind {
 		case "started":
@@ -190,26 +237,8 @@ func makeCapture(records []monitor.Record) (model.Capture, []poc.TimeRange, []po
 			capture.Snapshots = append(capture.Snapshots, toSnapshot(*record.Observation))
 		case "sample_error":
 			capture.Errors = append(capture.Errors, model.Failure{ReceivedAt: record.RecordedAt, Reason: "native_sample_failed"})
-		case "paused":
-			if pauseStart == nil {
-				value := record.RecordedAt
-				pauseStart = &value
-			}
-		case "resumed":
-			if pauseStart != nil {
-				if record.RecordedAt.After(*pauseStart) {
-					pauses = append(pauses, poc.TimeRange{StartAt: *pauseStart, EndAt: record.RecordedAt})
-				}
-				pauseStart = nil
-			}
 		case "finished", "aborted":
 			endAt = record.RecordedAt
-			if pauseStart != nil {
-				if endAt.After(*pauseStart) {
-					pauses = append(pauses, poc.TimeRange{StartAt: *pauseStart, EndAt: endAt})
-				}
-				pauseStart = nil
-			}
 		}
 	}
 	if startAt.IsZero() || endAt.IsZero() || !endAt.After(startAt) {
@@ -218,6 +247,12 @@ func makeCapture(records []monitor.Record) (model.Capture, []poc.TimeRange, []po
 	capture.StartAt = startAt
 	capture.EndAt = endAt
 	evidence := buildEvidence(capture.Snapshots, startAt, endAt)
+	pauses := make([]poc.TimeRange, 0)
+	for _, pause := range PauseRanges(records) {
+		if pause.EndAt.After(pause.StartAt) {
+			pauses = append(pauses, poc.TimeRange{StartAt: pause.StartAt, EndAt: pause.EndAt})
+		}
+	}
 	return capture, pauses, evidence, nil
 }
 

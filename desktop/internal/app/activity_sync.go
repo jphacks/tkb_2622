@@ -233,6 +233,86 @@ func clipActivitySegments(segments []evaluation.ActivitySegment, after, through 
 	return clipped
 }
 
+func subtractPauseRanges(segments []cloud.ActivitySegment, pauses []evaluation.PauseRange) []cloud.ActivitySegment {
+	result := make([]cloud.ActivitySegment, 0, len(segments))
+	for _, segment := range segments {
+		parts := []cloud.ActivitySegment{segment}
+		for _, pause := range pauses {
+			if !pause.EndAt.After(pause.StartAt) {
+				continue
+			}
+			next := make([]cloud.ActivitySegment, 0, len(parts)+1)
+			for _, part := range parts {
+				if !pause.StartAt.Before(part.EndTime) || !pause.EndAt.After(part.StartTime) {
+					next = append(next, part)
+					continue
+				}
+				if part.StartTime.Before(pause.StartAt) {
+					left := part
+					left.EndTime = pause.StartAt
+					next = append(next, left)
+				}
+				if part.EndTime.After(pause.EndAt) {
+					right := part
+					right.StartTime = pause.EndAt
+					next = append(next, right)
+				}
+			}
+			parts = next
+		}
+		result = append(result, parts...)
+	}
+	return result
+}
+
+func sameActivitySegments(a, b []cloud.ActivitySegment) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !a[i].StartTime.Equal(b[i].StartTime) || !a[i].EndTime.Equal(b[i].EndTime) ||
+			a[i].Classification != b[i].Classification || len(a[i].Reasons) != len(b[i].Reasons) {
+			return false
+		}
+		for j := range a[i].Reasons {
+			if a[i].Reasons[j] != b[i].Reasons[j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (a *App) repairOutboxPauseGaps(state *activitySyncState) (bool, error) {
+	records, err := monitor.ReadSessionRecords(state.SessionID)
+	if err != nil {
+		return false, err
+	}
+	pauses := evaluation.PauseRanges(records)
+	if len(pauses) == 0 {
+		return false, nil
+	}
+	changed := false
+	for i := range state.Items {
+		item := &state.Items[i]
+		if item.Batch != nil {
+			segments := subtractPauseRanges(item.Batch.Segments, pauses)
+			if !sameActivitySegments(segments, item.Batch.Segments) {
+				item.Batch.Segments = segments
+				changed = true
+			}
+		}
+		if item.Operation != nil {
+			segments := subtractPauseRanges(item.Operation.Remaining, pauses)
+			if !sameActivitySegments(segments, item.Operation.Remaining) {
+				item.Operation.Remaining = segments
+				changed = true
+			}
+		}
+	}
+	return changed, nil
+}
+
 func collectorHealthyForBatch(state string) bool {
 	switch state {
 	case "running", "paused", "finished", "aborted":
@@ -406,12 +486,22 @@ func (a *App) flushActivitySyncLocked(ctx context.Context, auth cloud.AuthSessio
 			return err
 		}
 	}
+	repairedPauseGaps := false
 	for len(state.Items) > 0 {
 		item := state.Items[0]
 		switch item.Kind {
 		case "batch":
 			receipt, balance, err := a.cloudClient.UploadActivityBatch(ctx, auth, *item.Batch)
 			if err != nil {
+				if !repairedPauseGaps && strings.Contains(err.Error(), "reported activity exceeds server-observed running time") {
+					changed, repairErr := a.repairOutboxPauseGaps(&state)
+					if repairErr == nil && changed {
+						if saveErr := store.SaveActivitySyncState(state); saveErr == nil {
+							repairedPauseGaps = true
+							continue
+						}
+					}
+				}
 				a.markActivitySyncPending()
 				return err
 			}
@@ -452,6 +542,15 @@ func (a *App) flushActivitySyncLocked(ctx context.Context, auth cloud.AuthSessio
 			}
 			version, balance, discarded, reward, err := a.sendActivityOperation(ctx, auth, state.SessionID, operation)
 			if err != nil {
+				if !repairedPauseGaps && strings.Contains(err.Error(), "reported activity exceeds server-observed running time") {
+					changed, repairErr := a.repairOutboxPauseGaps(&state)
+					if repairErr == nil && changed {
+						if saveErr := store.SaveActivitySyncState(state); saveErr == nil {
+							repairedPauseGaps = true
+							continue
+						}
+					}
+				}
 				a.markActivitySyncPending()
 				return err
 			}

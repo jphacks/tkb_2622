@@ -200,12 +200,10 @@ struct HomeView: View {
             .font(.caption.weight(.medium))
             .foregroundStyle(.white.opacity(0.82))
           HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(snapshot.rewardBalanceMinutes.formatted())
+            Text(formattedDuration(snapshot.rewardBalanceSeconds))
               .font(.system(size: 34, weight: .bold, design: .rounded))
               .monospacedDigit()
-              .accessibilityIdentifier("rewardBalanceMinutes")
-            Text("分")
-              .font(.title3.weight(.semibold))
+              .accessibilityIdentifier("rewardBalanceSeconds")
           }
           .foregroundStyle(.white)
         }
@@ -375,7 +373,7 @@ struct HomeView: View {
     } else if snapshot.sessionStatus == .paused {
       NavigationLink {
         UsageReservationView(
-          balanceMinutes: snapshot.rewardBalanceMinutes,
+          balanceSeconds: snapshot.rewardBalanceSeconds,
           sessionID: snapshot.sessionID ?? "",
           sessionVersion: snapshot.sessionVersion ?? 0,
           screenTime: screenTime
@@ -387,10 +385,10 @@ struct HomeView: View {
       }
       .buttonStyle(.borderedProminent)
       .tint(AppTheme.primary)
-      .disabled(snapshot.rewardBalanceMinutes < 5)
+      .disabled(snapshot.rewardBalanceSeconds < 1)
 
-      if snapshot.rewardBalanceMinutes < 5 {
-        Label("利用枠は5分からです。あと\(5 - snapshot.rewardBalanceMinutes)分の報酬が必要です。", systemImage: "info.circle")
+      if snapshot.rewardBalanceSeconds < 1 {
+        Label("報酬を1秒以上貯めると利用できます。", systemImage: "info.circle")
           .font(.footnote)
           .foregroundStyle(AppTheme.secondaryInk)
       }
@@ -406,7 +404,7 @@ struct HomeView: View {
 
       Label {
         Text(snapshot.sessionStatus == .working
-          ? "Macで作業を一時停止すると使えます。利用枠は5分からで、集中判定された作業15分が約5分の目安です。"
+          ? "Macで作業を一時停止すると使えます。報酬1秒から利用できます。"
           : "Macで作業を開始すると、作業中に貯めた報酬を利用できます。")
       } icon: {
         Image(systemName: "info.circle")
@@ -438,6 +436,7 @@ struct HomeView: View {
   }
 
   private func formattedDuration(_ seconds: Int) -> String {
+    if seconds < 60 { return "\(seconds)秒" }
     let minutes = seconds / 60
     let remainder = seconds % 60
     return remainder == 0 ? "\(minutes)分" : "\(minutes)分\(remainder)秒"

@@ -42,6 +42,10 @@ make -C backend up
 | `SEED_AUTH_SUBJECT=<UUID> make -C backend seed-group-profile` | アカウント設定を変えず，2人のプロフィールとグループだけを投入 |
 | `make -C backend generate` | protoからGoコードと`internal/docs/openapi.yaml`を再生成．プラグインは`bin/`に配置 |
 
+### 報酬設定の確認
+
+報酬設定の回帰確認は，`backend`内で`go test ./internal/reward/... ./internal/workflow/...`を実行します。`WORKFLOW_TEST_DATABASE_URL`にマイグレーション済みローカルDBの接続URLを設定すると，workflow経由のセッション開始・初期残高・1分後の報酬付与も検証します。接続先はloopbackに限定し，作成した一時セッションはロールバック，一時ユーザー等は後処理で削除します。
+
 ### 開発用モックデータ
 
 アプリでSupabase Authへログインし，業務UserとiOS端末を登録した後に実行します。`SEED_AUTH_SUBJECT`にはログインしたSupabaseユーザーのUUIDを指定してください。投入先は`compose.local.yaml`で起動するローカルPostgreSQLに固定されています。
@@ -91,6 +95,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 | `SUPABASE_JWT_AUDIENCE` | 許可するaudience．既定`authenticated` |
 | `AUTH_ALLOW_LOCAL_HTTP` | `true`でHTTPのissuer（Supabase CLIのローカル環境等）を許可．既定は無効 |
 | `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
+| `APP_ENV`，`REWARD_POLICY_TEST_MODE` | ローカルCompose専用．`local`と`true`の組合せで新規セッションのみ作業1分ごとに報酬20秒を付与し，既知活動の最低条件を1分にする．アカウントごとに初回の試験セッションで1分を一度だけ付与する．本番へ設定しない |
 | `APNS_TEAM_ID`，`APNS_KEY_ID`，`APNS_BUNDLE_ID`，`APNS_AUTH_KEY_PATH` | すべて設定するとAPNs配信を有効化．秘密鍵ファイルは実行環境のSecret管理からマウントする．未設定時はAPNs送信を停止し，Outboxを保持 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 

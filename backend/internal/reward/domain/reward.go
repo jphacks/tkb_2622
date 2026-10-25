@@ -11,16 +11,20 @@ var (
 
 // Policy converts cumulative TASK + RELATED_TRANSITION time into break seconds.
 type Policy struct {
-	Version            int32
-	WorkBlockMillis    int64
-	RewardBlockSeconds int64
+	Version                  int32
+	WorkBlockMillis          int64
+	RewardBlockSeconds       int64
+	MinimumKnownActiveMillis int64
+	InitialBalanceSeconds    int64
 }
 
 var (
 	// PolicyV1 preserves the original 1/3 conversion for sessions already in progress.
 	PolicyV1 = Policy{Version: 1, WorkBlockMillis: 3_000, RewardBlockSeconds: 1}
 	// PolicyV2 follows the provisional MVP rule: five minutes of related work earns one minute.
-	PolicyV2      = Policy{Version: 2, WorkBlockMillis: 300_000, RewardBlockSeconds: 60}
+	PolicyV2 = Policy{Version: 2, WorkBlockMillis: 300_000, RewardBlockSeconds: 60, MinimumKnownActiveMillis: 300_000}
+	// PolicyTest is enabled only by the local Compose API for iPhone usage-grant testing.
+	PolicyTest    = Policy{Version: 3, WorkBlockMillis: 60_000, RewardBlockSeconds: 20, MinimumKnownActiveMillis: 60_000, InitialBalanceSeconds: 60}
 	CurrentPolicy = PolicyV2
 )
 
@@ -30,6 +34,8 @@ func PolicyForVersion(version int32) (Policy, error) {
 		return PolicyV1, nil
 	case PolicyV2.Version:
 		return PolicyV2, nil
+	case PolicyTest.Version:
+		return PolicyTest, nil
 	default:
 		return Policy{}, ErrPolicy
 	}
@@ -58,13 +64,17 @@ type Eligibility struct {
 }
 
 func (e Eligibility) Check(collectorHealthy bool) (bool, string) {
+	return e.CheckForPolicy(collectorHealthy, 300_000)
+}
+
+func (e Eligibility) CheckForPolicy(collectorHealthy bool, minimumKnownActiveMillis int64) (bool, string) {
 	if !collectorHealthy {
 		return false, "collector_unhealthy"
 	}
 	if e.Quality == nil || *e.Quality < 0.70 {
 		return false, "coverage_below_70_percent"
 	}
-	if e.KnownActiveMillis < 300_000 {
+	if e.KnownActiveMillis < minimumKnownActiveMillis {
 		return false, "known_active_below_5_minutes"
 	}
 	return true, ""

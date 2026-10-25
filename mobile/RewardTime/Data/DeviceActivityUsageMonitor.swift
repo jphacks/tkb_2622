@@ -22,7 +22,7 @@ struct DeviceActivityUsageMonitor {
         reservedSeconds: Int,
         applications: Set<ApplicationToken>
     ) throws {
-        guard reservedSeconds > 0, reservedSeconds.isMultiple(of: 60) else {
+        guard reservedSeconds > 0 else {
             throw DeviceActivityUsageMonitorError.invalidDuration
         }
         guard !applications.isEmpty else {
@@ -52,6 +52,26 @@ struct DeviceActivityUsageMonitor {
         for seconds in stride(from: 60, through: reservedSeconds, by: 60) {
             let eventName = DeviceActivityEvent.Name("usage-seconds-\(seconds)")
             let threshold = DateComponents(minute: seconds / 60)
+            if #available(iOS 17.4, *) {
+                events[eventName] = DeviceActivityEvent(
+                    applications: applications,
+                    categories: [],
+                    webDomains: [],
+                    threshold: threshold,
+                    includesPastActivity: false
+                )
+            } else {
+                events[eventName] = DeviceActivityEvent(
+                    applications: applications,
+                    categories: [],
+                    webDomains: [],
+                    threshold: threshold
+                )
+            }
+        }
+        if reservedSeconds % 60 != 0 {
+            let eventName = DeviceActivityEvent.Name("usage-seconds-\(reservedSeconds)")
+            let threshold = DateComponents(minute: reservedSeconds / 60, second: reservedSeconds % 60)
             if #available(iOS 17.4, *) {
                 events[eventName] = DeviceActivityEvent(
                     applications: applications,
@@ -116,7 +136,7 @@ enum DeviceActivityUsageMonitorError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidDuration:
-            "利用時間は1分単位で指定してください。"
+            "利用時間は1秒以上で指定してください。"
         case .noSelectedApplications:
             "利用時間を計測するアプリを先に選んでください。"
         case .anotherGrantIsActive:

@@ -31,6 +31,8 @@ services:
     build: .
     environment:
       PORT: "8080"
+      APP_ENV: local
+      REWARD_POLICY_TEST_MODE: "true"
       DATABASE_URL: postgres://tkb_app:local-app-only@postgres:5432/tkb?sslmode=disable
       SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:?Set SUPABASE_JWT_ISSUER}
       SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}

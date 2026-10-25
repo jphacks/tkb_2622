@@ -6,8 +6,8 @@ enum UsageReservationEligibility: Equatable {
     case invalidPendingRequest
 
     static func evaluate(
-        selectedMinutes: Int,
-        balanceMinutes: Int,
+        selectedSeconds: Int,
+        balanceSeconds: Int,
         pendingOperationID: String?,
         pendingSeconds: Int?
     ) -> Self {
@@ -15,8 +15,7 @@ enum UsageReservationEligibility: Equatable {
             guard !pendingOperationID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let pendingSeconds,
                   pendingSeconds > 0,
-                  pendingSeconds.isMultiple(of: 60),
-                  pendingSeconds / 60 == selectedMinutes else {
+                  pendingSeconds == selectedSeconds else {
                 return .invalidPendingRequest
             }
             // The reservation may already have been committed, reducing the
@@ -25,7 +24,7 @@ enum UsageReservationEligibility: Equatable {
             return .allowed
         }
 
-        guard selectedMinutes > 0 else { return .insufficientBalance }
-        return selectedMinutes <= balanceMinutes ? .allowed : .insufficientBalance
+        guard selectedSeconds > 0 else { return .insufficientBalance }
+        return selectedSeconds <= balanceSeconds ? .allowed : .insufficientBalance
     }
 }
