@@ -8,6 +8,31 @@ extension Notification.Name {
 }
 
 enum MobileAppConfiguration {
+  static func debugConnectAPIBaseURLDefault(isSimulator: Bool) -> String {
+    isSimulator ? "http://127.0.0.1:8080" : ""
+  }
+
+  static var connectAPIBaseURLDefault: String {
+    #if targetEnvironment(simulator)
+      return debugConnectAPIBaseURLDefault(isSimulator: true)
+    #else
+      return debugConnectAPIBaseURLDefault(isSimulator: false)
+    #endif
+  }
+
+  static var isSimulator: Bool {
+    #if targetEnvironment(simulator)
+      return true
+    #else
+      return false
+    #endif
+  }
+
+  static func isLoopbackURL(_ rawValue: String) -> Bool {
+    guard let host = URLComponents(string: rawValue)?.host?.lowercased() else { return false }
+    return ["localhost", "127.0.0.1", "::1"].contains(host)
+  }
+
   static var supabaseProjectURL: String? {
     configuredURL(
       value(userDefaultsKey: "mobile.supabase.projectURL", infoKey: "SUPABASE_PROJECT_URL"))
@@ -42,7 +67,7 @@ enum MobileAppConfiguration {
         return storedValue
       }
       if infoKey == "CONNECT_API_BASE_URL" {
-        return "http://127.0.0.1:8080"
+        return connectAPIBaseURLDefault
       }
     #endif
     return configuredValue(Bundle.main.object(forInfoDictionaryKey: infoKey) as? String)
@@ -58,6 +83,10 @@ enum MobileAppConfiguration {
   private static func configuredURL(_ value: String?) -> String? {
     guard let value else { return nil }
     #if DEBUG
+      guard let value = configuredValue(value) else { return nil }
+      #if !targetEnvironment(simulator)
+        guard !isLoopbackURL(value) else { return nil }
+      #endif
       return value
     #else
       guard let url = URL(string: value), url.scheme?.lowercased() == "https", url.host != nil

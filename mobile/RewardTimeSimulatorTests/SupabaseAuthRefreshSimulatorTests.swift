@@ -16,6 +16,20 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         super.tearDown()
     }
 
+    func testDebugConnectAPIDefaultUsesLoopbackOnlyForSimulator() {
+        XCTAssertEqual(
+            MobileAppConfiguration.debugConnectAPIBaseURLDefault(isSimulator: true),
+            "http://127.0.0.1:8080"
+        )
+        XCTAssertEqual(
+            MobileAppConfiguration.debugConnectAPIBaseURLDefault(isSimulator: false),
+            ""
+        )
+        XCTAssertTrue(MobileAppConfiguration.isLoopbackURL("http://127.0.0.1:8080"))
+        XCTAssertTrue(MobileAppConfiguration.isLoopbackURL("http://localhost:8080"))
+        XCTAssertFalse(MobileAppConfiguration.isLoopbackURL("http://192.0.2.10:8080"))
+    }
+
     func testEmailOTPRequestUsesSharedSignupCapableFlow() async throws {
         let requests = LockedAuthRequests()
         AuthRefreshURLProtocol.handler = { request in

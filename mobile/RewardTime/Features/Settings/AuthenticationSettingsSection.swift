@@ -8,7 +8,7 @@ struct AuthenticationSettingsSection: View {
   var onAuthenticationChanged: () -> Void = {}
   @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
   @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
-  @AppStorage("mobile.api.baseURL") private var apiBaseURLText = "http://127.0.0.1:8080"
+  @AppStorage("mobile.api.baseURL") private var apiBaseURLText = MobileAppConfiguration.connectAPIBaseURLDefault
   @AppStorage("mobile.auth.lastEmail") private var lastEmail = ""
 
   @State private var email = ""
@@ -54,6 +54,12 @@ struct AuthenticationSettingsSection: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("connectAPIBaseURL")
+          if !MobileAppConfiguration.isSimulator && MobileAppConfiguration.isLoopbackURL(apiBaseURLText) {
+            Text("127.0.0.1はiPhone自身を指します。実機ではMacのLAN IPを使ってください。")
+              .font(.caption)
+              .foregroundStyle(.orange)
+              .fixedSize(horizontal: false, vertical: true)
+          }
           }
           .textFieldStyle(.roundedBorder)
           .font(.footnote)
