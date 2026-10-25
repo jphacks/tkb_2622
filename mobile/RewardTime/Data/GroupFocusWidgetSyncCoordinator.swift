@@ -11,6 +11,9 @@ struct GroupFocusWidgetSnapshot: Codable, Equatable {
 enum GroupFocusWidgetCache {
     static let widgetKind = "FocusLinkGroupFocusWidget"
     private static let key = "mobile.widget.groupFocusSnapshot"
+    #if DEBUG
+    private static let localPreviewKey = "mobile.widget.groupFocusLocalPreview"
+    #endif
 
     static func read() -> GroupFocusWidgetSnapshot? {
         guard let data = ScreenTimeSharedStorage.defaults.data(forKey: key) else { return nil }
@@ -26,8 +29,33 @@ enum GroupFocusWidgetCache {
 
     static func clear() {
         ScreenTimeSharedStorage.defaults.removeObject(forKey: key)
+        #if DEBUG
+        ScreenTimeSharedStorage.defaults.removeObject(forKey: localPreviewKey)
+        #endif
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
     }
+
+    #if DEBUG
+    static var isShowingLocalPreview: Bool {
+        ScreenTimeSharedStorage.defaults.bool(forKey: localPreviewKey)
+    }
+
+    static func showLocalPreview() {
+        let now = Date()
+        let members = [
+            MobileGroupFocusMember(displayName: "ちほ", avatarID: "cat", startedAt: now),
+            MobileGroupFocusMember(displayName: "ゆう", avatarID: "dragon", startedAt: now),
+            MobileGroupFocusMember(displayName: "はる", avatarID: "slime", startedAt: now)
+        ]
+        ScreenTimeSharedStorage.defaults.set(true, forKey: localPreviewKey)
+        save(members: members, updatedAt: now)
+    }
+
+    static func hideLocalPreview() {
+        ScreenTimeSharedStorage.defaults.removeObject(forKey: localPreviewKey)
+        clear()
+    }
+    #endif
 }
 
 @MainActor
@@ -39,7 +67,12 @@ final class GroupFocusWidgetSyncCoordinator: ObservableObject {
         }
 
         while !Task.isCancelled {
-            if UIApplication.shared.applicationState == .active {
+            #if DEBUG
+            let isShowingLocalPreview = GroupFocusWidgetCache.isShowingLocalPreview
+            #else
+            let isShowingLocalPreview = false
+            #endif
+            if !isShowingLocalPreview && UIApplication.shared.applicationState == .active {
                 do {
                     let members = try await ConfiguredGroupRepository().fetchFocusedMembers()
                     GroupFocusWidgetCache.save(members: members)

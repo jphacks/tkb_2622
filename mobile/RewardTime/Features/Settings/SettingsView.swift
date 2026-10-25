@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncError: String?
+    #if DEBUG
+    @State private var isShowingWidgetPreview = false
+    #endif
 
     init(screenTime: MobileScreenTimeController, isAuthenticated: Bool = true) {
         _screenTime = ObservedObject(wrappedValue: screenTime)
@@ -156,12 +159,41 @@ struct SettingsView: View {
                 .disabled(!screenTime.hasAppliedRestriction || hasOpenUsageGrant)
 
             }
+
+            #if DEBUG
+            SurfaceCard {
+                sectionTitle("ウィジェット確認", icon: "widget.small")
+                Text("友達のキャラクター表示を、この端末だけのサンプルで確認できます。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                Button {
+                    if isShowingWidgetPreview {
+                        GroupFocusWidgetCache.hideLocalPreview()
+                    } else {
+                        GroupFocusWidgetCache.showLocalPreview()
+                    }
+                    isShowingWidgetPreview = GroupFocusWidgetCache.isShowingLocalPreview
+                } label: {
+                    Label(
+                        isShowingWidgetPreview ? "サンプル表示を終了" : "サンプルをウィジェットに表示",
+                        systemImage: isShowingWidgetPreview ? "xmark.circle" : "sparkles"
+                    )
+                }
+                .buttonStyle(.bordered)
+                Text("ホーム画面を長押しして「集中ルーム」ウィジェットを追加してください。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            }
+            #endif
         }
         .navigationTitle("設定")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             screenTime.refreshAuthorizationStatus()
             refreshOpenUsageGrant()
+            #if DEBUG
+            isShowingWidgetPreview = GroupFocusWidgetCache.isShowingLocalPreview
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

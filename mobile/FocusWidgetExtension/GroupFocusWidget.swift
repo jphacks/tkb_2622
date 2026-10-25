@@ -76,12 +76,6 @@ private struct FocusRoomWidgetView: View {
             HStack {
                 Text("集中ルーム")
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                Spacer(minLength: 4)
-                if let updatedAt = entry.updatedAt, !isStale {
-                    Text(updatedAt, style: .relative)
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .lineLimit(1)
-                }
             }
             .foregroundStyle(Color(red: 0.30, green: 0.24, blue: 0.18))
             .padding(.horizontal, 12)
