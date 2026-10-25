@@ -11,15 +11,25 @@
 #### 3. 特長3
 
 ### 解決出来ること
+
+
 ### 今後の展望
+ユーザーの集中しているかどうかを，ユーザーの自己評価を使って，学習の材料に使い，最適化を行うプロセスに組み込む．
+
 ### 注力したこと（こだわり等）
-* 
-* 
+#### アイデア面
+* 報酬設計の部分をスマホ内の生き物を育てるという設定にするのではなく，スマホの利用時間にすることで，物理的にユーザーの行動を制限することを可能にした．（人はこれからもスマホに依存してしまう傾向が続いていく）
+
+#### 技術面
+* バックエンド側を**モジューラーモノリス×クリーンアーキテクチャーを採用することで，将来のマイクロサービス化まで視野に入れた構成**
+* バックエンドで型安全なProtocol Bufferを使用
+* インフラでは，デスクトップやモバイルアプリから直で，アプリケーションサーバーにつなげることで，WAFやレートリミッターなどを設定して，セキュリティ面の対策を実施
+* デスクトップアプリでは，UIを軽量かつモダンなUIにするために，React×Wails　v2を用いた．
 
 ## 開発技術
 ### 活用した技術
 #### API・データ
-* Supabase Auth／Supabase PostgreSQL（料金削減目的）
+* Supabase Auth／Supabase PostgreSQL
 * Connect RPC（Protocol Buffers / Bufで定義したAPI）
 * Apple Screen Time API（FamilyControls・ManagedSettings・DeviceActivity）による娯楽アプリの制限・一時解除
 * Apple Push Notification service（APNs）によるグループの作業開始通知
@@ -27,7 +37,7 @@
 
 #### フレームワーク・ライブラリ・モジュール
 * バックエンド：Go，connect-go，pgx，sqlc，goose，golang-jwt
-* デスクトップ：Wails v22，React 19，TypeScript，Vite，99designs/keyring（macOS Keychain／Windows資格情報ストア）
+* デスクトップ：Wails v2，React 19，TypeScript，Vite，99designs/keyring（macOS Keychain／Windows資格情報ストア）
 * iPhone：Swift / SwiftUI，Supabase Swift SDK，WidgetKit
 
 #### デバイス
