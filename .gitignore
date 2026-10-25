@@ -12,6 +12,9 @@ desktop/frontend/node_modules/
 desktop/frontend/dist/
 desktop/build/bin/
 
+# Swift Package build outputs
+mobile/RewardTimeTests/.build/
+
 # macOS Finder metadata
 .DS_Store
 

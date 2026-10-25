@@ -1,0 +1,1 @@
+../../../RewardTime/Data/UsageReservationEligibility.swift

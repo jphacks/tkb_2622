@@ -62,6 +62,9 @@ struct GroupView: View {
             .tint(AppTheme.primary)
           }
         case .loaded(let groups) where groups.isEmpty:
+          if let loadError = model.loadError {
+            loadFailureWarning(loadError)
+          }
           SurfaceCard {
             Label("所属グループはありません", systemImage: "person.2")
               .font(.headline)
@@ -75,6 +78,9 @@ struct GroupView: View {
             .tint(AppTheme.primary)
           }
         case .loaded(let groups):
+          if let loadError = model.loadError {
+            loadFailureWarning(loadError)
+          }
           groupPicker(groups)
 
           if let group = selectedGroup(in: groups) {
@@ -186,6 +192,21 @@ struct GroupView: View {
     }
   }
 
+  private func loadFailureWarning(_ message: String) -> some View {
+    SurfaceCard {
+      Label("最新のグループ一覧を取得できませんでした", systemImage: "wifi.exclamationmark")
+        .font(.subheadline.weight(.semibold))
+      Text("前回取得したグループ情報を表示しています。通信が回復したら再読み込みしてください。")
+        .font(.footnote)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Text(message)
+        .font(.caption)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Button("再読み込み") { Task { await model.load() } }
+        .buttonStyle(.bordered)
+    }
+  }
+
   private var createGroupSheet: some View {
     NavigationStack {
       Form {
@@ -249,11 +270,9 @@ struct GroupView: View {
       if let clientError = error as? ConnectJSONClient.ClientError,
         case .connect(code: "invalid_argument") = clientError
       {
-        createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。"
+        createError = "グループ名は前後の空白を除いて1〜100文字で入力してください。 (API: CreateGroup)"
       } else {
-        createError =
-          (error as? LocalizedError)?.errorDescription
-          ?? "グループを作成できませんでした。接続状態を確認して再試行してください。"
+        createError = GroupAPIErrorMessage.describe(error, operation: .createGroup)
       }
     }
   }
@@ -283,7 +302,7 @@ struct GroupView: View {
       clearInvitationToken()
       await model.refreshWorkStarts()
     } catch {
-      acceptError = invitationFailureMessage(error)
+      acceptError = GroupAPIErrorMessage.describe(error, operation: .acceptInvitation)
       isShowingAcceptInvitation = true
     }
   }
@@ -306,7 +325,7 @@ struct GroupView: View {
       invitationGroupID = groupID
       invitationOperationID = nil
     } catch {
-      invitationError = invitationFailureMessage(error)
+      invitationError = GroupAPIErrorMessage.describe(error, operation: .createInvitation)
     }
   }
 
@@ -333,7 +352,7 @@ struct GroupView: View {
         groupNotice = "グループから退出しました。"
       }
     } catch {
-      leaveError = invitationFailureMessage(error)
+      leaveError = GroupAPIErrorMessage.describe(error, operation: .leaveGroup)
     }
   }
 
@@ -342,15 +361,6 @@ struct GroupView: View {
     acceptOperationID = nil
     acceptError = nil
     isShowingAcceptInvitation = false
-  }
-
-  private func invitationFailureMessage(_ error: Error) -> String {
-    if let clientError = error as? ConnectJSONClient.ClientError,
-      case .connect(code: "failed_precondition") = clientError
-    {
-      return "招待リンクは期限切れか、すでに使用されています。新しいリンクを発行してもらってください。"
-    }
-    return (error as? LocalizedError)?.errorDescription ?? "もう一度お試しください。"
   }
 
   @ViewBuilder

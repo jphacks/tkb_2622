@@ -10,6 +10,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    @Published private(set) var refreshError: String?
 
     private let repository: any HomeRepository
     private var loadGeneration = 0
@@ -19,14 +20,14 @@ final class HomeViewModel: ObservableObject {
     }
 
     func load() async {
-        await fetchSnapshot(preserveLoadedState: false)
+        _ = await fetchSnapshot(preserveLoadedState: false)
     }
 
-    func refresh() async {
+    func refresh() async -> Bool {
         await fetchSnapshot(preserveLoadedState: true)
     }
 
-    private func fetchSnapshot(preserveLoadedState: Bool) async {
+    private func fetchSnapshot(preserveLoadedState: Bool) async -> Bool {
         let hadLoadedState: Bool
         if case .loaded = state {
             hadLoadedState = true
@@ -39,16 +40,23 @@ final class HomeViewModel: ObservableObject {
         if !preserveLoadedState || !hadLoadedState {
             state = .loading
         }
+        refreshError = nil
 
         do {
             let snapshot = try await repository.fetchCurrentSnapshot()
-            guard requestGeneration == loadGeneration else { return }
+            guard requestGeneration == loadGeneration else { return false }
             state = .loaded(snapshot)
+            return true
         } catch {
-            guard requestGeneration == loadGeneration else { return }
-            if preserveLoadedState && hadLoadedState { return }
-            state = .failed((error as? LocalizedError)?.errorDescription
-                ?? "APIへ接続できません。通信状態とAPI設定を確認してください。")
+            guard requestGeneration == loadGeneration else { return false }
+            let message = (error as? LocalizedError)?.errorDescription
+                ?? "APIへ接続できません。通信状態とAPI設定を確認してください。"
+            if preserveLoadedState && hadLoadedState {
+                refreshError = message
+                return false
+            }
+            state = .failed(message)
+            return false
         }
     }
 

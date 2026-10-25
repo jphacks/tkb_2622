@@ -2,7 +2,7 @@ import Combine
 import SwiftUI
 
 @MainActor
-private final class HistoryViewModel: ObservableObject {
+final class HistoryViewModel: ObservableObject {
   enum Section: String, CaseIterable, Identifiable {
     case work = "作業"
     case rewards = "報酬"
@@ -23,6 +23,10 @@ private final class HistoryViewModel: ObservableObject {
   private var repository: (any HistoryRepository)?
   private var loadGeneration = 0
   private var loadMoreGeneration = 0
+
+  init(repository: (any HistoryRepository)? = nil) {
+    self.repository = repository
+  }
 
   func load() async {
     loadGeneration += 1

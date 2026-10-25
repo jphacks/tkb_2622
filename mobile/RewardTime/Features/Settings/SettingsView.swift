@@ -4,16 +4,25 @@ import FamilyControls
 struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var screenTime: MobileScreenTimeController
+    private let isAuthenticated: Bool
     @State private var isFamilyActivityPickerPresented = false
     @State private var isPickingAlwaysAllowedApps = false
     @State private var isSyncingDeviceSettings = false
-    @State private var needsDeviceSettingsSync = false
+    @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncError: String?
 
+    init(screenTime: MobileScreenTimeController, isAuthenticated: Bool = true) {
+        _screenTime = ObservedObject(wrappedValue: screenTime)
+        self.isAuthenticated = isAuthenticated
+    }
+
     var body: some View {
         ScreenContainer {
-            AuthenticationSettingsSection(showsDeveloperConfiguration: true) {
+            AuthenticationSettingsSection(
+                showsDeveloperConfiguration: true,
+                allowsAutomaticAPISync: isAuthenticated
+            ) {
                 NotificationCenter.default.post(name: .mobileAuthenticationChanged, object: nil)
                 Task { await syncDeviceSettings() }
             }
@@ -205,6 +214,9 @@ struct SettingsView: View {
                 Task { await syncDeviceSettings() }
             }
         }
+        .onChange(of: isAuthenticated) { _, authenticated in
+            if authenticated { Task { await syncDeviceSettings() } }
+        }
         .familyActivityPicker(
             headerText: isPickingAlwaysAllowedApps ? "常時許可するアプリを選択" : "制限するアプリを選択",
             footerText: isPickingAlwaysAllowedApps ? "常時許可するApple標準アプリを選びます。Safariは選択しないでください。" : nil,
@@ -243,32 +255,41 @@ struct SettingsView: View {
 
     @MainActor
     private func syncDeviceSettings() async {
-        guard !isSyncingDeviceSettings else {
-            needsDeviceSettingsSync = true
-            return
-        }
+        let authenticatedUserID = MobileAppConfiguration.makeAuthService()?.authenticatedUserID
+        let request = DeviceSettingsSyncRequestKey(
+            isAuthenticated: isAuthenticated && authenticatedUserID != nil,
+            authenticatedUserID: authenticatedUserID,
+            settings: screenTime.backendRestrictionSettings
+        )
+        guard deviceSettingsSyncGate.begin(request) else { return }
+
         isSyncingDeviceSettings = true
         defer { isSyncingDeviceSettings = false }
 
-        repeat {
-            needsDeviceSettingsSync = false
-            await performDeviceSettingsSync()
-        } while needsDeviceSettingsSync
+        var requestToRun: DeviceSettingsSyncRequestKey? = request
+        while let currentRequest = requestToRun {
+            await performDeviceSettingsSync(for: currentRequest)
+            requestToRun = deviceSettingsSyncGate.finish()
+        }
     }
 
     @MainActor
-    private func performDeviceSettingsSync() async {
+    private func performDeviceSettingsSync(for request: DeviceSettingsSyncRequestKey) async {
         do {
-            _ = try await ConfiguredDeviceSettingsRepository().sync(
-                settings: screenTime.backendRestrictionSettings
-            )
+            try await AuthenticatedAPISyncFlow.run(
+                isAuthenticated: request.isAuthenticated
+            ) {
+                _ = try await ConfiguredDeviceSettingsRepository().sync(
+                    settings: request.settings
+                )
+            }
             deviceSyncError = nil
         } catch DeviceSettingsRepositoryError.missingConfiguration {
             deviceSyncError = nil
         } catch DeviceSettingsRepositoryError.invalidConfiguration {
             deviceSyncError = "接続設定を確認してください。"
         } catch {
-            deviceSyncError = "端末設定を同期できません。"
+            deviceSyncError = DeviceSettingsSyncErrorMessage.describe(error)
         }
     }
 }

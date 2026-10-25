@@ -38,6 +38,12 @@
 | [デスクトップ共同開発](docs/spec/7.デスクトップ共同開発.md) | Mac担当者が先行する共通基盤，OS別UIの境界・配置・接続契約，引き渡し条件・分担・検証を記載 |
 | [Desktop・iPhone連携の現状と本番化課題](docs/spec/8.desktop-mobile連携の現状と課題.md) | 同一アカウントで共有される状態，未接続範囲，環境設定と本番化の優先課題を記載 |
 
+## 作業計画
+
+| 資料 | 状態 |
+| --- | --- |
+| [Mobile APIエラー安定化 作業リスト](docs/plans/2026-10-25-mobile-api-stability.md) | mobileのAPIエラーを優先し、Simulator test・実装・文書更新・ローカルコミットを縦切りで進める。ウィジェット／Dynamic Islandは後続 |
+
 ## UIモック
 
 画面遷移と表示項目の参照用HTMLです。モックの状態と仕様との対応・実装時の扱いは[UIモック案内](docs/UI/README.md)，業務ルールは仕様資料を正とします。
