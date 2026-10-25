@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/jphacks/tkb_2622/desktop/internal/app"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
@@ -11,6 +13,28 @@ func configurePlatform(configuration *options.App, _ *app.Host) {
 		// 画面はライト配色だけなので，OSがダークモードでもタイトルバーを画面に合わせる．
 		Theme:    windows.Light,
 		Messages: webview2Messages(),
+	}
+	// ウィンドウを閉じてもタスクトレイに常駐し，トレイの「終了」で終了する．
+	configuration.HideWindowOnClose = true
+	// 常駐中にもう一度起動されたら，2つ目は起動せず既存のウィンドウで作業画面を表示する．
+	configuration.SingleInstanceLock = &options.SingleInstanceLock{
+		UniqueId:               "jphacks-tkb2622-focus-link-desktop",
+		OnSecondInstanceLaunch: func(options.SecondInstanceData) { showMainWindow("session") },
+	}
+
+	startup := configuration.OnStartup
+	configuration.OnStartup = func(ctx context.Context) {
+		if startup != nil {
+			startup(ctx)
+		}
+		startTray(ctx)
+	}
+	shutdown := configuration.OnShutdown
+	configuration.OnShutdown = func(ctx context.Context) {
+		if shutdown != nil {
+			shutdown(ctx)
+		}
+		stopTray()
 	}
 }
 
