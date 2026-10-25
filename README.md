@@ -19,16 +19,20 @@
 ## 開発技術
 ### 活用した技術
 #### API・データ
-* 
-* 
+* Supabase Auth／Supabase PostgreSQL（料金削減目的）
+* Connect RPC（Protocol Buffers / Bufで定義したAPI）
+* Apple Screen Time API（FamilyControls・ManagedSettings・DeviceActivity）による娯楽アプリの制限・一時解除
+* Apple Push Notification service（APNs）によるグループの作業開始通知
+* Google Cloud Run／Artifact Registry／Secret Manager，Cloudflare Workers，Terraform，GitHub Actions
 
 #### フレームワーク・ライブラリ・モジュール
-* 
-* 
+* バックエンド：Go，connect-go，pgx，sqlc，goose，golang-jwt
+* デスクトップ：Wails v22，React 19，TypeScript，Vite，99designs/keyring（macOS Keychain／Windows資格情報ストア）
+* iPhone：Swift / SwiftUI，Supabase Swift SDK，WidgetKit
 
 #### デバイス
-* 
-* 
+* macOS・Windows（デスクトップアプリ：作業の設定・計測・結果表示）
+* iPhone（報酬時間の利用・娯楽アプリの利用制限・ウィジェット）
 
 ### 独自技術
 #### ハッカソンで開発した独自機能・技術
