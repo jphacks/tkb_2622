@@ -47,6 +47,7 @@ func (a Actor) isPC() bool {
 type Batch struct {
 	SessionID, BatchID, Hash, Status, EvaluatorVersion, RulesVersion string
 	Seq                                                              int64
+	CollectorHealthy                                                 bool
 	Segments                                                         []Segment
 }
 type Operation struct {

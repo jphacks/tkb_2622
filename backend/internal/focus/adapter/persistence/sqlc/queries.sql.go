@@ -15,7 +15,7 @@ import (
 )
 
 const batchByID = `-- name: BatchByID :one
-SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, received_at FROM app.activity_batches WHERE session_id = $1 AND batch_id = $2
+SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy, received_at FROM app.activity_batches WHERE session_id = $1 AND batch_id = $2
 `
 
 type BatchByIDParams struct {
@@ -35,6 +35,7 @@ func (q *Queries) BatchByID(ctx context.Context, arg BatchByIDParams) (AppActivi
 		&i.EvaluatorVersion,
 		&i.RulesVersion,
 		&i.Segments,
+		&i.CollectorHealthy,
 		&i.ReceivedAt,
 	)
 	return i, err
@@ -175,7 +176,7 @@ func (q *Queries) DeleteBatch(ctx context.Context, arg DeleteBatchParams) error 
 }
 
 const getBatch = `-- name: GetBatch :one
-SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, received_at FROM app.activity_batches WHERE session_id = $1 AND seq = $2
+SELECT session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy, received_at FROM app.activity_batches WHERE session_id = $1 AND seq = $2
 `
 
 type GetBatchParams struct {
@@ -195,6 +196,7 @@ func (q *Queries) GetBatch(ctx context.Context, arg GetBatchParams) (AppActivity
 		&i.EvaluatorVersion,
 		&i.RulesVersion,
 		&i.Segments,
+		&i.CollectorHealthy,
 		&i.ReceivedAt,
 	)
 	return i, err
@@ -294,8 +296,8 @@ func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (AppTask, erro
 }
 
 const insertBatch = `-- name: InsertBatch :exec
-INSERT INTO app.activity_batches (session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO app.activity_batches (session_id, seq, batch_id, request_hash, status, evaluator_version, rules_version, segments, collector_healthy)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type InsertBatchParams struct {
@@ -307,6 +309,7 @@ type InsertBatchParams struct {
 	EvaluatorVersion string
 	RulesVersion     string
 	Segments         json.RawMessage
+	CollectorHealthy bool
 }
 
 func (q *Queries) InsertBatch(ctx context.Context, arg InsertBatchParams) error {
@@ -319,6 +322,7 @@ func (q *Queries) InsertBatch(ctx context.Context, arg InsertBatchParams) error 
 		arg.EvaluatorVersion,
 		arg.RulesVersion,
 		arg.Segments,
+		arg.CollectorHealthy,
 	)
 	return err
 }

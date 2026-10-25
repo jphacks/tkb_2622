@@ -66,7 +66,7 @@ func asSession(s q.AppWorkSession) domain.Session {
 	}
 }
 func asBatch(b q.AppActivityBatch) (application.Batch, error) {
-	out := application.Batch{SessionID: b.SessionID.String(), BatchID: b.BatchID.String(), Hash: b.RequestHash, Status: b.Status, EvaluatorVersion: b.EvaluatorVersion, RulesVersion: b.RulesVersion, Seq: b.Seq}
+	out := application.Batch{SessionID: b.SessionID.String(), BatchID: b.BatchID.String(), Hash: b.RequestHash, Status: b.Status, EvaluatorVersion: b.EvaluatorVersion, RulesVersion: b.RulesVersion, Seq: b.Seq, CollectorHealthy: b.CollectorHealthy}
 	return out, json.Unmarshal(b.Segments, &out.Segments)
 }
 
@@ -263,7 +263,7 @@ func (r *Repository) InsertBatch(ctx context.Context, b application.Batch) error
 	if err != nil {
 		return err
 	}
-	return r.q.InsertBatch(ctx, q.InsertBatchParams{SessionID: uid(b.SessionID), Seq: b.Seq, BatchID: uid(b.BatchID), RequestHash: b.Hash, Status: b.Status, EvaluatorVersion: b.EvaluatorVersion, RulesVersion: b.RulesVersion, Segments: segments})
+	return r.q.InsertBatch(ctx, q.InsertBatchParams{SessionID: uid(b.SessionID), Seq: b.Seq, BatchID: uid(b.BatchID), RequestHash: b.Hash, Status: b.Status, EvaluatorVersion: b.EvaluatorVersion, RulesVersion: b.RulesVersion, Segments: segments, CollectorHealthy: b.CollectorHealthy})
 }
 func (r *Repository) SetBatchStatus(ctx context.Context, sessionID string, seq int64, status string) error {
 	return r.q.SetBatchStatus(ctx, q.SetBatchStatusParams{SessionID: uid(sessionID), Seq: seq, Status: status})

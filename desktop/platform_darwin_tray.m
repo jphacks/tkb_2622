@@ -15,7 +15,7 @@ extern void FocusLinkQuit(void);
 @interface FocusLinkStatusController : NSObject {
     NSStatusItem *_statusItem;
     NSMenu *_menu;
-    NSPopover *_popover;
+    NSPanel *_statusPanel;
     id _outsideClickMonitor;
 }
 
@@ -23,10 +23,29 @@ extern void FocusLinkQuit(void);
 - (void)removeStatusItem;
 - (void)statusItemPressed:(id)sender;
 - (void)showWindow:(id)sender;
-- (void)presentPopover;
-- (void)closePopover;
-- (void)closePopoverForOutsideClick;
+- (void)presentStatusPanel;
+- (void)closeStatusPanel;
+- (void)closeStatusPanelForOutsideClick;
 - (void)quitApplication:(id)sender;
+
+@end
+
+@interface FLStatusPanel : NSPanel
+@end
+
+@implementation FLStatusPanel
+
+- (BOOL)canBecomeKeyWindow {
+    return YES;
+}
+
+- (BOOL)canBecomeMainWindow {
+    return NO;
+}
+
+- (void)cancelOperation:(id)sender {
+    [self orderOut:sender];
+}
 
 @end
 
@@ -39,6 +58,8 @@ static FocusLinkStatusController *focusLinkStatusController;
         return;
     }
 
+    // 通常のDockアプリではなく、メニューバー常駐アプリとして起動する。
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     _statusItem = [[[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength] retain];
     if (_statusItem == nil) {
         return;
@@ -67,12 +88,15 @@ static FocusLinkStatusController *focusLinkStatusController;
     NSMenuItem *quitItem = [_menu addItemWithTitle:@"終了" action:@selector(quitApplication:) keyEquivalent:@""];
     quitItem.target = self;
 
-    _popover = [[NSPopover alloc] init];
-    FocusLinkConfigurePopover(_popover);
+    _statusPanel = [[FLStatusPanel alloc] initWithContentRect:NSMakeRect(0, 0, 320, 220)
+                                                    styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel
+                                                      backing:NSBackingStoreBuffered
+                                                        defer:NO];
+    FocusLinkConfigureStatusPanel(_statusPanel);
     _outsideClickMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown | NSEventMaskOtherMouseDown) handler:^(NSEvent *event) {
         if (event == nil) return;
         dispatch_async(dispatch_get_main_queue(), ^{
-            [focusLinkStatusController closePopoverForOutsideClick];
+            [focusLinkStatusController closeStatusPanelForOutsideClick];
         });
     }];
 }
@@ -87,15 +111,15 @@ static FocusLinkStatusController *focusLinkStatusController;
         [_statusItem release];
         _statusItem = nil;
     }
-    [_popover close];
-    [_popover release];
-    _popover = nil;
+    [_statusPanel orderOut:nil];
+    [_statusPanel release];
+    _statusPanel = nil;
 }
 
 - (void)statusItemPressed:(id)sender {
     NSEvent *event = [NSApp currentEvent];
     if (event.type == NSEventTypeRightMouseUp) {
-        [self closePopover];
+        [self closeStatusPanel];
         [NSMenu popUpContextMenu:_menu withEvent:event forView:_statusItem.button];
         return;
     }
@@ -107,28 +131,45 @@ static FocusLinkStatusController *focusLinkStatusController;
 }
 
 - (void)showWindow:(id)sender {
-    [self closePopover];
+    [self closeStatusPanel];
     FocusLinkDispatchOpenPage("session");
 }
 
-- (void)presentPopover {
-    if (_statusItem == nil || _statusItem.button == nil || _popover == nil) {
+- (void)presentStatusPanel {
+    if (_statusItem == nil || _statusItem.button == nil || _statusPanel == nil) {
         return;
     }
-    if (_popover.isShown) {
-        [_popover close];
+    if (_statusPanel.isVisible) {
+        [_statusPanel orderOut:nil];
         return;
     }
-    [_popover showRelativeToRect:_statusItem.button.bounds ofView:_statusItem.button preferredEdge:NSMinYEdge];
+
+    NSStatusBarButton *button = _statusItem.button;
+    NSScreen *screen = button.window.screen ?: NSScreen.mainScreen;
+    if (screen == nil) {
+        return;
+    }
+
+    NSRect buttonRect = [button convertRect:button.bounds toView:nil];
+    buttonRect = [button.window convertRectToScreen:buttonRect];
+    NSRect visibleFrame = screen.visibleFrame;
+    NSSize panelSize = _statusPanel.frame.size;
+    CGFloat minX = NSMinX(visibleFrame) + 8;
+    CGFloat maxX = NSMaxX(visibleFrame) - panelSize.width - 8;
+    if (maxX < minX) maxX = minX;
+    CGFloat originX = MIN(MAX(NSMidX(buttonRect) - panelSize.width / 2, minX), maxX);
+    CGFloat originY = NSMaxY(visibleFrame) - panelSize.height - 4;
+    [_statusPanel setFrameOrigin:NSMakePoint(originX, originY)];
+    [_statusPanel makeKeyAndOrderFront:nil];
 }
 
-- (void)closePopover {
-    [_popover close];
+- (void)closeStatusPanel {
+    [_statusPanel orderOut:nil];
 }
 
-- (void)closePopoverForOutsideClick {
-    if (_popover.isShown) {
-        [_popover close];
+- (void)closeStatusPanelForOutsideClick {
+    if (_statusPanel.isVisible) {
+        [_statusPanel orderOut:nil];
     }
 }
 
@@ -155,13 +196,13 @@ void FocusLinkInstallStatusItem(void) {
 
 void FocusLinkPresentPopover(void) {
     @autoreleasepool {
-        [focusLinkStatusController performSelectorOnMainThread:@selector(presentPopover) withObject:nil waitUntilDone:NO];
+        [focusLinkStatusController performSelectorOnMainThread:@selector(presentStatusPanel) withObject:nil waitUntilDone:NO];
     }
 }
 
 void FocusLinkClosePopover(void) {
     @autoreleasepool {
-        [focusLinkStatusController performSelectorOnMainThread:@selector(closePopover) withObject:nil waitUntilDone:NO];
+        [focusLinkStatusController performSelectorOnMainThread:@selector(closeStatusPanel) withObject:nil waitUntilDone:NO];
     }
 }
 

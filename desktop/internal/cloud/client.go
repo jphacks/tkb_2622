@@ -76,10 +76,8 @@ type Session struct {
 }
 
 type SessionHistoryEntry struct {
-	Session          Session
-	EarnedSeconds    int64
-	SpentSeconds     int64
-	DiscardedSeconds int64
+	Session Session
+	Reward  RewardSummary
 }
 
 type Durations struct {
@@ -105,6 +103,7 @@ type ActivityBatch struct {
 	Seq              int64             `json:"seq"`
 	EvaluatorVersion string            `json:"evaluatorVersion"`
 	RulesVersion     string            `json:"rulesVersion"`
+	CollectorHealthy bool              `json:"collectorHealthy"`
 	Segments         []ActivitySegment `json:"segments"`
 }
 
@@ -147,6 +146,10 @@ type RewardSummary struct {
 	EarnedSeconds    int64
 	SpentSeconds     int64
 	DiscardedSeconds int64
+	Status           string
+	PolicyVersion    int32
+	Reason           string
+	GrantStopped     bool
 }
 
 type Client struct {
@@ -511,6 +514,28 @@ type durationMessage struct {
 	WorkMillis              protoInt64 `json:"workMillis"`
 }
 
+type rewardSummaryMessage struct {
+	EarnedSeconds    protoInt64 `json:"earnedSeconds"`
+	SpentSeconds     protoInt64 `json:"spentSeconds"`
+	DiscardedSeconds protoInt64 `json:"discardedSeconds"`
+	Status           string     `json:"status"`
+	PolicyVersion    int32      `json:"policyVersion"`
+	Reason           string     `json:"reason"`
+	GrantStopped     bool       `json:"grantStopped"`
+}
+
+func rewardSummaryFromMessage(message rewardSummaryMessage) RewardSummary {
+	status := strings.TrimPrefix(strings.ToLower(message.Status), "reward_status_")
+	if status == "unspecified" {
+		status = ""
+	}
+	return RewardSummary{
+		EarnedSeconds: int64(message.EarnedSeconds), SpentSeconds: int64(message.SpentSeconds),
+		DiscardedSeconds: int64(message.DiscardedSeconds), Status: status,
+		PolicyVersion: message.PolicyVersion, Reason: message.Reason, GrantStopped: message.GrantStopped,
+	}
+}
+
 func sessionFromMessage(message sessionMessage) Session {
 	startedAt, _ := time.Parse(time.RFC3339Nano, message.StartedAt)
 	endedAt, _ := time.Parse(time.RFC3339Nano, message.EndedAt)
@@ -546,12 +571,8 @@ func (c *Client) ListSessionHistory(ctx context.Context, auth AuthSession) ([]Se
 		}
 		var response struct {
 			Entries []struct {
-				Session sessionMessage `json:"session"`
-				Reward  struct {
-					EarnedSeconds    protoInt64 `json:"earnedSeconds"`
-					SpentSeconds     protoInt64 `json:"spentSeconds"`
-					DiscardedSeconds protoInt64 `json:"discardedSeconds"`
-				} `json:"reward"`
+				Session sessionMessage       `json:"session"`
+				Reward  rewardSummaryMessage `json:"reward"`
 			} `json:"entries"`
 			NextPageToken string `json:"nextPageToken"`
 		}
@@ -560,8 +581,7 @@ func (c *Client) ListSessionHistory(ctx context.Context, auth AuthSession) ([]Se
 		}
 		for _, item := range response.Entries {
 			entries = append(entries, SessionHistoryEntry{
-				Session: sessionFromMessage(item.Session), EarnedSeconds: int64(item.Reward.EarnedSeconds),
-				SpentSeconds: int64(item.Reward.SpentSeconds), DiscardedSeconds: int64(item.Reward.DiscardedSeconds),
+				Session: sessionFromMessage(item.Session), Reward: rewardSummaryFromMessage(item.Reward),
 			})
 		}
 		if response.NextPageToken == "" {
@@ -745,7 +765,8 @@ func (c *Client) UploadActivityBatch(ctx context.Context, auth AuthSession, batc
 	}
 	input := map[string]any{
 		"sessionId": batch.SessionID, "batchId": batch.BatchID, "seq": protoInt64(batch.Seq),
-		"evaluatorVersion": batch.EvaluatorVersion, "rulesVersion": batch.RulesVersion, "segments": segments,
+		"evaluatorVersion": batch.EvaluatorVersion, "rulesVersion": batch.RulesVersion,
+		"collectorHealthy": batch.CollectorHealthy, "segments": segments,
 	}
 	var response struct {
 		Receipt *activityReceiptMessage `json:"receipt"`
@@ -866,12 +887,8 @@ func (c *Client) GetSession(ctx context.Context, auth AuthSession, sessionID str
 		return Session{}, RewardSummary{}, errors.New("session ID is required")
 	}
 	var response struct {
-		Session *sessionMessage `json:"session"`
-		Reward  *struct {
-			EarnedSeconds    protoInt64 `json:"earnedSeconds"`
-			SpentSeconds     protoInt64 `json:"spentSeconds"`
-			DiscardedSeconds protoInt64 `json:"discardedSeconds"`
-		} `json:"reward"`
+		Session *sessionMessage       `json:"session"`
+		Reward  *rewardSummaryMessage `json:"reward"`
 	}
 	if err := c.Connect(ctx, "focus.v1.FocusService/GetSession", auth.AccessToken, map[string]string{"sessionId": sessionID}, &response); err != nil {
 		return Session{}, RewardSummary{}, err
@@ -879,10 +896,7 @@ func (c *Client) GetSession(ctx context.Context, auth AuthSession, sessionID str
 	if response.Session == nil || response.Session.ID != sessionID || response.Reward == nil {
 		return Session{}, RewardSummary{}, errors.New("API omitted the completed session result")
 	}
-	return sessionFromMessage(*response.Session), RewardSummary{
-		EarnedSeconds: int64(response.Reward.EarnedSeconds), SpentSeconds: int64(response.Reward.SpentSeconds),
-		DiscardedSeconds: int64(response.Reward.DiscardedSeconds),
-	}, nil
+	return sessionFromMessage(*response.Session), rewardSummaryFromMessage(*response.Reward), nil
 }
 
 func (c *Client) AbortSession(ctx context.Context, session AuthSession, operationID, sessionID string, expectedVersion int64, endedAt time.Time) error {

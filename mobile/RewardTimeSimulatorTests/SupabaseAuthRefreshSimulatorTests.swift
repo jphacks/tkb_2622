@@ -76,9 +76,13 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         )
         let service = SupabaseAuthService(client: client)
 
-        try await service.verifyEmailOTP(email: "person@example.test", code: "123456")
+        let hasSession = try await service.verifyEmailOTP(
+            email: "person@example.test",
+            code: "123456"
+        )
         let accessToken = try await service.accessToken()
 
+        XCTAssertTrue(hasSession)
         XCTAssertEqual(accessToken, "refreshed-simulator-access-token")
         let request = try XCTUnwrap(requests.values.first)
         XCTAssertEqual(request.url?.path, "/auth/v1/verify")
@@ -87,6 +91,34 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         XCTAssertEqual(payload["email"] as? String, "person@example.test")
         XCTAssertEqual(payload["token"] as? String, "123456")
         XCTAssertEqual(payload["type"] as? String, "email")
+    }
+
+    func testEmailOTPVerificationWithoutSessionKeepsUserSignedOut() async throws {
+        let requests = LockedAuthRequests()
+        AuthRefreshURLProtocol.handler = { request in
+            requests.append(request)
+            return (200, Self.confirmationPendingUserJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AuthRefreshURLProtocol.self]
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://project.example.test")!,
+            supabaseKey: "simulator-publishable-key",
+            options: SupabaseClientOptions(
+                auth: .init(storage: LockedAuthLocalStorage(), autoRefreshToken: false),
+                global: .init(session: URLSession(configuration: configuration))
+            )
+        )
+        let service = SupabaseAuthService(client: client)
+
+        let hasSession = try await service.verifyEmailOTP(
+            email: "person@example.test",
+            code: "123456"
+        )
+
+        XCTAssertFalse(hasSession)
+        XCTAssertNil(client.auth.currentSession)
+        XCTAssertEqual(requests.values.first?.url?.path, "/auth/v1/verify")
     }
 
     func testExpiredStoredSessionRefreshesBeforeReturningAccessToken() async throws {
@@ -204,6 +236,10 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
 
     private static let refreshedSessionJSON = """
     {"access_token":"refreshed-simulator-access-token","token_type":"bearer","expires_in":3600,"expires_at":1898200000,"refresh_token":"rotated-simulator-refresh-token","user":{"id":"d3db82c0-7943-47f4-90c5-06455a5c1e1c","app_metadata":{},"user_metadata":{},"aud":"authenticated","email":"simulator@example.test","created_at":"2026-10-25T00:00:00Z","updated_at":"2026-10-25T00:00:00Z"}}
+    """
+
+    private static let confirmationPendingUserJSON = """
+    {"id":"d3db82c0-7943-47f4-90c5-06455a5c1e1c","app_metadata":{},"user_metadata":{},"aud":"authenticated","email":"person@example.test","created_at":"2026-10-25T00:00:00Z","updated_at":"2026-10-25T00:00:00Z"}
     """
 }
 

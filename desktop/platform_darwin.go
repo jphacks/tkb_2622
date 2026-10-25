@@ -55,6 +55,7 @@ type popoverState struct {
 
 func configurePlatform(configuration *options.App, host *app.Host) {
 	configuration.Mac = &mac.Options{TitleBar: mac.TitleBarDefault()}
+	configuration.StartHidden = true
 	configuration.HideWindowOnClose = true
 	applicationMenu := menu.NewMenu()
 	applicationMenu.Append(menu.AppMenu())
@@ -311,21 +312,25 @@ func FocusLinkOpenPage(cPage *C.char) {
 	if page != "session" && page != "history" && page != "settings" && page != "feedback" {
 		return
 	}
-	if page == "feedback" {
-		state := host.CurrentSnapshot()
-		if state.Result == nil {
+
+	// AppKitのCコールバック中にWailsのウィンドウ操作へ戻らないよう、Go側で処理を分離する。
+	go func() {
+		if page == "feedback" {
+			state := host.CurrentSnapshot()
+			if state.Result == nil {
+				return
+			}
+			C.FocusLinkClosePopover()
+			wailsruntime.Show(ctx)
+			wailsruntime.WindowShow(ctx)
+			wailsruntime.EventsEmit(ctx, "desktop:show-feedback", state.Result)
 			return
 		}
 		C.FocusLinkClosePopover()
 		wailsruntime.Show(ctx)
 		wailsruntime.WindowShow(ctx)
-		wailsruntime.EventsEmit(ctx, "desktop:show-feedback", state.Result)
-		return
-	}
-	C.FocusLinkClosePopover()
-	wailsruntime.Show(ctx)
-	wailsruntime.WindowShow(ctx)
-	wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
+		wailsruntime.EventsEmit(ctx, "desktop:open-page", page)
+	}()
 }
 
 //export FocusLinkQuit

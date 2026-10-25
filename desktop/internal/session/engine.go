@@ -198,25 +198,26 @@ func (e *Engine) SetSyncStatus(status string, now time.Time) {
 
 func (e *Engine) SetCloudOperationPending(pending bool, now time.Time) {
 	e.state.CloudOperationPending = pending
+	if pending && e.state.Result != nil && e.state.Session != nil && e.state.Result.SessionID == e.state.Session.ID &&
+		(e.state.Session.Status == "FINALIZED" || e.state.Session.Status == "ABORTED") && e.state.Result.RewardStatus == "" {
+		// 報酬結果はAPI応答が返るまで確定表示しない。
+		e.state.Result.RewardStatus = "queued"
+	}
 	e.touch(now)
 }
 
-func (e *Engine) SetResultReward(id string, earned, spent, discarded int, now time.Time) bool {
-	if earned < 0 || spent < 0 || discarded < 0 {
+func (e *Engine) SetResultReward(id string, reward RewardSummary, now time.Time) bool {
+	if reward.EarnedSeconds < 0 || reward.SpentSeconds < 0 || reward.DiscardedSeconds < 0 {
 		return false
 	}
 	updated := false
 	if e.state.Result != nil && e.state.Result.SessionID == id {
-		e.state.Result.EarnedSeconds = earned
-		e.state.Result.UsedSeconds = spent
-		e.state.Result.DiscardedSeconds = discarded
+		applyRewardSummary(e.state.Result, reward)
 		updated = true
 	}
 	for index := range e.state.History {
 		if e.state.History[index].SessionID == id {
-			e.state.History[index].EarnedSeconds = earned
-			e.state.History[index].UsedSeconds = spent
-			e.state.History[index].DiscardedSeconds = discarded
+			applyRewardSummary(&e.state.History[index], reward)
 			updated = true
 		}
 	}
@@ -227,6 +228,16 @@ func (e *Engine) SetResultReward(id string, earned, spent, discarded int, now ti
 		e.touch(now)
 	}
 	return updated
+}
+
+func applyRewardSummary(result *Result, reward RewardSummary) {
+	result.EarnedSeconds = reward.EarnedSeconds
+	result.UsedSeconds = reward.SpentSeconds
+	result.DiscardedSeconds = reward.DiscardedSeconds
+	result.RewardStatus = reward.Status
+	result.RewardReason = reward.Reason
+	result.RewardPolicyVersion = reward.PolicyVersion
+	result.RewardGrantStopped = reward.GrantStopped
 }
 
 func (e *Engine) SetCloudSession(current *CloudSession, now time.Time) {

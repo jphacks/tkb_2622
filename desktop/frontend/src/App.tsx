@@ -81,7 +81,12 @@ function ConnectedApp({ store }: { store: DesktopStore }) {
     return updated;
   }, requestEmailOTP: (email: string) => store.requestEmailOTP(email), verifyEmailOTP: (email: string, code: string) => store.verifyEmailOTP(email, code), signOut: () => store.signOut(), refreshAccount: () => store.connect(), onNavigate: (next: 'feedback' | 'history' | 'settings') => setPage(next) };
   const active = state.session && ['RUNNING', 'PAUSED'].includes(state.session.status);
-  const content = page === 'session' ? (showStartup ? <StartupPage {...props} onLater={() => setShowStartup(false)} onStarted={() => setShowStartup(false)} onResumed={() => setShowStartup(false)} /> : <SessionPage {...props} />) : page === 'feedback' ? <FeedbackPage result={selectedResult ?? state.result} mode={state.mode} /> : page === 'history' ? <HistoryPage history={state.history} mode={state.mode} cloudConnected={state.account?.status === 'signedIn'} historyError={state.historyError} balanceSeconds={state.balanceSeconds} onRefresh={() => { void store.connect(); }} onSelect={result => { setSelectedResult(result); setPage('feedback'); }} /> : <SettingsPage {...props} />;
+  const feedbackResult = selectedResult
+    ? state.result?.sessionId === selectedResult.sessionId
+      ? state.result
+      : state.history.find(result => result.sessionId === selectedResult.sessionId) ?? selectedResult
+    : state.result;
+  const content = page === 'session' ? (showStartup ? <StartupPage {...props} onLater={() => setShowStartup(false)} onStarted={() => setShowStartup(false)} onResumed={() => setShowStartup(false)} /> : <SessionPage {...props} />) : page === 'feedback' ? <FeedbackPage result={feedbackResult} mode={state.mode} /> : page === 'history' ? <HistoryPage history={state.history} mode={state.mode} cloudConnected={state.account?.status === 'signedIn'} historyError={state.historyError} balanceSeconds={state.balanceSeconds} onRefresh={() => { void store.connect(); }} onSelect={result => { setSelectedResult(result); setPage('feedback'); }} /> : <SettingsPage {...props} />;
   const openMain = page !== 'session';
   const currentSession = state.session;
   const hasCurrentCloudBalance = state.account?.status === 'signedIn' && (currentSession?.serverVersion ?? 0) > 0 && ['RUNNING', 'PAUSED'].includes(currentSession?.status ?? '') && state.balanceSeconds !== null;

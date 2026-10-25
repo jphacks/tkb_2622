@@ -39,7 +39,11 @@ func (r *Repository) Wallet(ctx context.Context, userID string) (domain.Wallet, 
 	if err != nil {
 		return domain.Wallet{}, err
 	}
-	out := domain.Wallet{UserID: userID, BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq, Version: w.Version}
+	out := domain.Wallet{
+		UserID: userID, BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq,
+		Version: w.Version, PolicyVersion: w.PolicyVersion, GrantStopped: w.GrantStopped,
+		StopReason: w.StopReason, CollectorHealthy: w.CollectorHealthy,
+	}
 	if w.SessionID.Valid {
 		out.SessionID = w.SessionID.UUID.String()
 	}
@@ -48,9 +52,19 @@ func (r *Repository) Wallet(ctx context.Context, userID string) (domain.Wallet, 
 
 func (r *Repository) SaveWallet(ctx context.Context, w domain.Wallet) error {
 	if w.Version == 1 {
-		return r.q.InsertWallet(ctx, q.InsertWalletParams{UserID: uuid.MustParse(w.UserID), SessionID: nullID(w.SessionID), BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq})
+		return r.q.InsertWallet(ctx, q.InsertWalletParams{
+			UserID: uuid.MustParse(w.UserID), SessionID: nullID(w.SessionID),
+			BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq,
+			PolicyVersion: w.PolicyVersion, GrantStopped: w.GrantStopped,
+			StopReason: w.StopReason, CollectorHealthy: w.CollectorHealthy,
+		})
 	}
-	n, err := r.q.UpdateWallet(ctx, q.UpdateWalletParams{UserID: uuid.MustParse(w.UserID), SessionID: nullID(w.SessionID), BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq, Version: w.Version - 1})
+	n, err := r.q.UpdateWallet(ctx, q.UpdateWalletParams{
+		UserID: uuid.MustParse(w.UserID), SessionID: nullID(w.SessionID),
+		BalanceSeconds: w.BalanceSeconds, EvaluatedSeq: w.EvaluatedSeq,
+		PolicyVersion: w.PolicyVersion, GrantStopped: w.GrantStopped,
+		StopReason: w.StopReason, CollectorHealthy: w.CollectorHealthy, Version: w.Version - 1,
+	})
 	if err != nil {
 		return err
 	}
@@ -73,7 +87,19 @@ func (r *Repository) Summary(ctx context.Context, sessionID string) (domain.Summ
 	if err != nil {
 		return domain.Summary{}, err
 	}
-	return domain.Summary{EarnedSeconds: s.Earned, SpentSeconds: s.Spent, DiscardedSeconds: s.Discarded}, nil
+	return domain.Summary{
+		EarnedSeconds: s.Earned, SpentSeconds: s.Spent, DiscardedSeconds: s.Discarded,
+		PolicyVersion: s.PolicyVersion, Status: s.Status.String, Reason: s.Reason,
+		GrantStopped: s.GrantStopped, CollectorHealthy: s.CollectorHealthy, Finalized: s.Finalized,
+	}, nil
+}
+
+func (r *Repository) SaveOutcome(ctx context.Context, outcome domain.SessionOutcome) error {
+	return r.q.SaveOutcome(ctx, q.SaveOutcomeParams{
+		SessionID: uuid.MustParse(outcome.SessionID), UserID: uuid.MustParse(outcome.UserID),
+		PolicyVersion: outcome.PolicyVersion, Status: outcome.Status,
+		Reason: outcome.Reason, GrantStopped: outcome.GrantStopped,
+	})
 }
 
 func (r *Repository) ListTransactions(ctx context.Context, userID string, before time.Time, beforeID string, limit int) ([]application.Transaction, error) {

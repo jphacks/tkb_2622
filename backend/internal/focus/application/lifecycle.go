@@ -16,6 +16,7 @@ const maxSeqAhead = 1000
 type BatchInput struct {
 	SessionID, BatchID, EvaluatorVersion, RulesVersion string
 	Seq                                                int64
+	CollectorHealthy                                   bool
 	Segments                                           []Segment
 }
 
@@ -24,6 +25,7 @@ type Receipt struct {
 	Seq                int64
 	Status             string
 	AcceptedThroughSeq int64
+	CollectorHealthy   bool
 	MissingSeqs        []int64
 }
 
@@ -122,7 +124,7 @@ func (l *Lifecycle) AcceptBatch(ctx context.Context, a Actor, in BatchInput, now
 	if err = domain.ValidateSegments(in.Segments); err != nil {
 		return Receipt{}, Session{}, translate(err)
 	}
-	b := Batch{SessionID: in.SessionID, BatchID: in.BatchID, Hash: hash, EvaluatorVersion: in.EvaluatorVersion, RulesVersion: in.RulesVersion, Seq: in.Seq, Segments: in.Segments}
+	b := Batch{SessionID: in.SessionID, BatchID: in.BatchID, Hash: hash, EvaluatorVersion: in.EvaluatorVersion, RulesVersion: in.RulesVersion, Seq: in.Seq, CollectorHealthy: in.CollectorHealthy, Segments: in.Segments}
 	switch {
 	case !s.Open():
 		b.Status = "HISTORY"
@@ -185,6 +187,13 @@ func (l *Lifecycle) receipt(ctx context.Context, s Session, b Batch) (Receipt, e
 	r := Receipt{BatchID: b.BatchID, Seq: b.Seq, Status: status, AcceptedThroughSeq: s.AcceptedSeq, MissingSeqs: []int64{}}
 	if !s.Open() {
 		return r, nil
+	}
+	if s.AcceptedSeq > 0 {
+		latestAccepted, err := l.repo.GetBatch(ctx, s.ID, s.AcceptedSeq)
+		if err != nil {
+			return Receipt{}, err
+		}
+		r.CollectorHealthy = latestAccepted.CollectorHealthy
 	}
 	pending, err := l.repo.PendingSeqs(ctx, s.ID)
 	if err != nil {
