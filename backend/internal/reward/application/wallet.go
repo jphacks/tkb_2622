@@ -106,7 +106,7 @@ func validUUID(value string) bool {
 	return err == nil && id != uuid.Nil && id.String() == value
 }
 
-// Open binds the wallet to a newly started session and grants any one-time local test balance.
+// Open binds the wallet to a newly started session and grants its local test balance once.
 func (w *Wallets) Open(ctx context.Context, userID, sessionID string) (domain.Wallet, error) {
 	wallet, err := w.repo.Wallet(ctx, userID)
 	if err != nil {
@@ -129,7 +129,7 @@ func (w *Wallets) ensureInitialTestBalance(ctx context.Context, wallet domain.Wa
 	if w.currentPolicy.InitialBalanceSeconds <= 0 || wallet.SessionID == "" || wallet.PolicyVersion != w.currentPolicy.Version {
 		return wallet, nil
 	}
-	const sourceID = "local-test-initial-balance-v3"
+	sourceID := "local-test-initial-balance-v3:" + wallet.SessionID
 	sourceRepository, ok := w.repo.(interface {
 		HasTransactionSource(context.Context, string, string) (bool, error)
 	})

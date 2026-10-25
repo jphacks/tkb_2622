@@ -2,6 +2,7 @@ import Combine
 import SwiftUI
 
 struct GroupView: View {
+  @Environment(\.scenePhase) private var scenePhase
   @StateObject private var model = GroupViewModel(repository: ConfiguredGroupRepository())
   @Binding private var invitationToken: String?
   @State private var selectedGroupID: String?
@@ -55,15 +56,12 @@ struct GroupView: View {
             Text(message)
               .font(.subheadline)
               .foregroundStyle(AppTheme.secondaryInk)
-            Button("再読み込み") {
-              Task { await model.load() }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.primary)
+            ProgressView("自動で再読み込みします…")
+              .font(.footnote)
           }
         case .loaded(let groups) where groups.isEmpty:
-          if let loadError = model.loadError {
-            loadFailureWarning(loadError)
+          if model.loadError != nil {
+            loadFailureWarning
           }
           SurfaceCard {
             Label("所属グループはありません", systemImage: "person.2")
@@ -78,8 +76,8 @@ struct GroupView: View {
             .tint(AppTheme.primary)
           }
         case .loaded(let groups):
-          if let loadError = model.loadError {
-            loadFailureWarning(loadError)
+          if model.loadError != nil {
+            loadFailureWarning
           }
           groupPicker(groups)
 
@@ -103,11 +101,11 @@ struct GroupView: View {
         await model.refreshWorkStarts()
       }
     }
-    .task(id: isAuthenticated) {
-      if isAuthenticated { await model.runWorkStartPolling() }
+    .task(id: isAuthenticated && scenePhase == .active) {
+      if isAuthenticated && scenePhase == .active { await model.runWorkStartPolling() }
     }
     .onReceive(NotificationCenter.default.publisher(for: .mobileAuthenticationChanged)) { _ in
-      if isAuthenticated {
+      if isAuthenticated && scenePhase == .active {
         Task {
           await model.load()
           await model.refreshWorkStarts()
@@ -192,18 +190,10 @@ struct GroupView: View {
     }
   }
 
-  private func loadFailureWarning(_ message: String) -> some View {
+  private var loadFailureWarning: some View {
     SurfaceCard {
-      Label("最新のグループ一覧を取得できませんでした", systemImage: "wifi.exclamationmark")
-        .font(.subheadline.weight(.semibold))
-      Text("前回取得したグループ情報を表示しています。通信が回復したら再読み込みしてください。")
+      ProgressView("自動で再読み込みします…")
         .font(.footnote)
-        .foregroundStyle(AppTheme.secondaryInk)
-      Text(message)
-        .font(.caption)
-        .foregroundStyle(AppTheme.secondaryInk)
-      Button("再読み込み") { Task { await model.load() } }
-        .buttonStyle(.bordered)
     }
   }
 

@@ -91,6 +91,24 @@ func TestRunnerStartsSessionWithConfiguredRewardPolicy(t *testing.T) {
 				if earned != tc.earned || wallet.BalanceSeconds != tc.initial+tc.earned {
 					t.Errorf("one work minute earned=%d balance=%d; want %d, %d", earned, wallet.BalanceSeconds, tc.earned, tc.initial+tc.earned)
 				}
+				actor := focus.Actor{UserID: userID, DeviceID: deviceID, DevicePlatform: "MACOS"}
+				if _, err := f.End(ctx, actor, true, s.ID, s.Version, time.Now(), 0, nil, time.Now()); err != nil {
+					return err
+				}
+				if _, _, err := r.Discard(ctx, userID, s.ID, reward.Eligibility{Quality: &quality, CollectorHealthy: &healthy, KnownActiveMillis: 60_000}); err != nil {
+					return err
+				}
+				next, err := f.Start(ctx, actor, taskID, 1, true, time.Now())
+				if err != nil {
+					return err
+				}
+				wallet, err = r.Open(ctx, userID, next.ID)
+				if err != nil {
+					return err
+				}
+				if wallet.BalanceSeconds != tc.initial {
+					t.Errorf("new session balance=%d; want %d", wallet.BalanceSeconds, tc.initial)
+				}
 				return rollback
 			})
 			if !errors.Is(err, rollback) {

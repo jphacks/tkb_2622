@@ -395,8 +395,8 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
     func testPendingReservationCanRetryWhenCommittedBalanceWasDebited() {
         XCTAssertEqual(
             UsageReservationEligibility.evaluate(
-                selectedMinutes: 10,
-                balanceMinutes: 0,
+                selectedSeconds: 600,
+                balanceSeconds: 0,
                 pendingOperationID: "operation-1",
                 pendingSeconds: 600
             ),
@@ -404,8 +404,8 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         )
         XCTAssertEqual(
             UsageReservationEligibility.evaluate(
-                selectedMinutes: 10,
-                balanceMinutes: 0,
+                selectedSeconds: 600,
+                balanceSeconds: 0,
                 pendingOperationID: nil,
                 pendingSeconds: 600
             ),
@@ -436,6 +436,69 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         }
         XCTAssertEqual(Set(refreshedGroups.map(\.id)), ["group-1", "group-2"])
         XCTAssertNil(viewModel.loadError)
+    }
+
+    @MainActor
+    func testGroupPollingAutomaticallyRetriesUntilListRecovers() async throws {
+        let repository = SimulatorGroupRepository(groups: [try group(id: "group-1")])
+        repository.fetchGroupsError = URLError(.notConnectedToInternet)
+        var delays: [UInt64] = []
+        let viewModel = GroupViewModel(repository: repository, sleep: { delay in
+            delays.append(delay)
+            if delays.count == 2 { repository.fetchGroupsError = nil }
+            if delays.count == 3 { throw CancellationError() }
+        })
+
+        await viewModel.runWorkStartPolling()
+
+        XCTAssertEqual(delays, [5_000_000_000, 5_000_000_000, 30_000_000_000])
+        XCTAssertEqual(repository.fetchGroupsCallCount, 3)
+        guard case .loaded(let groups) = viewModel.state else {
+            return XCTFail("A recovered connection must reload groups without a button tap")
+        }
+        XCTAssertEqual(groups.map(\.id), ["group-1"])
+        XCTAssertNil(viewModel.loadError)
+    }
+
+    @MainActor
+    func testGroupPollingRetainsCachedListUntilAutomaticRetrySucceeds() async throws {
+        let repository = SimulatorGroupRepository(groups: [try group(id: "group-1")])
+        var sleeps = 0
+        var retainedIDs: [String] = []
+        var retainedLoadError: String?
+        var viewModel: GroupViewModel!
+        let newGroup = try group(id: "group-2")
+        viewModel = GroupViewModel(repository: repository, sleep: { _ in
+            sleeps += 1
+            if sleeps > 1 { throw CancellationError() }
+            if case .loaded(let groups) = viewModel.state { retainedIDs = groups.map(\.id) }
+            retainedLoadError = viewModel.loadError
+            repository.fetchGroupsError = nil
+            repository.groups.append(newGroup)
+        })
+        await viewModel.load()
+        repository.fetchGroupsError = URLError(.timedOut)
+
+        await viewModel.runWorkStartPolling()
+
+        XCTAssertEqual(retainedIDs, ["group-1"])
+        XCTAssertNotNil(retainedLoadError)
+        guard case .loaded(let groups) = viewModel.state else { return XCTFail("Expected recovered list") }
+        XCTAssertEqual(groups.map(\.id), ["group-1", "group-2"])
+        XCTAssertNil(viewModel.loadError)
+    }
+
+    @MainActor
+    func testGroupPollingStopsWhenRetrySleepIsCancelled() async {
+        let repository = SimulatorGroupRepository(groups: [])
+        repository.fetchGroupsError = URLError(.notConnectedToInternet)
+        let viewModel = GroupViewModel(repository: repository, sleep: { _ in
+            throw CancellationError()
+        })
+
+        await viewModel.runWorkStartPolling()
+
+        XCTAssertEqual(repository.fetchGroupsCallCount, 1, "Cancelled polling must not issue another request")
     }
 
     private func group(id: String) throws -> MobileGroup {
@@ -485,12 +548,14 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
 private final class SimulatorGroupRepository: GroupRepository {
     var groups: [MobileGroup]
     var fetchGroupsError: Error?
+    private(set) var fetchGroupsCallCount = 0
 
     init(groups: [MobileGroup]) {
         self.groups = groups
     }
 
     func fetchGroups() async throws -> [MobileGroup] {
+        fetchGroupsCallCount += 1
         if let fetchGroupsError { throw fetchGroupsError }
         return groups
     }

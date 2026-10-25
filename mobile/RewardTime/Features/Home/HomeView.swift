@@ -161,14 +161,6 @@ struct HomeView: View {
 
   private func refreshWarning(_ message: String) -> some View {
     SurfaceCard {
-      Label("最新の状態を取得できませんでした", systemImage: "wifi.exclamationmark")
-        .font(.subheadline.weight(.semibold))
-      Text("前回取得した内容を表示しています。通信が回復したら再読み込みしてください。")
-        .font(.footnote)
-        .foregroundStyle(AppTheme.secondaryInk)
-      Text(message)
-        .font(.caption)
-        .foregroundStyle(AppTheme.secondaryInk)
       Button("再試行") { Task { await refreshAndReconcile() } }
         .buttonStyle(.bordered)
     }

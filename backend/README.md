@@ -95,7 +95,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 | `SUPABASE_JWT_AUDIENCE` | 許可するaudience．既定`authenticated` |
 | `AUTH_ALLOW_LOCAL_HTTP` | `true`でHTTPのissuer（Supabase CLIのローカル環境等）を許可．既定は無効 |
 | `API_DOCS_ENABLED` | `true`で`/docs`（Swagger UI）を公開．既定は無効．ローカルComposeでは有効 |
-| `APP_ENV`，`REWARD_POLICY_TEST_MODE` | ローカルCompose専用．`local`と`true`の組合せで新規セッションのみ作業1分ごとに報酬20秒を付与し，既知活動の最低条件を1分にする．アカウントごとに初回の試験セッションで1分を一度だけ付与する．本番へ設定しない |
+| `APP_ENV`，`REWARD_POLICY_TEST_MODE` | ローカルCompose専用．`local`と`true`の組合せで新規セッションのみ作業1分ごとに報酬20秒を付与し，既知活動の最低条件を1分にする．作業セッションを開始するたびに初期60秒を付与し，同じセッションの再送では二重付与しない．本番へ設定しない |
 | `APNS_TEAM_ID`，`APNS_KEY_ID`，`APNS_BUNDLE_ID`，`APNS_AUTH_KEY_PATH` | すべて設定するとAPNs配信を有効化．秘密鍵ファイルは実行環境のSecret管理からマウントする．未設定時はAPNs送信を停止し，Outboxを保持 |
 | `BACKEND_IMAGE` | デプロイ用Composeで必須．Artifact Registryの固定タグまたはダイジェスト付きイメージ |
 

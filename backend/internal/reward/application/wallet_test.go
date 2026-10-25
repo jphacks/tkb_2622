@@ -78,6 +78,10 @@ func TestLocalInitialBalanceDoesNotStopOrOffsetWorkRewards(t *testing.T) {
 	if err != nil || wallet.BalanceSeconds != 60 || wallet.PolicyVersion != PolicyTest.Version {
 		t.Fatalf("initial wallet = %+v, err = %v; want 60 seconds on test policy", wallet, err)
 	}
+	wallet, err = wallets.ensureInitialTestBalance(ctx, wallet)
+	if err != nil || wallet.BalanceSeconds != 60 || len(repo.transactions) != 1 {
+		t.Fatalf("initial grant replay: balance=%d transactions=%d err=%v", wallet.BalanceSeconds, len(repo.transactions), err)
+	}
 	quality, healthy := 0.80, true
 	eligibility := domain.Eligibility{Quality: &quality, KnownActiveMillis: 30_000, CollectorHealthy: &healthy}
 	earned, wallet, err := wallets.Accrue(ctx, rewardTestUserID, rewardTestSessionID, 30_000, eligibility, 1)
@@ -96,8 +100,21 @@ func TestLocalInitialBalanceDoesNotStopOrOffsetWorkRewards(t *testing.T) {
 		t.Fatal(err)
 	}
 	wallet, err = wallets.Open(ctx, rewardTestUserID, "00000000-0000-4000-8000-000000000013")
-	if err != nil || wallet.BalanceSeconds != 0 {
-		t.Fatalf("second session initial balance = %d, err = %v; want no repeated initial grant", wallet.BalanceSeconds, err)
+	if err != nil || wallet.BalanceSeconds != 60 {
+		t.Fatalf("second session initial balance = %d, err = %v; want 60 seconds for the new session", wallet.BalanceSeconds, err)
+	}
+	wallet, err = wallets.ensureInitialTestBalance(ctx, wallet)
+	if err != nil || wallet.BalanceSeconds != 60 {
+		t.Fatalf("second session replay: balance=%d err=%v; want 60", wallet.BalanceSeconds, err)
+	}
+	initialGrants := 0
+	for _, transaction := range repo.transactions {
+		if transaction.Type == "ADJUST" {
+			initialGrants++
+		}
+	}
+	if initialGrants != 2 {
+		t.Fatalf("initial grants across two sessions = %d; want exactly two", initialGrants)
 	}
 }
 
