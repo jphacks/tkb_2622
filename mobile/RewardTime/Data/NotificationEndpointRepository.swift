@@ -20,29 +20,71 @@ struct ConfiguredNotificationEndpointRepository {
         let registrationId: String
     }
 
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     func register(token: String, environment: String) async throws {
         let client = try makeClient()
+        try await register(token: token, environment: environment, client: client)
+    }
+
+    func register(token: String, environment: String, client: ConnectJSONClient) async throws {
         let apnsEnvironment = environment == "development" ? "AP_NS_ENVIRONMENT_DEVELOPMENT" : "AP_NS_ENVIRONMENT_PRODUCTION"
-        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
-        let response: RegisterResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "RegisterNotificationEndpoint",
-            requestBody: RegisterRequest(apnsToken: token, environment: apnsEnvironment, registrationId: registrationID),
-            responseType: RegisterResponse.self
+        let deviceSettings = ConfiguredDeviceSettingsRepository(defaults: defaults)
+        let registrationID = deviceSettings.stableRegistrationID()
+        try await NotificationEndpointRegistrationFlow.register(
+            ensureDevice: {
+                _ = try await deviceSettings.ensureDeviceRegistered(client: client)
+            },
+            registerEndpoint: {
+                do {
+                    let response: RegisterResponse = try await client.call(
+                        service: "identity.v1.IdentityService",
+                        method: "RegisterNotificationEndpoint",
+                        requestBody: RegisterRequest(
+                            apnsToken: token,
+                            environment: apnsEnvironment,
+                            registrationId: registrationID
+                        ),
+                        responseType: RegisterResponse.self
+                    )
+                    guard response.registered else {
+                        throw NotificationEndpointError.registrationRejected
+                    }
+                } catch {
+                    throw NotificationEndpointError.requestFailed(
+                        operation: "identity.v1.IdentityService/RegisterNotificationEndpoint",
+                        underlying: error
+                    )
+                }
+            }
         )
-        guard response.registered else { throw NotificationEndpointError.registrationRejected }
     }
 
     func delete() async throws {
         let client = try makeClient()
-        let registrationID = ConfiguredDeviceSettingsRepository().stableRegistrationID()
-        let response: DeleteResponse = try await client.call(
-            service: "identity.v1.IdentityService",
-            method: "DeleteNotificationEndpoint",
-            requestBody: DeleteRequest(registrationId: registrationID),
-            responseType: DeleteResponse.self
-        )
-        guard response.deleted else { throw NotificationEndpointError.deletionRejected }
+        try await delete(client: client)
+    }
+
+    func delete(client: ConnectJSONClient) async throws {
+        let registrationID = ConfiguredDeviceSettingsRepository(defaults: defaults).stableRegistrationID()
+        do {
+            let response: DeleteResponse = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "DeleteNotificationEndpoint",
+                requestBody: DeleteRequest(registrationId: registrationID),
+                responseType: DeleteResponse.self
+            )
+            guard response.deleted else { throw NotificationEndpointError.deletionRejected }
+        } catch {
+            throw NotificationEndpointError.requestFailed(
+                operation: "identity.v1.IdentityService/DeleteNotificationEndpoint",
+                underlying: error
+            )
+        }
     }
 
     private func makeClient() throws -> ConnectJSONClient {
@@ -66,12 +108,17 @@ private enum NotificationEndpointError: LocalizedError {
     case missingConfiguration
     case registrationRejected
     case deletionRejected
+    case requestFailed(operation: String, underlying: Error)
 
     var errorDescription: String? {
         switch self {
-        case .missingConfiguration: "通知APIの接続設定を確認してください。"
-        case .registrationRejected: "サーバーが通知先登録を確認できませんでした。"
-        case .deletionRejected: "サーバーが通知先解除を確認できませんでした。"
+        case .missingConfiguration: return "通知APIの接続設定を確認してください。"
+        case .registrationRejected: return "サーバーが通知先登録を確認できませんでした。"
+        case .deletionRejected: return "サーバーが通知先解除を確認できませんでした。"
+        case .requestFailed(let operation, let underlying):
+            let detail = (underlying as? LocalizedError)?.errorDescription
+                ?? underlying.localizedDescription
+            return "\(detail) (API: \(operation))"
         }
     }
 }

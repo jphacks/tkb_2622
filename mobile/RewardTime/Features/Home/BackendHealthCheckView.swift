@@ -116,7 +116,7 @@ struct BackendHealthCheckView: View {
                 checkState = .failed("HTTPエラー（\(code)）。URLとbackendの起動状態を確認してください。")
             case .unexpectedHealthStatus:
                 checkState = .failed("backendから正常なhealth応答がありませんでした。")
-            case .missingAccessToken, .invalidResponse, .connect:
+            case .missingAccessToken, .tokenProviderFailed, .invalidResponse, .connect:
                 checkState = .failed("backendから正常なhealth応答がありませんでした。")
             }
         } catch {

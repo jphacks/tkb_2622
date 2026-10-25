@@ -8,6 +8,31 @@ extension Notification.Name {
 }
 
 enum MobileAppConfiguration {
+  static func debugConnectAPIBaseURLDefault(isSimulator: Bool) -> String {
+    isSimulator ? "http://127.0.0.1:8080" : ""
+  }
+
+  static var connectAPIBaseURLDefault: String {
+    #if targetEnvironment(simulator)
+      return debugConnectAPIBaseURLDefault(isSimulator: true)
+    #else
+      return debugConnectAPIBaseURLDefault(isSimulator: false)
+    #endif
+  }
+
+  static var isSimulator: Bool {
+    #if targetEnvironment(simulator)
+      return true
+    #else
+      return false
+    #endif
+  }
+
+  static func isLoopbackURL(_ rawValue: String) -> Bool {
+    guard let host = URLComponents(string: rawValue)?.host?.lowercased() else { return false }
+    return ["localhost", "127.0.0.1", "::1"].contains(host)
+  }
+
   static var supabaseProjectURL: String? {
     configuredURL(
       value(userDefaultsKey: "mobile.supabase.projectURL", infoKey: "SUPABASE_PROJECT_URL"))
@@ -42,7 +67,7 @@ enum MobileAppConfiguration {
         return storedValue
       }
       if infoKey == "CONNECT_API_BASE_URL" {
-        return "http://127.0.0.1:8080"
+        return connectAPIBaseURLDefault
       }
     #endif
     return configuredValue(Bundle.main.object(forInfoDictionaryKey: infoKey) as? String)
@@ -58,6 +83,10 @@ enum MobileAppConfiguration {
   private static func configuredURL(_ value: String?) -> String? {
     guard let value else { return nil }
     #if DEBUG
+      guard let value = configuredValue(value) else { return nil }
+      #if !targetEnvironment(simulator)
+        guard !isLoopbackURL(value) else { return nil }
+      #endif
       return value
     #else
       guard let url = URL(string: value), url.scheme?.lowercased() == "https", url.host != nil
@@ -83,6 +112,10 @@ struct SupabaseAuthService: AccessTokenProviding {
     )
   }
 
+  init(client: SupabaseClient) {
+    self.client = client
+  }
+
   func sendEmailOTP(to email: String) async throws {
     try await client.auth.signInWithOTP(email: email, shouldCreateUser: true)
   }
@@ -102,7 +135,20 @@ struct SupabaseAuthService: AccessTokenProviding {
   }
 
   func signOutFromThisDevice() async throws {
-    try await client.auth.signOut(scope: .local)
+    try await DeviceSignOutFlow.perform(
+      revokeDevice: {
+        guard UserDefaults.standard.string(forKey: "mobile.device.id") != nil else { return }
+        guard let apiURLText = MobileAppConfiguration.connectAPIBaseURL,
+              let apiURL = URL(string: apiURLText), apiURL.host != nil else {
+          throw DeviceSettingsRepositoryError.missingConfiguration
+        }
+        let api = ConnectJSONClient(baseURL: apiURL, tokenProvider: self)
+        try await ConfiguredDeviceRevocationRepository().revokeRegisteredDevice(client: api)
+      },
+      signOutLocally: {
+        try await client.auth.signOut(scope: .local)
+      }
+    )
   }
 }
 
@@ -232,16 +278,18 @@ struct IdentityAPIRepository {
     client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
   }
 
+  init(client: ConnectJSONClient) {
+    self.client = client
+  }
+
   func ensureUserAndFetchCurrentUser(operationID: String) async throws -> MobileIdentity {
-    let _: EnsureUserResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let _: EnsureUserResponse = try await call(
       method: "EnsureUser",
       requestBody: EnsureUserRequest(operationId: operationID),
       responseType: EnsureUserResponse.self
     )
 
-    let response: GetMeResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: GetMeResponse = try await call(
       method: "GetMe",
       requestBody: EmptyIdentityRequest(),
       responseType: GetMeResponse.self
@@ -250,8 +298,7 @@ struct IdentityAPIRepository {
   }
 
   func updateDisplayName(_ displayName: String) async throws -> MobileIdentity {
-    let response: UpdateDisplayNameResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: UpdateDisplayNameResponse = try await call(
       method: "UpdateDisplayName",
       requestBody: UpdateDisplayNameRequest(displayName: displayName),
       responseType: UpdateDisplayNameResponse.self
@@ -260,12 +307,44 @@ struct IdentityAPIRepository {
   }
 
   func updateAvatar(_ avatarID: String) async throws -> MobileIdentity {
-    let response: UpdateAvatarResponse = try await client.call(
-      service: "identity.v1.IdentityService",
+    let response: UpdateAvatarResponse = try await call(
       method: "UpdateAvatar",
       requestBody: UpdateAvatarRequest(avatarID: avatarID),
       responseType: UpdateAvatarResponse.self
     )
     return response.user
+  }
+
+  private func call<Request: Encodable, Response: Decodable>(
+    method: String,
+    requestBody: Request,
+    responseType: Response.Type
+  ) async throws -> Response {
+    do {
+      return try await client.call(
+        service: "identity.v1.IdentityService",
+        method: method,
+        requestBody: requestBody,
+        responseType: responseType
+      )
+    } catch {
+      throw IdentityAPIRepositoryError.requestFailed(
+        operation: "identity.v1.IdentityService/\(method)",
+        underlying: error
+      )
+    }
+  }
+}
+
+private enum IdentityAPIRepositoryError: LocalizedError {
+  case requestFailed(operation: String, underlying: Error)
+
+  var errorDescription: String? {
+    switch self {
+    case .requestFailed(let operation, let underlying):
+      let detail = (underlying as? LocalizedError)?.errorDescription
+        ?? underlying.localizedDescription
+      return "\(detail) (API: \(operation))"
+    }
   }
 }

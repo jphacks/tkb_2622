@@ -10,6 +10,7 @@ final class GroupViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    @Published private(set) var loadError: String?
     @Published private(set) var workStarts: [MobileGroupWorkStart] = []
     @Published private(set) var workStartError: String?
     private let repository: any GroupRepository
@@ -23,14 +24,28 @@ final class GroupViewModel: ObservableObject {
     func load() async {
         loadGeneration += 1
         let requestGeneration = loadGeneration
-        state = .loading
+        let previousGroups: [MobileGroup]?
+        if case .loaded(let groups) = state {
+            previousGroups = groups
+        } else {
+            previousGroups = nil
+            state = .loading
+        }
+        loadError = nil
         do {
             let groups = try await repository.fetchGroups()
             guard requestGeneration == loadGeneration else { return }
             state = .loaded(groups)
+            loadError = nil
         } catch {
             guard requestGeneration == loadGeneration else { return }
-            state = .failed(Self.failureMessage(for: error))
+            let message = Self.failureMessage(for: error, operation: .listGroups)
+            if let previousGroups {
+                state = .loaded(previousGroups)
+                loadError = message
+            } else {
+                state = .failed(message)
+            }
         }
     }
 
@@ -60,8 +75,7 @@ final class GroupViewModel: ObservableObject {
                 .sorted { $0.startedAt.date > $1.startedAt.date }
                 .prefix(30))
         } catch {
-            workStartError = (error as? LocalizedError)?.errorDescription
-                ?? "作業開始フィードを更新できませんでした。"
+            workStartError = GroupAPIErrorMessage.describe(error, operation: .workStartFeed)
         }
     }
 
@@ -72,6 +86,7 @@ final class GroupViewModel: ObservableObject {
         } else {
             state = .loaded([group])
         }
+        loadError = nil
         return group
     }
 
@@ -86,6 +101,7 @@ final class GroupViewModel: ObservableObject {
         } else {
             state = .loaded([group])
         }
+        loadError = nil
         return group
     }
 
@@ -97,22 +113,21 @@ final class GroupViewModel: ObservableObject {
         return groupDeleted
     }
 
-    private static func failureMessage(for error: Error) -> String {
+    private static func failureMessage(
+        for error: Error,
+        operation: GroupAPIErrorMessage.Operation
+    ) -> String {
         switch error {
         case GroupRepositoryError.missingConfiguration:
-            return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。"
+            return "設定タブでSupabase Project URL・公開用キー・API URLを設定してください。 (API: \(operation.rawValue))"
         case GroupRepositoryError.invalidConfiguration:
-            return "設定タブのSupabase接続情報とAPI URLを確認してください。"
-        case ConnectJSONClient.ClientError.httpStatus(404):
-            return "接続先のbackendにグループAPIがありません。backendを最新版に更新して再起動してください。"
-        case ConnectJSONClient.ClientError.connect(code: "internal"):
-            return "backend内部エラーです。グループ用DBマイグレーションが適用済みか確認してください。"
-        case ConnectJSONClient.ClientError.connect(code: "failed_precondition"):
-            return "業務User登録が未完了です。設定タブでアカウント接続を再確認してください。"
+            return "設定タブのSupabase接続情報とAPI URLを確認してください。 (API: \(operation.rawValue))"
+        case let clientError as ConnectJSONClient.ClientError:
+            return GroupAPIErrorMessage.describe(clientError, operation: operation)
         case let error as LocalizedError:
-            return error.errorDescription ?? "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+            return GroupAPIErrorMessage.describe(error, operation: operation)
         default:
-            return "グループAPIへ接続できません。API URLとbackendの稼働状態を確認してください。"
+            return GroupAPIErrorMessage.describe(error, operation: operation)
         }
     }
 }

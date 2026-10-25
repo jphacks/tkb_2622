@@ -74,7 +74,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 
 ## 構成と環境変数
 
-- `cmd/api`：HTTPサーバー，JSON形式のslogログ，SIGINT／SIGTERMでの正常終了．
+- `cmd/api`：HTTPサーバー，JSON形式のslogログ，Connect RPCごとのHTTP method／path／status／所要時間記録，SIGINT／SIGTERMでの正常終了．request bodyとAuthorization headerはログに記録しない．
 - `cmd/migrate`：`up`／`down`／`status`コマンド．SQLはバイナリに埋め込みます．
 - `internal/server`：HTTP，Connectハンドラー，公式`connectrpc.com/grpchealth`のハンドラー．
 - `internal/database`：pgx（`database/sql`互換）によるPostgreSQL接続．Supabaseのトランザクションプーラーと両立するよう，サーバー側のprepared statementを使いません．

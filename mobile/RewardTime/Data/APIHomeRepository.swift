@@ -88,25 +88,64 @@ struct APIHomeRepository: HomeRepository {
     private let client: ConnectJSONClient
     private let selectedApplicationCount: Int
 
-    init(baseURL: URL, auth: any AccessTokenProviding, selectedApplicationCount: Int) {
-        client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
+    init(
+        baseURL: URL,
+        auth: any AccessTokenProviding,
+        selectedApplicationCount: Int,
+        session: URLSession = .shared
+    ) {
+        client = ConnectJSONClient(baseURL: baseURL, session: session, tokenProvider: auth)
         self.selectedApplicationCount = selectedApplicationCount
     }
 
+    private func call<Request: Encodable, Response: Decodable>(
+        service: String,
+        method: String,
+        requestBody: Request,
+        responseType: Response.Type
+    ) async throws -> Response {
+        do {
+            return try await client.call(
+                service: service,
+                method: method,
+                requestBody: requestBody,
+                responseType: responseType
+            )
+        } catch {
+            throw APIHomeRepositoryError.requestFailed(
+                operation: "\(service)/\(method)",
+                underlying: error
+            )
+        }
+    }
+
     func fetchCurrentSnapshot() async throws -> MobileHomeSnapshot {
-        async let sessionResponse: CurrentSessionResponse = client.call(
+        for attempt in 0..<2 {
+            do {
+                return try await fetchConsistentSnapshot()
+            } catch APIHomeRepositoryError.inconsistentSessionIDs {
+                guard attempt == 0 else {
+                    throw APIHomeRepositoryError.inconsistentSessionIDs
+                }
+            }
+        }
+        throw APIHomeRepositoryError.inconsistentSessionIDs
+    }
+
+    private func fetchConsistentSnapshot() async throws -> MobileHomeSnapshot {
+        async let sessionResponse: CurrentSessionResponse = call(
             service: "focus.v1.FocusService",
             method: "GetCurrentSession",
             requestBody: EmptyRequest(),
             responseType: CurrentSessionResponse.self
         )
-        async let balanceResponse: BalanceResponse = client.call(
+        async let balanceResponse: BalanceResponse = call(
             service: "reward.v1.RewardService",
             method: "GetBalance",
             requestBody: EmptyRequest(),
             responseType: BalanceResponse.self
         )
-        async let restrictionResponse: RestrictionStateResponse = client.call(
+        async let restrictionResponse: RestrictionStateResponse = call(
             service: "restriction.v1.RestrictionService",
             method: "GetRestrictionState",
             requestBody: EmptyRequest(),
@@ -233,13 +272,18 @@ private struct ProtoJSONInt64: Decodable {
 private enum APIHomeRepositoryError: LocalizedError {
     case inconsistentSessionIDs
     case unexpectedSessionStatus
+    case requestFailed(operation: String, underlying: Error)
 
     var errorDescription: String? {
         switch self {
         case .inconsistentSessionIDs:
-            "作業・残高・制限状態のセッションが一致しません。少し待ってから再読み込みしてください。"
+            return "作業・残高・制限状態のセッションが一致しません。少し待ってから再読み込みしてください。 (API: GetCurrentSession/GetBalance/GetRestrictionState)"
         case .unexpectedSessionStatus:
-            "作業状態を読み取れませんでした。アプリを再読み込みしてください。"
+            return "作業状態を読み取れませんでした。アプリを再読み込みしてください。 (API: focus.v1.FocusService/GetCurrentSession)"
+        case .requestFailed(let operation, let underlying):
+            let detail = (underlying as? LocalizedError)?.errorDescription
+                ?? underlying.localizedDescription
+            return "\(detail) (API: \(operation))"
         }
     }
 }

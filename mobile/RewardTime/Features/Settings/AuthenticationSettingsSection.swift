@@ -4,14 +4,16 @@ import SwiftUI
 struct AuthenticationSettingsSection: View {
   var showsHeading = true
   var showsDeveloperConfiguration = false
+  var allowsAutomaticAPISync = true
   var onAuthenticationChanged: () -> Void = {}
   @AppStorage("mobile.supabase.projectURL") private var projectURLText = ""
   @AppStorage("mobile.supabase.publishableKey") private var publishableKey = ""
-  @AppStorage("mobile.api.baseURL") private var apiBaseURLText = "http://127.0.0.1:8080"
+  @AppStorage("mobile.api.baseURL") private var apiBaseURLText = MobileAppConfiguration.connectAPIBaseURLDefault
   @AppStorage("mobile.auth.lastEmail") private var lastEmail = ""
 
   @State private var email = ""
   @State private var otp = ""
+  @State private var sessionRestoreGate = AuthenticationSessionRestoreGate()
   @State private var isOTPRequested = false
   /// The address the latest code was sent to. Verification always uses this value.
   @State private var requestedEmail: String?
@@ -52,9 +54,16 @@ struct AuthenticationSettingsSection: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("connectAPIBaseURL")
+          if !MobileAppConfiguration.isSimulator && MobileAppConfiguration.isLoopbackURL(apiBaseURLText) {
+            Text("127.0.0.1はiPhone自身を指します。実機ではMacのLAN IPを使ってください。")
+              .font(.caption)
+              .foregroundStyle(.orange)
+              .fixedSize(horizontal: false, vertical: true)
+          }
           }
           .textFieldStyle(.roundedBorder)
           .font(.footnote)
+          .accessibilityIdentifier("developerConnectionSettings")
         }
       #else
         if hasConnectionConfiguration {
@@ -107,6 +116,7 @@ struct AuthenticationSettingsSection: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(AppTheme.primary)
+        .accessibilityIdentifier("sendEmailOTP")
         .disabled(
           isWorking
             || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -146,6 +156,7 @@ struct AuthenticationSettingsSection: View {
     }
     .onAppear {
       if email.isEmpty { email = lastEmail }
+      guard sessionRestoreGate.begin() else { return }
       Task { await restoreSessionIfPresent() }
     }
     .onChange(of: identity?.displayName) { _, newValue in
@@ -312,7 +323,6 @@ struct AuthenticationSettingsSection: View {
         email = sessionEmail
         lastEmail = sessionEmail
       }
-      onAuthenticationChanged()
     } catch {
       setMessage(
         "保存済みのSupabaseログインを確認できませんでした: \(AuthenticationErrorMessage.describe(error))",
@@ -321,7 +331,17 @@ struct AuthenticationSettingsSection: View {
       return
     }
     do {
-      try await loadBusinessIdentity(using: service)
+      let didSync = try await AuthenticatedAPISyncFlow.run(
+        isAuthenticated: allowsAutomaticAPISync
+      ) {
+        try await loadBusinessIdentity(using: service, origin: .automaticSessionRestore)
+      }
+      if !didSync {
+        setMessage(
+          "保存済みのログインはありますが、サーバー同期は端末内利用中のため停止しています。",
+          error: false
+        )
+      }
     } catch {
       setMessage(
         "Supabaseログインは保存されていますが、backendのEnsureUser／GetMeに失敗しました: \(AuthenticationErrorMessage.describe(error))",
@@ -343,7 +363,10 @@ struct AuthenticationSettingsSection: View {
   }
 
   @MainActor
-  private func loadBusinessIdentity(using service: SupabaseAuthService) async throws {
+  private func loadBusinessIdentity(
+    using service: SupabaseAuthService,
+    origin: IdentitySyncOrigin = .userInitiated
+  ) async throws {
     let session = try await service.client.auth.session
     guard let apiBaseURLText = MobileAppConfiguration.connectAPIBaseURL else {
       throw SettingsInputError.invalidURL("Connect API URL")
@@ -369,7 +392,9 @@ struct AuthenticationSettingsSection: View {
     #else
       setMessage("ログインしました。", error: false)
     #endif
-    onAuthenticationChanged()
+    if origin.notifiesRootAuthenticationState {
+      onAuthenticationChanged()
+    }
   }
 
   @MainActor

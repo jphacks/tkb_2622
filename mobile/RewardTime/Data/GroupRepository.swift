@@ -181,12 +181,28 @@ struct APIGroupRepository: GroupRepository {
 
     private let client: ConnectJSONClient
     private let baseURL: URL
-    private let auth: SupabaseAuthService
+    private let authenticatedUserID: () -> String?
+    private let defaults: UserDefaults
 
     init(baseURL: URL, auth: SupabaseAuthService) {
+        self.init(
+            baseURL: baseURL,
+            client: ConnectJSONClient(baseURL: baseURL, tokenProvider: auth),
+            authenticatedUserID: { auth.authenticatedUserID },
+            defaults: .standard
+        )
+    }
+
+    init(
+        baseURL: URL,
+        client: ConnectJSONClient,
+        authenticatedUserID: @escaping () -> String? = { nil },
+        defaults: UserDefaults = .standard
+    ) {
         self.baseURL = baseURL
-        self.auth = auth
-        client = ConnectJSONClient(baseURL: baseURL, tokenProvider: auth)
+        self.client = client
+        self.authenticatedUserID = authenticatedUserID
+        self.defaults = defaults
     }
 
     func fetchGroups() async throws -> [MobileGroup] {
@@ -200,10 +216,9 @@ struct APIGroupRepository: GroupRepository {
     }
 
     func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
-        let userID = auth.authenticatedUserID ?? "unknown"
+        let userID = authenticatedUserID() ?? "unknown"
         let apiLocation = "\(baseURL.scheme ?? "http")-\(baseURL.host ?? "api")-\(baseURL.port ?? 0)"
         let cursorKey = "mobile.group.work-start-cursor.\(apiLocation).\(userID)"
-        let defaults = UserDefaults.standard
         let cursor = defaults.data(forKey: cursorKey)
             .flatMap { try? JSONDecoder().decode(WorkStartCursor.self, from: $0) }
             ?? WorkStartCursor(startedAt: Self.rfc3339String(from: Date()), eventID: nil)

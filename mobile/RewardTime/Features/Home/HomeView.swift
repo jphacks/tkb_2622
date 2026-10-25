@@ -10,29 +10,41 @@ struct HomeView: View {
   private let isAuthenticated: Bool
   private let isVisible: Bool
   private let requestSignIn: () -> Void
+  private let apiSyncError: String?
+  private let retryAPISync: () async -> Void
 
   init(
     repository: any HomeRepository = ConfiguredHomeRepository(),
     screenTime: MobileScreenTimeController,
     isAuthenticated: Bool = true,
     isVisible: Bool = true,
-    requestSignIn: @escaping () -> Void = {}
+    requestSignIn: @escaping () -> Void = {},
+    apiSyncError: String? = nil,
+    retryAPISync: @escaping () async -> Void = {}
   ) {
     _viewModel = StateObject(wrappedValue: HomeViewModel(repository: repository))
     _screenTime = ObservedObject(wrappedValue: screenTime)
     self.isAuthenticated = isAuthenticated
     self.isVisible = isVisible
     self.requestSignIn = requestSignIn
+    self.apiSyncError = apiSyncError
+    self.retryAPISync = retryAPISync
   }
 
   var body: some View {
     ScreenContainer {
       if isAuthenticated {
+        if let apiSyncError {
+          apiSyncWarning(apiSyncError)
+        }
         switch viewModel.state {
         case .loading:
           ProgressView("状態を読み込み中…")
             .frame(maxWidth: .infinity, minHeight: 180)
         case .loaded(let snapshot):
+          if let refreshError = viewModel.refreshError {
+            refreshWarning(refreshError)
+          }
           sessionCard(snapshot)
           rewardBalanceCard(snapshot)
           restrictedAppsCard(snapshot)
@@ -80,14 +92,16 @@ struct HomeView: View {
 
   @MainActor
   private func loadAndReconcile() async {
-    await viewModel.load()
+    let refreshed = await viewModel.refresh()
+    guard refreshed else { return }
     await reconcileLoadedSnapshot()
   }
 
   @MainActor
   private func refreshAndReconcile() async {
-    await viewModel.refresh()
+    let refreshed = await viewModel.refresh()
     guard !Task.isCancelled else { return }
+    guard refreshed else { return }
     await reconcileLoadedSnapshot()
   }
 
@@ -142,6 +156,39 @@ struct HomeView: View {
           .font(.footnote)
           .foregroundStyle(AppTheme.secondaryInk)
       }
+    }
+  }
+
+  private func refreshWarning(_ message: String) -> some View {
+    SurfaceCard {
+      Label("最新の状態を取得できませんでした", systemImage: "wifi.exclamationmark")
+        .font(.subheadline.weight(.semibold))
+      Text("前回取得した内容を表示しています。通信が回復したら再読み込みしてください。")
+        .font(.footnote)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Text(message)
+        .font(.caption)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Button("再試行") { Task { await refreshAndReconcile() } }
+        .buttonStyle(.bordered)
+    }
+  }
+
+  private func apiSyncWarning(_ message: String) -> some View {
+    SurfaceCard {
+      Label("サーバー同期に失敗しました", systemImage: "exclamationmark.triangle.fill")
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.red)
+      Text("詳細を確認し、通信が戻ったら再試行してください。")
+        .font(.footnote)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Text(message)
+        .font(.caption)
+        .foregroundStyle(AppTheme.secondaryInk)
+      Button("同期を再試行") {
+        Task { await retryAPISync() }
+      }
+      .buttonStyle(.bordered)
     }
   }
 
