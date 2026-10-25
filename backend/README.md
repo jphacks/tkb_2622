@@ -116,7 +116,7 @@ RPCはSupabaseのアクセストークンが必要です．画面右上の「Aut
 
 ## Cloud Run向けの準備と実行手順
 
-Cloud Runのサービス（`tkb-<env>-api`）・マイグレーション用Job（`tkb-<env>-migrate`）・Artifact Registry・Secretは[infra](../infra/README.md)のTerraformで作成します．環境変数とSecretの参照もTerraformで設定するため，デプロイではイメージだけを更新します．Supabase上ではAPI実行用ロールを作成し，`app`スキーマへの必要な権限だけを付与します（[インフラ構成](../docs/spec/2.インフラ構成.md)）．以下は実行手順であり，クラウドへのデプロイはまだ行っていません．
+Cloud Runのサービス（`tkb-<env>-api`）・マイグレーション用Job（`tkb-<env>-migrate`）・Artifact Registry・Secretは[infra](../infra/README.md)のTerraformで作成します．環境変数とSecretの参照もTerraformで設定するため，デプロイではイメージだけを更新します．Supabase上ではAPI実行用ロールを作成し，`app`スキーマへの必要な権限だけを付与します（[インフラ構成](../docs/spec/2.インフラ構成.md)）．mainへのマージでGitHub Actions（`.github/workflows/deploy-backend.yml`）がdevに対して同じ手順を実行します．以下は手動で実行する場合の手順です．
 
 1. `ENV`（`dev`／`prod`），`PROJECT_ID`，`REGION`（`asia-northeast1`）を設定し，リポジトリルートでイメージをビルド・公開します．タグはコミットIDなどの固定値にします．
 

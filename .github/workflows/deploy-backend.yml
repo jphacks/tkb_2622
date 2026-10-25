@@ -1,0 +1,21 @@
+name: deploy-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - .github/workflows/_deploy.yml
+      - .github/workflows/deploy-backend.yml
+  workflow_dispatch:
+
+# 再利用ワークフローに渡す権限の上限
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dev:
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      environment: dev
