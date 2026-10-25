@@ -360,44 +360,54 @@ struct HomeView: View {
 
   @ViewBuilder
   private func breakAction(_ snapshot: MobileHomeSnapshot) -> some View {
-    if snapshot.sessionStatus == .paused {
-      if let grantID = snapshot.activeGrantID,
-        let reservedSeconds = snapshot.activeGrantReservedSeconds,
-        ["GRANT_STATUS_RESERVED", "GRANT_STATUS_ACTIVATED"].contains(
-          snapshot.activeGrantStatus ?? "")
-      {
-        NavigationLink {
-          ActiveUsageView(grantID: grantID, reservedSeconds: Int64(reservedSeconds))
-        } label: {
-          Label("利用中の枠を確認", systemImage: "timer")
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(AppTheme.primary)
-      } else {
-        NavigationLink {
-          UsageReservationView(
-            balanceMinutes: snapshot.rewardBalanceMinutes,
-            sessionID: snapshot.sessionID ?? "",
-            sessionVersion: snapshot.sessionVersion ?? 0,
-            screenTime: screenTime
-          )
-        } label: {
-          Label("残高を使う", systemImage: "cup.and.saucer.fill")
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(AppTheme.primary)
-        .disabled(snapshot.rewardBalanceMinutes <= 0)
+    if let grantID = snapshot.activeGrantID,
+       let reservedSeconds = snapshot.activeGrantReservedSeconds,
+       ["GRANT_STATUS_RESERVED", "GRANT_STATUS_ACTIVATED"].contains(snapshot.activeGrantStatus ?? "") {
+      NavigationLink {
+        ActiveUsageView(grantID: grantID, reservedSeconds: Int64(reservedSeconds))
+      } label: {
+        Label("利用中の枠を確認", systemImage: "timer")
+          .font(.headline)
+          .frame(maxWidth: .infinity, minHeight: 52)
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(AppTheme.primary)
+    } else if snapshot.sessionStatus == .paused {
+      NavigationLink {
+        UsageReservationView(
+          balanceMinutes: snapshot.rewardBalanceMinutes,
+          sessionID: snapshot.sessionID ?? "",
+          sessionVersion: snapshot.sessionVersion ?? 0,
+          screenTime: screenTime
+        )
+      } label: {
+        Label("残高を使う", systemImage: "cup.and.saucer.fill")
+          .font(.headline)
+          .frame(maxWidth: .infinity, minHeight: 52)
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(AppTheme.primary)
+      .disabled(snapshot.rewardBalanceMinutes < 5)
+
+      if snapshot.rewardBalanceMinutes < 5 {
+        Label("利用枠は5分からです。あと\(5 - snapshot.rewardBalanceMinutes)分の報酬が必要です。", systemImage: "info.circle")
+          .font(.footnote)
+          .foregroundStyle(AppTheme.secondaryInk)
       }
     } else {
+      Button {} label: {
+        Label("残高を使う", systemImage: "cup.and.saucer.fill")
+          .font(.headline)
+          .frame(maxWidth: .infinity, minHeight: 52)
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(AppTheme.primary)
+      .disabled(true)
+
       Label {
-        Text(
-          snapshot.sessionStatus == .working
-            ? "残高を使うには、Macで作業を一時停止してください。"
-            : "作業セッション中の小休憩で残高を使えます。")
+        Text(snapshot.sessionStatus == .working
+          ? "Macで作業を一時停止すると、報酬を利用できます。"
+          : "Macで作業を開始すると、作業中に貯めた報酬を利用できます。")
       } icon: {
         Image(systemName: "info.circle")
       }
