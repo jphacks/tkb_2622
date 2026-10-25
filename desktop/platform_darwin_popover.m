@@ -37,6 +37,8 @@ static NSTextField *FLLabel(NSString *value, NSFont *font, NSColor *color) {
     label.lineBreakMode = NSLineBreakByTruncatingTail;
     label.cell.usesSingleLineMode = YES;
     label.cell.wraps = NO;
+    [label.widthAnchor constraintLessThanOrEqualToConstant:292].active = YES;
+    [label setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     return label;
 }
 
@@ -77,6 +79,7 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     BOOL _nameEntryExpanded;
 }
 - (void)buttonPressed:(NSButton *)sender;
+- (void)updatePrimaryButtonTextColor;
 - (void)setStatusPanelHeight:(CGFloat)height;
 - (CGFloat)preferredHeightForState:(NSDictionary *)state;
 @end
@@ -85,6 +88,7 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 
 - (void)loadView {
     NSVisualEffectView *root = [[[NSVisualEffectView alloc] initWithFrame:NSMakeRect(0, 0, 320, 220)] autorelease];
+    [root.widthAnchor constraintEqualToConstant:320].active = YES;
     root.material = NSVisualEffectMaterialPopover;
     root.blendingMode = NSVisualEffectBlendingModeBehindWindow;
     root.state = NSVisualEffectStateActive;
@@ -120,6 +124,8 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     _nameField.translatesAutoresizingMaskIntoConstraints = NO;
     _nameField.hidden = YES;
     [_nameField.heightAnchor constraintEqualToConstant:32].active = YES;
+    [_nameField.widthAnchor constraintLessThanOrEqualToConstant:292].active = YES;
+    [_nameField setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
     [stack addArrangedSubview:_nameField];
 
     _timerCard = FLStack(NSUserInterfaceLayoutOrientationVertical, 3);
@@ -187,6 +193,12 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     return button;
 }
 
+- (void)updatePrimaryButtonTextColor {
+    NSColor *textColor = _primaryButton.enabled ? NSColor.whiteColor : NSColor.disabledControlTextColor;
+    NSAttributedString *title = [[[NSAttributedString alloc] initWithString:_primaryButton.title attributes:@{ NSForegroundColorAttributeName: textColor }] autorelease];
+    _primaryButton.attributedTitle = title;
+}
+
 - (NSButton *)linkButtonWithTitle:(NSString *)title tag:(NSInteger)tag {
     NSButton *button = [NSButton buttonWithTitle:title target:self action:@selector(buttonPressed:)];
     button.tag = tag;
@@ -235,18 +247,22 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     BOOL canRetry = FLAllowed(state, @"retry");
 
     _statusLabel.stringValue = state[@"statusLabel"] ?: @"作業開始前";
+    _statusLabel.toolTip = _statusLabel.stringValue;
     _statusLabel.textColor = isRunning ? NSColor.systemGreenColor : (isPaused || isPending ? NSColor.systemOrangeColor : NSColor.secondaryLabelColor);
     _taskLabel.stringValue = state[@"taskDescription"] ?: @"タスクがありません";
     _taskLabel.toolTip = _taskLabel.stringValue;
     _taskHintLabel.stringValue = state[@"taskHint"] ?: @"";
+    _taskHintLabel.toolTip = _taskHintLabel.stringValue;
     _taskHintLabel.hidden = _taskHintLabel.stringValue.length == 0;
     _timerLabel.stringValue = state[@"elapsed"] ?: @"0:00:00";
     _timerHintLabel.stringValue = state[@"timerHint"] ?: @"";
+    _timerHintLabel.toolTip = _timerHintLabel.stringValue;
     _timerHintLabel.hidden = _timerHintLabel.stringValue.length == 0;
     _balanceLabel.stringValue = state[@"balance"] ?: @"";
+    _balanceLabel.toolTip = _balanceLabel.stringValue;
     _balanceLabel.hidden = _balanceLabel.stringValue.length == 0;
     _detailLabel.stringValue = detail;
-    _detailLabel.toolTip = detail;
+    _detailLabel.toolTip = state[@"detailTooltip"] ?: detail;
     _detailLabel.hidden = detail.length == 0;
 
     if (!isIdle) {
@@ -261,10 +277,11 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
 
     if (isIdle) {
         _primaryButton.hidden = NO;
-        _primaryButton.title = hasTask ? @"作業を開始" : @"設定を開く";
+        BOOL retryableStart = [state[@"startRetryable"] boolValue];
+        _primaryButton.title = hasTask ? (retryableStart ? @"再試行" : @"作業を開始") : @"設定を開く";
         _primaryButton.tag = hasTask ? FLPopoverActionStart : FLPopoverOpenSettings;
         _primaryButton.enabled = !_busy && (hasTask ? FLAllowed(state, @"start") : YES);
-        _primaryButton.toolTip = hasTask ? FLReason(state, @"start") : @"";
+        _primaryButton.toolTip = hasTask ? (retryableStart ? (state[@"detailTooltip"] ?: FLReason(state, @"start")) : FLReason(state, @"start")) : @"";
     } else if (isRunning) {
         _primaryButton.hidden = NO;
         _primaryButton.title = @"一時停止";
@@ -300,12 +317,14 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     _settingsButton.enabled = !_busy;
     _feedbackButton.enabled = !_busy && [state[@"hasResult"] boolValue];
     _feedbackButton.hidden = ![state[@"hasResult"] boolValue];
+    [self updatePrimaryButtonTextColor];
 }
 
 - (void)setBusy:(BOOL)busy {
     _busy = busy;
     if (busy) {
         _detailLabel.stringValue = @"処理しています…";
+        _detailLabel.toolTip = _detailLabel.stringValue;
         _detailLabel.hidden = NO;
         _primaryButton.enabled = NO;
         _secondaryButton.enabled = NO;
@@ -317,6 +336,7 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     } else if (_lastState != nil) {
         [self updateWithState:_lastState];
     }
+    [self updatePrimaryButtonTextColor];
 }
 
 - (void)dealloc {
