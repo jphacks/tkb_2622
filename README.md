@@ -38,7 +38,7 @@
 - デスクトップアプリでは，UIを軽量かつモダンなUIにするために，React×Wails　v2を用いた．
 
 ## 開発技術
-(アーキテクチャー図)[./docs/graph/tkb_architecture.png]
+![アーキテクチャー図](docs/graph/tkb_architecture.png)
 
 ### 活用した技術
 
