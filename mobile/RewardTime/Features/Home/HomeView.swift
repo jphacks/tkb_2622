@@ -230,7 +230,8 @@ struct HomeView: View {
   private func restrictedAppsCard(_ snapshot: MobileHomeSnapshot) -> some View {
     let isSelectingApps = screenTime.restrictionMode == .selectedApplications
     let hasLocalSelection =
-      isSelectingApps && (screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData)
+      (isSelectingApps && (screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData))
+      || (!isSelectingApps && screenTime.hasValidSafariSelection)
     let selectedTokens = Array(screenTime.restrictedApplicationTokens)
     let count =
       hasLocalSelection
@@ -239,7 +240,7 @@ struct HomeView: View {
 
     return SurfaceCard {
       HStack {
-        Text(isSelectingApps ? "制限するアプリ" : "標準以外のアプリ")
+        Text(isSelectingApps ? "制限するアプリ" : "制限対象のSafari")
           .font(.subheadline.weight(.bold))
         Spacer()
         Text(isSelectingApps ? "\(count)個" : "対象")
@@ -251,7 +252,7 @@ struct HomeView: View {
       }
 
       if !isSelectingApps {
-        Text("常時許可に選んだアプリを除くすべてのアプリにShieldを設定します。")
+        Text("SafariだけにShieldを設定します。設定でSafariを1つ選択してください。")
           .font(.footnote)
           .foregroundStyle(AppTheme.secondaryInk)
       } else if hasLocalSelection && !selectedTokens.isEmpty {
@@ -295,7 +296,7 @@ struct HomeView: View {
             ? "スクリーンタイムを許可すると、設定から対象アプリを選べます。"
             : (screenTime.restrictionMode == .selectedApplications
               ? "設定から制限するアプリを選べます。"
-              : "設定から常時許可するアプリを選べます。")
+              : "設定からSafariを制限対象に選べます。")
         )
         .font(.footnote)
         .foregroundStyle(AppTheme.secondaryInk)

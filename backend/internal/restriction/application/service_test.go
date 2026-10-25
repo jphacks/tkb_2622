@@ -19,7 +19,7 @@ func TestUpdatePolicyRebindsStateToNewRegisteredIPhone(t *testing.T) {
 		policy: domain.Policy{
 			UserID: userID, DeviceID: newDeviceID, Enabled: true, Configured: true,
 			TargetMode: "SELECTED_APPS", UsageTimeMode: "ACTIVE_USAGE",
-			AllowedAppsPolicy: "STANDARD_APPS_EXCEPT_SAFARI", Version: 1,
+			AllowedAppsPolicy: "ALL_APPS_EXCEPT_SAFARI", Version: 1,
 		},
 		state: domain.State{
 			UserID: userID, DeviceID: oldDeviceID, SessionID: uuid.NewString(),

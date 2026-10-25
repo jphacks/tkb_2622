@@ -322,7 +322,7 @@ func (s *Service) UpdatePolicy(ctx context.Context, a Actor, in PolicyInput) (ou
 			if in.ExpectedVersion != 0 {
 				return "", apperr.ErrConflict
 			}
-			p = Policy{DeviceID: in.DeviceID, UserID: a.UserID, UsageTimeMode: "ACTIVE_USAGE", AllowedAppsPolicy: "STANDARD_APPS_EXCEPT_SAFARI"}
+			p = Policy{DeviceID: in.DeviceID, UserID: a.UserID, UsageTimeMode: "ACTIVE_USAGE", AllowedAppsPolicy: "ALL_APPS_EXCEPT_SAFARI"}
 		case e != nil:
 			return "", e
 		case p.Version != in.ExpectedVersion:

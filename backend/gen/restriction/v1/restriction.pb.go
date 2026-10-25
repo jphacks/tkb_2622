@@ -521,7 +521,7 @@ type RestrictionPolicy struct {
 	TargetMode TargetMode             `protobuf:"varint,3,opt,name=target_mode,json=targetMode,proto3,enum=restriction.v1.TargetMode" json:"target_mode,omitempty"`
 	// Fixed for now: ACTIVE_USAGE.
 	UsageTimeMode string `protobuf:"bytes,4,opt,name=usage_time_mode,json=usageTimeMode,proto3" json:"usage_time_mode,omitempty"`
-	// Fixed for now: STANDARD_APPS_EXCEPT_SAFARI.
+	// Fixed for now: ALL_APPS_EXCEPT_SAFARI. Device tokens remain on the iPhone.
 	AllowedAppsPolicy string `protobuf:"bytes,5,opt,name=allowed_apps_policy,json=allowedAppsPolicy,proto3" json:"allowed_apps_policy,omitempty"`
 	// Version of the app selection kept on the device.
 	DeviceConfigVersion int64 `protobuf:"varint,6,opt,name=device_config_version,json=deviceConfigVersion,proto3" json:"device_config_version,omitempty"`

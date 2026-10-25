@@ -112,8 +112,7 @@ final class UsageReservationViewModel: ObservableObject {
             try DeviceActivityUsageMonitor().start(
                 operationID: operationID,
                 reservedSeconds: requestedSeconds,
-                selection: screenTime.selection,
-                alwaysAllowedSelection: screenTime.alwaysAllowedSelection
+                applications: screenTime.restrictedApplicationTokens
             )
             let repository = try ConfiguredUsageGrantRepository()
             let result = try await repository.reserve(

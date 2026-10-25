@@ -6,7 +6,7 @@ import ManagedSettings
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private let appGroup = "group.com.example.tkb2622.mobile"
     private let selectionKey = "mobile.screenTime.selection"
-    private let alwaysAllowedSelectionKey = "mobile.screenTime.alwaysAllowedSelection"
+    private let safariSelectionKey = "mobile.screenTime.safariSelection"
     private let restrictionModeKey = "mobile.screenTime.restrictionMode"
 
     override func eventDidReachThreshold(
@@ -46,36 +46,38 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let store = ManagedSettingsStore()
         let mode = defaults.string(forKey: restrictionModeKey) ?? "selectedApplications"
         if mode == "entireDevice" {
-            store.shield.applications = nil
-            store.shield.applicationCategories = .all(except: Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey))
+            guard let tokens = Self.applicationTokens(from: defaults, key: safariSelectionKey), tokens.count == 1 else {
+                failClosed(store: store, defaults: defaults, error: "missing_safari_selection")
+                return
+            }
+            store.shield.applicationCategories = nil
+            store.shield.applications = tokens
             defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
             return
         }
 
-        guard let data = defaults.data(forKey: selectionKey),
-              let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data),
-              !selection.applicationTokens.subtracting(
-                  Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey)
-              ).isEmpty else {
-            store.shield.applications = nil
-            store.shield.applicationCategories = .all(except: Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey))
-            defaults.set("missing_selection", forKey: "mobile.usage.monitorError")
-            defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
+        guard let tokens = Self.applicationTokens(from: defaults, key: selectionKey), !tokens.isEmpty else {
+            failClosed(store: store, defaults: defaults, error: "missing_selection")
             return
         }
         store.shield.applicationCategories = nil
-        store.shield.applications = selection.applicationTokens.subtracting(
-            Self.alwaysAllowedTokens(from: defaults, key: alwaysAllowedSelectionKey)
-        )
+        store.shield.applications = tokens
         defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
     }
 
-    private static func alwaysAllowedTokens(from defaults: UserDefaults, key: String) -> Set<ApplicationToken> {
+    private static func applicationTokens(from defaults: UserDefaults, key: String) -> Set<ApplicationToken>? {
         guard let data = defaults.data(forKey: key),
               let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) else {
-            return []
+            return nil
         }
         return selection.applicationTokens
+    }
+
+    private func failClosed(store: ManagedSettingsStore, defaults: UserDefaults, error: String) {
+        store.shield.applications = nil
+        store.shield.applicationCategories = .all()
+        defaults.set(error, forKey: "mobile.usage.monitorError")
+        defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
     }
 
     private static func reportedSeconds(from eventName: String) -> Int? {

@@ -6,7 +6,7 @@ struct SettingsView: View {
     @ObservedObject var screenTime: MobileScreenTimeController
     private let isAuthenticated: Bool
     @State private var isFamilyActivityPickerPresented = false
-    @State private var isPickingAlwaysAllowedApps = false
+    @State private var isPickingSafari = false
     @State private var isSyncingDeviceSettings = false
     @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
@@ -145,24 +145,26 @@ struct SettingsView: View {
                     }
                 }
 
-                DisclosureGroup {
-                    Text("標準アプリを選びます。Safariは含めないでください。")
+                if screenTime.restrictionMode == .entireDevice {
+                    HStack {
+                        Label("Safariのみ制限", systemImage: "safari")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text(screenTime.hasValidSafariSelection ? "選択済み" : "未選択")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(screenTime.hasValidSafariSelection ? AppTheme.teal : AppTheme.secondaryInk)
+                    }
+                    Text("アプリ一覧からSafariを1つだけ選択してください。")
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                     Button {
-                        isPickingAlwaysAllowedApps = true
+                        isPickingSafari = true
                         isFamilyActivityPickerPresented = true
                     } label: {
-                        Label("アプリを選択", systemImage: "checkmark.app")
+                        Label(screenTime.hasValidSafariSelection ? "Safariを選び直す" : "Safariを選択", systemImage: "safari")
                     }
                     .buttonStyle(.bordered)
                     .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
-                } label: {
-                    Label(
-                        "常に許可するアプリ · \(screenTime.alwaysAllowedSelection.applicationTokens.count)",
-                        systemImage: "checkmark.shield"
-                    )
-                    .font(.subheadline.weight(.medium))
                 }
 
                 Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "lock.fill")
@@ -218,16 +220,16 @@ struct SettingsView: View {
             if authenticated { Task { await syncDeviceSettings() } }
         }
         .familyActivityPicker(
-            headerText: isPickingAlwaysAllowedApps ? "常時許可するアプリを選択" : "制限するアプリを選択",
-            footerText: isPickingAlwaysAllowedApps ? "常時許可するApple標準アプリを選びます。Safariは選択しないでください。" : nil,
+            headerText: isPickingSafari ? "制限するSafariを選択" : "制限するアプリを選択",
+            footerText: isPickingSafari ? "Safariを1つだけ選択してください。" : nil,
             isPresented: $isFamilyActivityPickerPresented,
             selection: Binding(
                 get: {
-                    isPickingAlwaysAllowedApps ? screenTime.alwaysAllowedSelection : screenTime.selection
+                    isPickingSafari ? screenTime.safariSelection : screenTime.selection
                 },
                 set: { newSelection in
-                    if isPickingAlwaysAllowedApps {
-                        screenTime.alwaysAllowedSelection = newSelection
+                    if isPickingSafari {
+                        screenTime.safariSelection = newSelection
                     } else {
                         screenTime.selection = newSelection
                     }
