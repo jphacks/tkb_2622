@@ -1,6 +1,7 @@
 import DeviceActivity
 import FamilyControls
 import Foundation
+import ManagedSettings
 
 enum ScreenTimeSharedStorage {
     static let appGroup = "group.com.example.tkb2622.mobile"
