@@ -29,26 +29,28 @@ private struct FocusRoomProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (FocusRoomEntry) -> Void) {
-        completion(makeEntry(at: .now, phase: 0))
+        completion(makeEntry(at: .now))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<FocusRoomEntry>) -> Void) {
         let now = Date()
         let isLocalPreview = isLocalPreviewEnabled
         let snapshot = readSnapshot() ?? (isLocalPreview ? localPreviewSnapshot() : nil)
-        let entries = (0..<4).map { phase in
+        let entries = FocusRoomTimeline.dates(
+            now: now, updatedAt: snapshot?.updatedAt, isLocalPreview: isLocalPreview
+        ).map { date in
             FocusRoomEntry(
-                date: now.addingTimeInterval(TimeInterval(phase * 4 * 60)),
+                date: date,
                 members: snapshot?.members ?? [],
                 updatedAt: snapshot?.updatedAt,
                 isLocalPreview: isLocalPreview,
-                movementPhase: phase
+                movementPhase: FocusRoomTimeline.movementPhase(at: date)
             )
         }
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(15 * 60))))
     }
 
-    private func makeEntry(at date: Date, phase: Int) -> FocusRoomEntry {
+    private func makeEntry(at date: Date) -> FocusRoomEntry {
         let isLocalPreview = isLocalPreviewEnabled
         let snapshot = readSnapshot() ?? (isLocalPreview ? localPreviewSnapshot() : nil)
         return FocusRoomEntry(
@@ -56,7 +58,7 @@ private struct FocusRoomProvider: TimelineProvider {
             members: snapshot?.members ?? [],
             updatedAt: snapshot?.updatedAt,
             isLocalPreview: isLocalPreview,
-            movementPhase: phase
+            movementPhase: FocusRoomTimeline.movementPhase(at: date)
         )
     }
 
@@ -87,11 +89,15 @@ private struct FocusRoomProvider: TimelineProvider {
 private struct FocusRoomWidgetView: View {
     let entry: FocusRoomEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+
+    private var shouldAnimate: Bool { !reduceMotion && !isLuminanceReduced }
 
     private var isStale: Bool {
         if entry.isLocalPreview { return false }
         guard let updatedAt = entry.updatedAt else { return true }
-        return entry.date.timeIntervalSince(updatedAt) >= 12 * 60
+        return entry.date.timeIntervalSince(updatedAt) >= FocusRoomTimeline.maximumSnapshotAge
     }
 
     var body: some View {
@@ -129,7 +135,7 @@ private struct FocusRoomWidgetView: View {
                     characterRow
                         .padding(.horizontal, 12)
                         .padding(.bottom, 23)
-                        .animation(.easeInOut(duration: 1.4), value: entry.movementPhase)
+                        .animation(shouldAnimate ? .easeInOut(duration: 1.4) : nil, value: entry.movementPhase)
                 }
             }
             .clipped()
@@ -146,6 +152,10 @@ private struct FocusRoomWidgetView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: characterSize, height: characterSize)
+                        .rotationEffect(
+                            .degrees(shouldAnimate ? ((index + entry.movementPhase).isMultiple(of: 2) ? -4 : 4) : 0),
+                            anchor: .bottom
+                        )
                     Text(member.displayName)
                         .font(.system(size: family == .systemSmall ? 8 : 9, weight: .medium, design: .rounded))
                         .foregroundStyle(Color(red: 0.32, green: 0.26, blue: 0.20))
@@ -153,8 +163,8 @@ private struct FocusRoomWidgetView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .offset(
-                    x: movementOffset(for: index),
-                    y: (index + entry.movementPhase).isMultiple(of: 2) ? -3 : 2
+                    x: shouldAnimate ? movementOffset(for: index) : 0,
+                    y: shouldAnimate ? ((index + entry.movementPhase).isMultiple(of: 2) ? -3 : 2) : 0
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
