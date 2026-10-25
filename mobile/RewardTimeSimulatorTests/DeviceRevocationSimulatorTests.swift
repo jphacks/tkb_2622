@@ -361,6 +361,13 @@ final class DeviceRevocationSimulatorTests: XCTestCase {
         XCTAssertNil(gate.finish())
     }
 
+    func testAuthenticationSettingsRestoreRunsOnlyOncePerViewLifetime() {
+        var gate = AuthenticationSessionRestoreGate()
+
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(gate.begin(), "Tab reappearance must not recheck session or resync identity APIs")
+    }
+
     @MainActor
     func testGroupWorkStartPollingUsesActionableConnectErrorMessage() async throws {
         let repository = WorkStartFailureGroupRepository(

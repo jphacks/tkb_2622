@@ -13,6 +13,7 @@ struct AuthenticationSettingsSection: View {
 
   @State private var email = ""
   @State private var otp = ""
+  @State private var sessionRestoreGate = AuthenticationSessionRestoreGate()
   @State private var isOTPRequested = false
   /// The address the latest code was sent to. Verification always uses this value.
   @State private var requestedEmail: String?
@@ -149,6 +150,7 @@ struct AuthenticationSettingsSection: View {
     }
     .onAppear {
       if email.isEmpty { email = lastEmail }
+      guard sessionRestoreGate.begin() else { return }
       Task { await restoreSessionIfPresent() }
     }
     .onChange(of: identity?.displayName) { _, newValue in

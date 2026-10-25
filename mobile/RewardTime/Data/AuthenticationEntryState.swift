@@ -24,3 +24,13 @@ enum AuthenticationEntryState: Equatable {
     return currentState == .checking || currentState == .identitySyncRequired
   }
 }
+
+struct AuthenticationSessionRestoreGate {
+  private(set) var hasStarted = false
+
+  mutating func begin() -> Bool {
+    guard !hasStarted else { return false }
+    hasStarted = true
+    return true
+  }
+}
