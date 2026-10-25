@@ -660,7 +660,11 @@ func (e *Engine) updateActions() {
 		e.state.Actions["start"] = Capability{Reason: "サーバーに未終了の作業があります。状態を確認してから開始してください。"}
 	}
 	if !rules["start"] && e.state.Account.Status == "error" {
-		e.state.Actions["start"] = Capability{Reason: "ログイン状態を確認できません。設定から再接続してください。"}
+		reason := "アカウント状態を確認できません。設定から再接続してください。"
+		if strings.Contains(e.state.Account.Message, "サーバーに接続できませんでした") {
+			reason = "サーバーに接続できません。ネットワークと接続先を確認して再接続してください。"
+		}
+		e.state.Actions["start"] = Capability{Reason: reason}
 	}
 	if cloudOperationPending && active {
 		message := "サーバーへの作業状態の同期が終わるまでお待ちください。"

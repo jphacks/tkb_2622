@@ -12,6 +12,7 @@ enum {
     FLPopoverActionFinish,
     FLPopoverActionAbort,
     FLPopoverActionRetry,
+    FLPopoverActionReconnect,
     FLPopoverToggleName,
     FLPopoverOpenDashboard,
     FLPopoverOpenHistory,
@@ -311,10 +312,11 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
     if (isIdle) {
         _primaryButton.hidden = NO;
         BOOL retryableStart = [state[@"startRetryable"] boolValue];
-        _primaryButton.title = hasTask ? (retryableStart ? @"再試行" : @"作業を開始") : @"設定を開く";
-        _primaryButton.tag = hasTask ? FLPopoverActionStart : FLPopoverOpenSettings;
-        _primaryButton.enabled = !_busy && (hasTask ? FLAllowed(state, @"start") : YES);
-        _primaryButton.toolTip = hasTask ? (retryableStart ? (state[@"detailTooltip"] ?: FLReason(state, @"start")) : FLReason(state, @"start")) : @"";
+        BOOL canReconnect = [state[@"canReconnect"] boolValue];
+        _primaryButton.title = hasTask ? (canReconnect ? @"再接続" : (retryableStart ? @"再試行" : @"作業を開始")) : @"設定を開く";
+        _primaryButton.tag = hasTask ? (canReconnect ? FLPopoverActionReconnect : FLPopoverActionStart) : FLPopoverOpenSettings;
+        _primaryButton.enabled = !_busy && (hasTask ? (canReconnect || FLAllowed(state, @"start")) : YES);
+        _primaryButton.toolTip = hasTask ? (canReconnect ? FLReason(state, @"start") : (retryableStart ? (state[@"detailTooltip"] ?: FLReason(state, @"start")) : FLReason(state, @"start"))) : @"";
     } else if (isRunning) {
         _primaryButton.hidden = NO;
         _primaryButton.title = @"一時停止";
@@ -411,6 +413,9 @@ static NSString *FLReason(NSDictionary *state, NSString *action) {
             return;
         case FLPopoverActionRetry:
             FocusLinkDispatchPopoverAction("retry", "");
+            return;
+        case FLPopoverActionReconnect:
+            FocusLinkDispatchPopoverAction("reconnect", "");
             return;
         case FLPopoverOpenDashboard:
             FocusLinkDispatchOpenPage("session");

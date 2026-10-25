@@ -54,6 +54,7 @@ type popoverState struct {
 	HasTask         bool              `json:"hasTask"`
 	HasResult       bool              `json:"hasResult"`
 	StartRetryable  bool              `json:"startRetryable"`
+	CanReconnect    bool              `json:"canReconnect"`
 	Start           popoverCapability `json:"start"`
 	Pause           popoverCapability `json:"pause"`
 	Resume          popoverCapability `json:"resume"`
@@ -126,7 +127,7 @@ func updateNativePopover(snapshot session.Snapshot) {
 }
 
 func makePopoverState(snapshot session.Snapshot) popoverState {
-	view := popoverState{Status: "idle", StatusLabel: "作業開始前", Elapsed: "0:00:00"}
+	view := popoverState{Status: "idle", StatusLabel: "作業開始前", Elapsed: "0:00:00", CanReconnect: snapshot.Account.Status == "error"}
 	view.Start = capability(snapshot, "start")
 	view.Pause = capability(snapshot, "pause")
 	view.Resume = capability(snapshot, "resume")
@@ -296,7 +297,7 @@ func FocusLinkPopoverAction(cAction *C.char, cName *C.char) {
 		return
 	}
 	action := C.GoString(cAction)
-	if action != "start" && action != "pause" && action != "resume" && action != "finish" && action != "abort" && action != "retry" {
+	if action != "start" && action != "pause" && action != "resume" && action != "finish" && action != "abort" && action != "retry" && action != "reconnect" {
 		return
 	}
 	name := ""
@@ -305,6 +306,12 @@ func FocusLinkPopoverAction(cAction *C.char, cName *C.char) {
 	}
 	C.FocusLinkSetPopoverBusy(1)
 	go func() {
+		if action == "reconnect" {
+			updated := host.API.GetStartupState()
+			updateNativePopover(updated)
+			C.FocusLinkSetPopoverBusy(0)
+			return
+		}
 		before := host.CurrentSnapshot()
 		updated := host.API.Execute(session.Command{Action: action, Name: name})
 		updateNativePopover(updated)
