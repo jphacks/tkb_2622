@@ -150,6 +150,10 @@ func (w *statusRecorder) Unwrap() http.ResponseWriter { return w.ResponseWriter 
 func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
+		logger.Info("HTTP request started",
+			"method", r.Method,
+			"path", r.URL.Path,
+		)
 		recorder := &statusRecorder{ResponseWriter: w}
 		next.ServeHTTP(recorder, r)
 		status := recorder.status
