@@ -268,7 +268,23 @@ func (r *Recorder) ReadRecords() ([]Record, error) {
 	if r.filePath == "" || r.sessionID == "" {
 		return nil, errors.New("session capture path unavailable")
 	}
-	file, err := os.Open(r.filePath)
+	return readSessionRecords(r.filePath, r.sessionID)
+}
+
+func ReadSessionRecords(sessionID string) ([]Record, error) {
+	if !validSessionID(sessionID) {
+		return nil, errors.New("invalid session id")
+	}
+	configDirectory, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("user config directory unavailable: %w", err)
+	}
+	filePath := filepath.Join(configDirectory, "Focus Link", "sessions", sessionID+".jsonl")
+	return readSessionRecords(filePath, sessionID)
+}
+
+func readSessionRecords(filePath, sessionID string) ([]Record, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("session capture could not be opened: %w", err)
 	}
@@ -282,7 +298,7 @@ func (r *Recorder) ReadRecords() ([]Record, error) {
 		if err := json.Unmarshal(scanner.Bytes(), &value); err != nil {
 			return nil, fmt.Errorf("session capture record is invalid: %w", err)
 		}
-		if value.SessionID != r.sessionID {
+		if value.SessionID != sessionID {
 			return nil, errors.New("session capture contains a different session id")
 		}
 		records = append(records, value)

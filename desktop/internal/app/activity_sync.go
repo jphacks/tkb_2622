@@ -284,14 +284,7 @@ func sameActivitySegments(a, b []cloud.ActivitySegment) bool {
 }
 
 func (a *App) repairOutboxPauseGaps(state *activitySyncState) (bool, error) {
-	a.mu.Lock()
-	recorder := a.recorder
-	if recorder == nil {
-		a.mu.Unlock()
-		return false, nil
-	}
-	records, err := recorder.ReadRecords()
-	a.mu.Unlock()
+	records, err := monitor.ReadSessionRecords(state.SessionID)
 	if err != nil {
 		return false, err
 	}
