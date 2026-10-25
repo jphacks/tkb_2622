@@ -71,6 +71,7 @@ macOSではメニューバー、Windowsではタスクトレイから作業画�
 - デスクトップはWails v2とReactを組み合わせ、画面とGoによる端末内処理を連携させます。
 
 ## 開発技術
+<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/06691e71-8e76-4ba5-9778-c7062b9e3ab1" />
 
 ![アーキテクチャー図](docs/graph/tkb_architecture.png)
 
