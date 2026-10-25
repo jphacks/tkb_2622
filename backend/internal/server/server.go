@@ -78,10 +78,14 @@ func (d Devices) ActiveIPhone(ctx context.Context, userID string) (string, error
 // Handler exposes only process health; it intentionally does not probe the database.
 func Handler(d Deps) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	health := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("{\"status\":\"ok\"}\n"))
-	})
+	}
+	mux.HandleFunc("GET /healthz", health)
+	// Cloud Run reserves paths ending in "z", so /healthz never reaches the container there.
+	// The Cloudflare Worker forwards /healthz to /health.
+	mux.HandleFunc("GET /health", health)
 	mux.Handle(grpchealth.NewHandler(grpchealth.NewStaticChecker()))
 	auth := connect.WithInterceptors(identityconnect.AuthInterceptor(d.Verifier))
 	mux.Handle(identityv1connect.NewIdentityServiceHandler(identityconnect.New(d.Identity), auth, connect.WithReadMaxBytes(64*1024)))
