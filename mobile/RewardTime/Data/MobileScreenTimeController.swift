@@ -182,7 +182,6 @@ final class MobileScreenTimeController: ObservableObject {
         hasAppliedRestriction = true
         ScreenTimeSharedStorage.defaults.set("SHIELD_STATUS_SHIELDED", forKey: "mobile.usage.localShieldStatus")
         errorMessage = nil
-        statusMessage = "指定したアプリをiPhoneに設定しました。対象アプリを開いてShield画面が表示されるか確認してください。"
         return true
     }
 
