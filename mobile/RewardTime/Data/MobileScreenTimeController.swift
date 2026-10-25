@@ -322,6 +322,9 @@ final class MobileScreenTimeController: ObservableObject {
                 failureReason: failureReason,
                 appliedAt: appliedAt
             )
+            if status != "SHIELD_STATUS_ERROR" {
+                errorMessage = nil
+            }
             shared.removeObject(forKey: operationKey)
             shared.removeObject(forKey: appliedAtKey)
             shared.removeObject(forKey: requestFingerprintKey)
