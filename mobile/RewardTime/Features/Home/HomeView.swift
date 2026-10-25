@@ -228,10 +228,7 @@ struct HomeView: View {
   }
 
   private func restrictedAppsCard(_ snapshot: MobileHomeSnapshot) -> some View {
-    let isSelectingApps = screenTime.restrictionMode == .selectedApplications
-    let hasLocalSelection =
-      (isSelectingApps && (screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData))
-      || (!isSelectingApps && screenTime.hasValidSafariSelection)
+    let hasLocalSelection = screenTime.hasSelectionBeenConfigured || !snapshot.isSampleData
     let selectedTokens = Array(screenTime.restrictedApplicationTokens)
     let count =
       hasLocalSelection
@@ -240,10 +237,10 @@ struct HomeView: View {
 
     return SurfaceCard {
       HStack {
-        Text(isSelectingApps ? "制限するアプリ" : "制限対象のSafari")
+        Text("制限するアプリ")
           .font(.subheadline.weight(.bold))
         Spacer()
-        Text(isSelectingApps ? "\(count)個" : "対象")
+        Text("\(count)個")
           .font(.caption.weight(.semibold))
           .foregroundStyle(AppTheme.primary)
           .padding(.horizontal, 10)
@@ -251,11 +248,7 @@ struct HomeView: View {
           .background(AppTheme.lavender, in: Capsule())
       }
 
-      if !isSelectingApps {
-        Text("SafariだけにShieldを設定します。設定でSafariを1つ選択してください。")
-          .font(.footnote)
-          .foregroundStyle(AppTheme.secondaryInk)
-      } else if hasLocalSelection && !selectedTokens.isEmpty {
+      if hasLocalSelection && !selectedTokens.isEmpty {
         LazyVGrid(
           columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
           alignment: .leading, spacing: 8
@@ -294,9 +287,7 @@ struct HomeView: View {
         Text(
           !screenTime.isAuthorized
             ? "スクリーンタイムを許可すると、設定から対象アプリを選べます。"
-            : (screenTime.restrictionMode == .selectedApplications
-              ? "設定から制限するアプリを選べます。"
-              : "設定からSafariを制限対象に選べます。")
+            : "設定から制限するアプリを選べます。"
         )
         .font(.footnote)
         .foregroundStyle(AppTheme.secondaryInk)
@@ -304,12 +295,11 @@ struct HomeView: View {
 
       Label(
         screenTime.appliedRestrictionLabel,
-        systemImage: screenTime.appliedRestrictionMode == nil
-          ? "lock.open" : "checkmark.shield.fill"
+        systemImage: screenTime.hasAppliedRestriction ? "checkmark.shield.fill" : "lock.open"
       )
       .font(.footnote.weight(.semibold))
       .foregroundStyle(
-        screenTime.appliedRestrictionMode == nil ? AppTheme.secondaryInk : AppTheme.teal)
+        screenTime.hasAppliedRestriction ? AppTheme.teal : AppTheme.secondaryInk)
 
       Text("適用状態は設定画面から変更できます。対象アプリを開いてShieldが表示されることも確認してください。")
         .font(.caption)

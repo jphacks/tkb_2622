@@ -312,16 +312,7 @@ struct ConfiguredHomeRepository: HomeRepository {
         let selectedApplications = selectionData
             .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
             .map(\.applicationTokens) ?? []
-        let restrictionMode = defaults.string(forKey: "mobile.screenTime.restrictionMode") ?? "selectedApplications"
-        let selectedApplicationCount: Int
-        if restrictionMode == "entireDevice" {
-            let safariData = defaults.data(forKey: "mobile.screenTime.safariSelection")
-            selectedApplicationCount = safariData
-                .flatMap { try? JSONDecoder().decode(FamilyActivitySelection.self, from: $0) }
-                .map(\.applicationTokens.count) ?? 0
-        } else {
-            selectedApplicationCount = selectedApplications.count
-        }
+        let selectedApplicationCount = selectedApplications.count
 
         return try await APIHomeRepository(
             baseURL: apiBaseURL,

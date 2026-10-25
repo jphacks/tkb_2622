@@ -1462,7 +1462,7 @@ components:
         allowedAppsPolicy:
           type: string
           title: allowed_apps_policy
-          description: 'Fixed for now: ALL_APPS_EXCEPT_SAFARI. Device tokens remain on the iPhone.'
+          description: 'Fixed for now: NONE. Apple app selection tokens remain on the iPhone.'
         deviceConfigVersion:
           type: string
           title: device_config_version

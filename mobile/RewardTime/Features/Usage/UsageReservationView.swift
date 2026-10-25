@@ -54,7 +54,6 @@ final class UsageReservationViewModel: ObservableObject {
 
     private var sessionCanReserve: Bool {
         !sessionID.isEmpty && screenTime.isAuthorized
-            && screenTime.restrictionMode == .selectedApplications
             && screenTime.restrictedApplicationCount > 0
             && !screenTime.hasUnsupportedTargets
             && ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID") == nil
@@ -72,9 +71,6 @@ final class UsageReservationViewModel: ObservableObject {
     var unavailableReason: String? {
         if sessionID.isEmpty { return "作業セッションを再読み込みしてください。" }
         if !screenTime.isAuthorized { return "先に設定からスクリーンタイムを許可してください。" }
-        if screenTime.restrictionMode != .selectedApplications {
-            return "利用時間を正確に計測するため、「選んだアプリを制限」にしてください。"
-        }
         if screenTime.restrictedApplicationCount == 0 {
             return "利用時間を計測するアプリを設定から選んでください。"
         }
@@ -129,7 +125,6 @@ final class UsageReservationViewModel: ObservableObject {
 
             defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
             defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
-            ScreenTimeSharedStorage.defaults.set(screenTime.restrictionMode.rawValue, forKey: "mobile.screenTime.restrictionMode")
             ScreenTimeSharedStorage.defaults.set(result.deviceID, forKey: "mobile.usage.deviceID")
             DeviceActivityUsageMonitor().activate(
                 grantID: result.grant.id,

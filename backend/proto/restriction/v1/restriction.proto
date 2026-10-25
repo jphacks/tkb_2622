@@ -37,7 +37,7 @@ message RestrictionPolicy {
   TargetMode target_mode = 3;
   // Fixed for now: ACTIVE_USAGE.
   string usage_time_mode = 4;
-  // Fixed for now: ALL_APPS_EXCEPT_SAFARI. Device tokens remain on the iPhone.
+  // Fixed for now: NONE. Apple app selection tokens remain on the iPhone.
   string allowed_apps_policy = 5;
   // Version of the app selection kept on the device.
   int64 device_config_version = 6;

@@ -6,7 +6,6 @@ struct SettingsView: View {
     @ObservedObject var screenTime: MobileScreenTimeController
     private let isAuthenticated: Bool
     @State private var isFamilyActivityPickerPresented = false
-    @State private var isPickingSafari = false
     @State private var isSyncingDeviceSettings = false
     @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
@@ -38,7 +37,7 @@ struct SettingsView: View {
                 }
 
                 if screenTime.isAuthorized {
-                    if screenTime.restrictionMode == .selectedApplications && screenTime.hasUnsupportedTargets {
+                    if screenTime.hasUnsupportedTargets {
                         Text("カテゴリとWebサイトは制限できません。")
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -83,80 +82,54 @@ struct SettingsView: View {
             }
 
             SurfaceCard {
-                sectionTitle("制限モード", icon: "slider.horizontal.3")
-                VStack(spacing: 8) {
-                    restrictionModeButton(.entireDevice)
-                    restrictionModeButton(.selectedApplications)
+                sectionTitle("アプリ制限", icon: "slider.horizontal.3")
+                Label("指定したアプリのみ制限", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.primary)
+
+                HStack {
+                    Label("制限するアプリ", systemImage: "square.grid.2x2")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(screenTime.restrictedApplicationCount)個")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.primary)
                 }
+                Button {
+                    isFamilyActivityPickerPresented = true
+                } label: {
+                    Label("アプリを選択", systemImage: "plus.app")
+                }
+                .buttonStyle(.bordered)
+                .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
 
-                if screenTime.restrictionMode == .selectedApplications {
-                    HStack {
-                        Label("制限するアプリ", systemImage: "square.grid.2x2")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text("\(screenTime.restrictedApplicationCount)個")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppTheme.primary)
-                    }
-                    Button {
-                        isPickingSafari = false
-                        isFamilyActivityPickerPresented = true
-                    } label: {
-                        Label("アプリを選択", systemImage: "plus.app")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
-
-                    if !screenTime.restrictedApplicationTokens.isEmpty {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
-                            ForEach(Array(screenTime.restrictedApplicationTokens), id: \.self) { token in
-                                Label(token)
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
-                            }
+                if !screenTime.restrictedApplicationTokens.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+                        ForEach(Array(screenTime.restrictedApplicationTokens), id: \.self) { token in
+                            Label(token)
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(AppTheme.background, in: RoundedRectangle(cornerRadius: 10))
                         }
-                    } else {
-                        Text("制限するアプリを選んでください。")
-                            .font(.footnote)
-                            .foregroundStyle(AppTheme.secondaryInk)
                     }
-                }
-
-                if screenTime.restrictionMode == .entireDevice {
-                    HStack {
-                        Label("Safariのみ制限", systemImage: "safari")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text(screenTime.hasValidSafariSelection ? "選択済み" : "未選択")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(screenTime.hasValidSafariSelection ? AppTheme.teal : AppTheme.secondaryInk)
-                    }
-                    Text("アプリ一覧からSafariを1つだけ選択してください。")
-                        .font(.caption)
+                } else {
+                    Text("制限するアプリを選んでください。")
+                        .font(.footnote)
                         .foregroundStyle(AppTheme.secondaryInk)
-                    Button {
-                        isPickingSafari = true
-                        isFamilyActivityPickerPresented = true
-                    } label: {
-                        Label(screenTime.hasValidSafariSelection ? "Safariを選び直す" : "Safariを選択", systemImage: "safari")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
                 }
 
-                Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.appliedRestrictionMode == nil ? "lock.open" : "lock.fill")
+                Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.hasAppliedRestriction ? "lock.fill" : "lock.open")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(screenTime.appliedRestrictionMode == nil ? AppTheme.secondaryInk : AppTheme.teal)
+                    .foregroundStyle(screenTime.hasAppliedRestriction ? AppTheme.teal : AppTheme.secondaryInk)
 
                 Button {
                     screenTime.applyRestriction()
                 } label: {
                     Label(
-                        screenTime.appliedRestrictionMode == nil ? "制限を適用" : "制限を再適用",
+                        screenTime.hasAppliedRestriction ? "制限を再適用" : "制限を適用",
                         systemImage: "lock.iphone")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -180,7 +153,7 @@ struct SettingsView: View {
                 Button("このアプリの制限を解除", role: .destructive) {
                     screenTime.clearRestriction()
                 }
-                .disabled(screenTime.appliedRestrictionMode == nil || hasOpenUsageGrant)
+                .disabled(!screenTime.hasAppliedRestriction || hasOpenUsageGrant)
 
             }
         }
@@ -201,19 +174,15 @@ struct SettingsView: View {
             if authenticated { Task { await syncDeviceSettings() } }
         }
         .familyActivityPicker(
-            headerText: isPickingSafari ? "制限するSafariを選択" : "制限するアプリを選択",
-            footerText: isPickingSafari ? "Safariを1つだけ選択してください。" : nil,
+            headerText: "制限するアプリを選択",
+            footerText: nil,
             isPresented: $isFamilyActivityPickerPresented,
             selection: Binding(
                 get: {
-                    isPickingSafari ? screenTime.safariSelection : screenTime.selection
+                    screenTime.selection
                 },
                 set: { newSelection in
-                    if isPickingSafari {
-                        screenTime.safariSelection = newSelection
-                    } else {
-                        screenTime.selection = newSelection
-                    }
+                    screenTime.selection = newSelection
                 }
             )
         )
@@ -229,29 +198,6 @@ struct SettingsView: View {
     private func sectionTitle(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.subheadline.weight(.bold))
-    }
-
-    private func restrictionModeButton(_ mode: LocalRestrictionMode) -> some View {
-        let isSelected = screenTime.restrictionMode == mode
-        return Button {
-            screenTime.restrictionMode = mode
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(isSelected ? AppTheme.primary : AppTheme.secondaryInk)
-                Text(mode.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppTheme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(12)
-            .background(
-                isSelected ? AppTheme.lavender : AppTheme.background,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(hasOpenUsageGrant)
     }
 
     private func refreshOpenUsageGrant() {
