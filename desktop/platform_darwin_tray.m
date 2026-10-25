@@ -39,6 +39,8 @@ static FocusLinkStatusController *focusLinkStatusController;
         return;
     }
 
+    // 通常のDockアプリではなく、メニューバー常駐アプリとして起動する。
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     _statusItem = [[[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength] retain];
     if (_statusItem == nil) {
         return;
