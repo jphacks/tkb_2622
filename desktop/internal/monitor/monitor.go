@@ -151,7 +151,9 @@ func (r *Recorder) RestoreSession(sessionID string, previous Status) error {
 	r.filePath = filePath
 	previous.State = "paused"
 	r.status = previous
-	return nil
+	// A restored active session is deliberately left paused until the user resumes it.
+	// Persist that boundary so evaluation never counts time while the desktop app was closed.
+	return r.append(Record{Kind: "paused"})
 }
 
 func (r *Recorder) Start(ctx context.Context, sessionID string) (Status, error) {
