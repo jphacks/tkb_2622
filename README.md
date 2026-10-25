@@ -1,6 +1,6 @@
 # Focus Link
 
-![Focus Link：PCの頑張りを、スマホ時間に。](docs/images/focus-link-hero.png)
+[![Focus Link：PCの頑張りを、スマホ時間に。](docs/images/focus-link-hero.png)](https://youtu.be/-fOMJobirTA)
 
 ## 製品概要
 
