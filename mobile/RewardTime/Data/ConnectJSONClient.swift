@@ -7,6 +7,7 @@ protocol AccessTokenProviding {
 struct ConnectJSONClient {
     enum ClientError: Error {
         case missingAccessToken
+        case tokenProviderFailed(Error)
         case invalidResponse
         case httpStatus(Int)
         case connect(code: String)
@@ -62,7 +63,13 @@ struct ConnectJSONClient {
         requestBody: Request,
         responseType: Response.Type
     ) async throws -> Response {
-        guard let accessToken = try await tokenProvider.accessToken(), !accessToken.isEmpty else {
+        let accessToken: String?
+        do {
+            accessToken = try await tokenProvider.accessToken()
+        } catch {
+            throw ClientError.tokenProviderFailed(error)
+        }
+        guard let accessToken, !accessToken.isEmpty else {
             throw ClientError.missingAccessToken
         }
 
@@ -96,7 +103,13 @@ struct ConnectJSONClient {
         queryItems: [URLQueryItem],
         responseType: Response.Type
     ) async throws -> Response {
-        guard let accessToken = try await tokenProvider.accessToken(), !accessToken.isEmpty else {
+        let accessToken: String?
+        do {
+            accessToken = try await tokenProvider.accessToken()
+        } catch {
+            throw ClientError.tokenProviderFailed(error)
+        }
+        guard let accessToken, !accessToken.isEmpty else {
             throw ClientError.missingAccessToken
         }
 
@@ -135,17 +148,21 @@ extension ConnectJSONClient.ClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAccessToken:
-            "ログインセッションがありません。再ログインしてください。"
+            return "ログインセッションがありません。再ログインしてください。"
+        case .tokenProviderFailed(let underlying):
+            let detail = (underlying as? LocalizedError)?.errorDescription
+                ?? underlying.localizedDescription
+            return "ログインセッションを更新できません。Supabaseへの接続を確認してください。(アクセストークン取得: \(detail))"
         case .invalidResponse:
-            "APIから不正な応答を受け取りました。"
+            return "APIから不正な応答を受け取りました。"
         case .httpStatus(let status):
-            "APIがHTTP \(status)を返しました。"
+            return "APIがHTTP \(status)を返しました。"
         case .connect(let code) where code == "unauthenticated":
-            "APIがアクセストークンを受け付けませんでした。APIのSUPABASE_JWT_ISSUERとアプリのProject URLが同じプロジェクトか確認してください。(unauthenticated)"
+            return "APIがアクセストークンを受け付けませんでした。APIのSUPABASE_JWT_ISSUERとアプリのProject URLが同じプロジェクトか確認してください。(unauthenticated)"
         case .connect(let code):
-            "APIがエラーを返しました。(\(code))"
+            return "APIがエラーを返しました。(\(code))"
         case .unexpectedHealthStatus(let status):
-            "APIの状態が想定外です。(\(status))"
+            return "APIの状態が想定外です。(\(status))"
         }
     }
 }

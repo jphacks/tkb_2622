@@ -29,7 +29,7 @@ enum UsageReservationFailurePolicy {
             ].contains(code)
         case .httpStatus(let status):
             return (400..<500).contains(status) && ![408, 425, 429].contains(status)
-        case .missingAccessToken, .invalidResponse, .unexpectedHealthStatus:
+        case .missingAccessToken, .tokenProviderFailed, .invalidResponse, .unexpectedHealthStatus:
             return false
         }
     }

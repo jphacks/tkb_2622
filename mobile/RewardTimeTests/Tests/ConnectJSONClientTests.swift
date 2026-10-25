@@ -222,14 +222,46 @@ final class ConnectJSONClientTests: XCTestCase {
         } catch ConnectJSONClient.ClientError.missingAccessToken {}
     }
 
+    func testCallLabelsTokenRefreshFailureAsPreflightFailureAndDoesNotSendAPIRequest() async throws {
+        StubURLProtocol.handler = { _ in
+            XCTFail("The API request must not be sent when token refresh fails")
+            throw URLError(.cancelled)
+        }
+        let client = ConnectJSONClient(
+            baseURL: URL(string: "https://api.example.test")!,
+            session: makeSession(),
+            tokenProvider: FailingTokenProvider(error: URLError(.timedOut))
+        )
+
+        do {
+            let _: GroupsResponse = try await client.call(
+                service: "identity.v1.IdentityService",
+                method: "EnsureUser",
+                requestBody: EmptyRequest(),
+                responseType: GroupsResponse.self
+            )
+            XCTFail("Expected token refresh failure")
+        } catch let error as ConnectJSONClient.ClientError {
+            guard case .tokenProviderFailed(let underlying) = error else {
+                return XCTFail("Expected token preflight error, got \(error)")
+            }
+            XCTAssertEqual((underlying as? URLError)?.code, .timedOut)
+            XCTAssertTrue(error.localizedDescription.contains("アクセストークン"))
+        }
+    }
+
     private func makeClient(token: String?) -> ConnectJSONClient {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [StubURLProtocol.self]
         return ConnectJSONClient(
             baseURL: URL(string: "https://api.example.test")!,
-            session: URLSession(configuration: configuration),
+            session: makeSession(),
             tokenProvider: StaticTokenProvider(token: token)
         )
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        return URLSession(configuration: configuration)
     }
 }
 
@@ -239,6 +271,11 @@ private struct GroupsResponse: Decodable { let groups: [String] }
 private struct StaticTokenProvider: AccessTokenProviding {
     let token: String?
     func accessToken() async throws -> String? { token }
+}
+
+private struct FailingTokenProvider: AccessTokenProviding {
+    let error: Error
+    func accessToken() async throws -> String? { throw error }
 }
 
 private final class StubURLProtocol: URLProtocol {
