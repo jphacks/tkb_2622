@@ -393,7 +393,8 @@ func (a *App) prepareActivitySyncLocked(at time.Time, final bool) error {
 		a.mu.Unlock()
 		return nil
 	}
-	records, err := a.recorder.ReadRecords()
+	// Terminal sessions have no attached recorder after restart; their capture remains on disk.
+	records, err := store.ReadSessionRecords(workSession.ID)
 	a.mu.Unlock()
 	if err != nil {
 		return err
@@ -802,7 +803,7 @@ func (a *App) prepareAbortActivitySyncLocked(ctx context.Context, auth cloud.Aut
 		return state, errors.New("local activity capture is unavailable for abort")
 	}
 	workSession := *current
-	records, err := recorder.ReadRecords()
+	records, err := store.ReadSessionRecords(workSession.ID)
 	a.mu.Unlock()
 	if err != nil {
 		return state, err
