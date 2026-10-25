@@ -12,7 +12,8 @@ export interface Classification { name: string; appId?: string; domain?: string;
 export interface ClassificationCandidate { name: string; appId: string; appName: string; domain: string; sampleCount: number }
 export interface Settings { tasks: Task[]; selectedTaskId: string; classifications: Classification[] }
 export type RewardStatus = 'pending' | 'queued' | 'granted' | 'ineligible' | 'unavailable';
-export interface Result { sessionId: string; name: string; status: SessionStatus; startedAt?: string; endedAt?: string; elapsedSeconds: number; taskSeconds?: number; relatedSeconds?: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; inactiveSeconds?: number; evaluatorVersion?: string; b100?: number; q?: number; workRate?: number; earnedSeconds: number; usedSeconds: number; discardedSeconds: number; rewardStatus?: RewardStatus; rewardReason?: string; rewardPolicyVersion?: number; rewardGrantStopped?: boolean }
+export interface ActivityDetail { appName?: string; domain?: string; startTime: string; endTime: string; durationSeconds: number; classification: string; reasons?: string[] }
+export interface Result { sessionId: string; name: string; status: SessionStatus; startedAt?: string; endedAt?: string; elapsedSeconds: number; taskSeconds?: number; relatedSeconds?: number; workSeconds: number; distractedSeconds: number; uncertainSeconds: number; inactiveSeconds?: number; evaluatorVersion?: string; b100?: number; q?: number; workRate?: number; earnedSeconds: number; usedSeconds: number; discardedSeconds: number; rewardStatus?: RewardStatus; rewardReason?: string; rewardPolicyVersion?: number; rewardGrantStopped?: boolean; activityDetails?: ActivityDetail[] }
 export type SessionAction = 'start' | 'pause' | 'resume' | 'finish' | 'abort' | 'retry';
 export interface Snapshot {
   revision: number; platform: Platform; mode: 'demo' | 'local-monitor'; updatedAt: string;

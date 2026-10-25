@@ -7,8 +7,8 @@ struct AuthenticationWelcomeView: View {
     ScrollView {
       VStack(spacing: 22) {
         VStack(spacing: 12) {
-          Image(systemName: "hourglass")
-            .font(.system(size: 34, weight: .semibold))
+          FocusLinkMark()
+            .frame(width: 36, height: 36)
             .foregroundStyle(AppTheme.primary)
             .frame(width: 76, height: 76)
             .background(AppTheme.lavender, in: RoundedRectangle(cornerRadius: 24))

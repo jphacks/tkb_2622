@@ -29,3 +29,7 @@ infra/**/terraform.tfvars
 infra/**/*.auto.tfvars
 infra/envs/backend.hcl
 infra/**/crash.log
+
+# 構成図の生成用 Python 仮想環境
+docs/graph/venv/
+docs/graph/__pycache__/

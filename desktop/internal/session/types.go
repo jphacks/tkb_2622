@@ -1,5 +1,7 @@
 package session
 
+import "time"
+
 type Task struct {
 	ID                  string `json:"id"`
 	Name                string `json:"name"`
@@ -85,29 +87,40 @@ type Settings struct {
 }
 
 type Result struct {
-	SessionID           string   `json:"sessionId"`
-	Name                string   `json:"name"`
-	Status              string   `json:"status"`
-	StartedAt           string   `json:"startedAt,omitempty"`
-	EndedAt             string   `json:"endedAt,omitempty"`
-	ElapsedSeconds      int      `json:"elapsedSeconds"`
-	TaskSeconds         int      `json:"taskSeconds"`
-	RelatedSeconds      int      `json:"relatedSeconds"`
-	WorkSeconds         int      `json:"workSeconds"`
-	DistractedSeconds   int      `json:"distractedSeconds"`
-	UncertainSeconds    int      `json:"uncertainSeconds"`
-	InactiveSeconds     int      `json:"inactiveSeconds"`
-	EvaluatorVersion    string   `json:"evaluatorVersion,omitempty"`
-	B100                *float64 `json:"b100,omitempty"`
-	Q                   *float64 `json:"q,omitempty"`
-	WorkRate            *float64 `json:"workRate,omitempty"`
-	EarnedSeconds       int      `json:"earnedSeconds"`
-	UsedSeconds         int      `json:"usedSeconds"`
-	DiscardedSeconds    int      `json:"discardedSeconds"`
-	RewardStatus        string   `json:"rewardStatus,omitempty"`
-	RewardReason        string   `json:"rewardReason,omitempty"`
-	RewardPolicyVersion int32    `json:"rewardPolicyVersion,omitempty"`
-	RewardGrantStopped  bool     `json:"rewardGrantStopped,omitempty"`
+	SessionID           string           `json:"sessionId"`
+	Name                string           `json:"name"`
+	Status              string           `json:"status"`
+	StartedAt           string           `json:"startedAt,omitempty"`
+	EndedAt             string           `json:"endedAt,omitempty"`
+	ElapsedSeconds      int              `json:"elapsedSeconds"`
+	TaskSeconds         int              `json:"taskSeconds"`
+	RelatedSeconds      int              `json:"relatedSeconds"`
+	WorkSeconds         int              `json:"workSeconds"`
+	DistractedSeconds   int              `json:"distractedSeconds"`
+	UncertainSeconds    int              `json:"uncertainSeconds"`
+	InactiveSeconds     int              `json:"inactiveSeconds"`
+	EvaluatorVersion    string           `json:"evaluatorVersion,omitempty"`
+	B100                *float64         `json:"b100,omitempty"`
+	Q                   *float64         `json:"q,omitempty"`
+	WorkRate            *float64         `json:"workRate,omitempty"`
+	EarnedSeconds       int              `json:"earnedSeconds"`
+	UsedSeconds         int              `json:"usedSeconds"`
+	DiscardedSeconds    int              `json:"discardedSeconds"`
+	RewardStatus        string           `json:"rewardStatus,omitempty"`
+	RewardReason        string           `json:"rewardReason,omitempty"`
+	RewardPolicyVersion int32            `json:"rewardPolicyVersion,omitempty"`
+	RewardGrantStopped  bool             `json:"rewardGrantStopped,omitempty"`
+	ActivityDetails     []ActivityDetail `json:"activityDetails,omitempty"`
+}
+
+type ActivityDetail struct {
+	AppName         string    `json:"appName,omitempty"`
+	Domain          string    `json:"domain,omitempty"`
+	StartTime       time.Time `json:"startTime"`
+	EndTime         time.Time `json:"endTime"`
+	DurationSeconds int       `json:"durationSeconds"`
+	Classification  string    `json:"classification"`
+	Reasons         []string  `json:"reasons,omitempty"`
 }
 
 type RewardSummary struct {
