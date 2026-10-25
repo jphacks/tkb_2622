@@ -23,6 +23,7 @@ var (
 type Repository interface {
 	ListGroups(context.Context, string) ([]domain.Group, error)
 	ListWorkStarts(context.Context, string, time.Time, string, int) ([]domain.WorkStart, error)
+	ListFocusedGroupMembers(context.Context, string) ([]domain.FocusedMember, error)
 	CreateGroup(context.Context, string, string, string) (domain.Group, error)
 	CreateInvitation(context.Context, string, string, string) (domain.Invitation, error)
 	AcceptInvitation(context.Context, string, string, string) (domain.Group, error)
@@ -49,6 +50,13 @@ func (s *Service) ListWorkStarts(ctx context.Context, userID string, after time.
 		return nil, ErrInvalid
 	}
 	return s.repo.ListWorkStarts(ctx, userID, after, afterID, limit)
+}
+
+func (s *Service) ListFocusedGroupMembers(ctx context.Context, userID string) ([]domain.FocusedMember, error) {
+	if !validUserID(userID) {
+		return nil, ErrUnauthenticated
+	}
+	return s.repo.ListFocusedGroupMembers(ctx, userID)
 }
 
 func (s *Service) CreateGroup(ctx context.Context, userID, operationID, name string) (domain.Group, error) {

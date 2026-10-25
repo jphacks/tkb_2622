@@ -10,6 +10,7 @@
 		B10000000000000000000010 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000011 /* Supabase */; };
 		B10000000000000000000013 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift */; };
 		B10000000000000000000015 /* DeviceActivityMonitorExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B10000000000000000000060 /* FocusWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000063 /* FocusWidgetExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B10000000000000000000031 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* XCTest.framework */; };
 		B10000000000000000000047 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* XCTest.framework */; };
 /* End PBXBuildFile section */
@@ -36,6 +37,13 @@
 			remoteGlobalIDString = B10000000000000000000006;
 			remoteInfo = RewardTime;
 		};
+		B10000000000000000000061 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B10000000000000000000009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B10000000000000000000064;
+			remoteInfo = FocusWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,6 +54,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				B10000000000000000000015 /* DeviceActivityMonitorExtension.appex in Embed App Extensions */,
+				B10000000000000000000060 /* FocusWidgetExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -61,12 +70,34 @@
 		B10000000000000000000030 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		B10000000000000000000032 /* RewardTimeSimulatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RewardTimeSimulatorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000044 /* RewardTimeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RewardTimeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000063 /* FocusWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FocusWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B10000000000000000000002 /* RewardTime */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = RewardTime; sourceTree = "<group>"; };
 		B10000000000000000000042 /* RewardTimeSimulatorTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = RewardTimeSimulatorTests; sourceTree = "<group>"; };
 		B10000000000000000000045 /* RewardTimeUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = RewardTimeUITests; sourceTree = "<group>"; };
+		B10000000000000000000065 /* FocusWidgetExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			children = (
+			);
+			exceptions = (
+				B1000000000000000000006D /* Exceptions for FocusWidgetExtension */,
+			);
+			explicitFileTypes = {};
+			explicitFolders = (
+			);
+			path = FocusWidgetExtension;
+			sourceTree = "<group>";
+		};
+		B1000000000000000000006D /* Exceptions for FocusWidgetExtension */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				FocusWidgetExtension.entitlements,
+				Info.plist,
+			);
+		target = B10000000000000000000064 /* FocusWidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +132,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B1000000000000000000006A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -118,6 +156,7 @@
 				B10000000000000000000002 /* RewardTime */,
 				B10000000000000000000042 /* RewardTimeSimulatorTests */,
 				B10000000000000000000045 /* RewardTimeUITests */,
+				B10000000000000000000065 /* FocusWidgetExtension */,
 				B10000000000000000000014 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift */,
 				B10000000000000000000017 /* DeviceActivityMonitorExtension/Info.plist */,
 				B10000000000000000000018 /* DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements */,
@@ -133,6 +172,7 @@
 				B10000000000000000000016 /* DeviceActivityMonitorExtension.appex */,
 				B10000000000000000000032 /* RewardTimeSimulatorTests.xctest */,
 				B10000000000000000000044 /* RewardTimeUITests.xctest */,
+				B10000000000000000000063 /* FocusWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -153,6 +193,7 @@
 			);
 			dependencies = (
 				B10000000000000000000020 /* PBXTargetDependency */,
+				B1000000000000000000006C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B10000000000000000000002 /* RewardTime */,
@@ -224,6 +265,26 @@
 			productReference = B10000000000000000000044 /* RewardTimeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		B10000000000000000000064 /* FocusWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000000000000000000066 /* Build configuration list for PBXNativeTarget "FocusWidgetExtension" */;
+			buildPhases = (
+				B10000000000000000000069 /* Sources */,
+				B1000000000000000000006A /* Frameworks */,
+				B1000000000000000000006B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B10000000000000000000065 /* FocusWidgetExtension */,
+			);
+			name = FocusWidgetExtension;
+			productName = FocusWidgetExtension;
+			productReference = B10000000000000000000063 /* FocusWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -249,6 +310,9 @@
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = B10000000000000000000006;
 					};
+					B10000000000000000000064 = {
+						CreatedOnToolsVersion = 27.1;
+					};
 				};
 			};
 			buildConfigurationList = B1000000000000000000000A /* Build configuration list for PBXProject "ios-reward-time" */;
@@ -272,6 +336,7 @@
 				B10000000000000000000021 /* DeviceActivityMonitorExtension */,
 				B10000000000000000000035 /* RewardTimeSimulatorTests */,
 				B10000000000000000000050 /* RewardTimeUITests */,
+				B10000000000000000000064 /* FocusWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -299,6 +364,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B10000000000000000000053 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000000000000000000006B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -337,6 +409,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000000000000000000069 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -354,6 +433,11 @@
 			isa = PBXTargetDependency;
 			target = B10000000000000000000006 /* RewardTime */;
 			targetProxy = B10000000000000000000048 /* PBXContainerItemProxy */;
+		};
+		B1000000000000000000006C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B10000000000000000000064 /* FocusWidgetExtension */;
+			targetProxy = B10000000000000000000061 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -595,6 +679,42 @@
 			};
 			name = Release;
 		};
+		B10000000000000000000067 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = FocusWidgetExtension/FocusWidgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FocusWidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.mobile.FocusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		B10000000000000000000068 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = FocusWidgetExtension/FocusWidgetExtension.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FocusWidgetExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.tkb2622.mobile.FocusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -639,6 +759,15 @@
 			buildConfigurations = (
 				B10000000000000000000055 /* Debug */,
 				B10000000000000000000056 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000000000000000000066 /* Build configuration list for PBXNativeTarget "FocusWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000067 /* Debug */,
+				B10000000000000000000068 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

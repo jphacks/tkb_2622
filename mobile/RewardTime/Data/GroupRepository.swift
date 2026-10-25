@@ -62,6 +62,7 @@ struct GroupProtoTimestamp: Decodable {
 protocol GroupRepository {
     func fetchGroups() async throws -> [MobileGroup]
     func fetchWorkStarts() async throws -> [MobileGroupWorkStart]
+    func fetchFocusedMembers() async throws -> [MobileGroupFocusMember]
     func createGroup(name: String, operationID: String) async throws -> MobileGroup
     func createInvitation(groupID: String, operationID: String) async throws -> MobileGroupInvitation
     func acceptInvitation(token: String, operationID: String) async throws -> MobileGroup
@@ -78,6 +79,12 @@ struct MobileGroupWorkStart: Decodable, Identifiable {
         case eventID = "event_id"
         case startedAt = "started_at"
     }
+}
+
+struct MobileGroupFocusMember: Codable, Hashable {
+    let displayName: String
+    let avatarID: String
+    let startedAt: Date
 }
 
 struct MobileGroupInvitation {
@@ -168,6 +175,22 @@ struct APIGroupRepository: GroupRepository {
         }
     }
 
+    private struct FocusedMembersResponse: Decodable {
+        struct Member: Decodable {
+            let displayName: String
+            let avatarID: String
+            let startedAt: GroupProtoTimestamp
+
+            private enum CodingKeys: String, CodingKey {
+                case displayName = "display_name"
+                case avatarID = "avatar_id"
+                case startedAt = "started_at"
+            }
+        }
+
+        let members: [Member]
+    }
+
     private struct WorkStartCursor: Codable {
         let startedAt: String
         let eventID: String?
@@ -246,6 +269,21 @@ struct APIGroupRepository: GroupRepository {
         return response.events
     }
 
+    func fetchFocusedMembers() async throws -> [MobileGroupFocusMember] {
+        let response: FocusedMembersResponse = try await client.get(
+            path: "v1/group/focus-status",
+            queryItems: [],
+            responseType: FocusedMembersResponse.self
+        )
+        return response.members.map {
+            MobileGroupFocusMember(
+                displayName: $0.displayName,
+                avatarID: ProfileAvatar.imageName(for: $0.avatarID),
+                startedAt: $0.startedAt.date
+            )
+        }
+    }
+
     func createGroup(name: String, operationID: String) async throws -> MobileGroup {
         let response: CreateGroupResponse = try await client.call(
             service: "group.v1.GroupService",
@@ -294,6 +332,10 @@ struct ConfiguredGroupRepository: GroupRepository {
 
     func fetchWorkStarts() async throws -> [MobileGroupWorkStart] {
         try await repository().fetchWorkStarts()
+    }
+
+    func fetchFocusedMembers() async throws -> [MobileGroupFocusMember] {
+        try await repository().fetchFocusedMembers()
     }
 
     func createGroup(name: String, operationID: String) async throws -> MobileGroup {

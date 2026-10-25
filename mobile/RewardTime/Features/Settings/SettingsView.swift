@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var deviceSettingsSyncGate = DeviceSettingsSyncGate()
     @State private var hasOpenUsageGrant = false
     @State private var deviceSyncError: String?
+    #if DEBUG
+    @State private var isShowingWidgetPreview = false
+    #endif
 
     init(screenTime: MobileScreenTimeController, isAuthenticated: Bool = true) {
         _screenTime = ObservedObject(wrappedValue: screenTime)
@@ -121,27 +124,17 @@ struct SettingsView: View {
                         .foregroundStyle(AppTheme.secondaryInk)
                 }
 
-                Label(screenTime.appliedRestrictionLabel, systemImage: screenTime.hasAppliedRestriction ? "lock.fill" : "lock.open")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(screenTime.hasAppliedRestriction ? AppTheme.teal : AppTheme.secondaryInk)
+                Label(
+                    hasOpenUsageGrant ? "利用枠のため一時解除中" : screenTime.hasAppliedRestriction ? "選択したアプリを制限中" : "作業中に自動で制限",
+                    systemImage: hasOpenUsageGrant ? "lock.open" : screenTime.hasAppliedRestriction ? "lock.fill" : "lock.iphone"
+                )
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(screenTime.hasAppliedRestriction ? AppTheme.teal : AppTheme.secondaryInk)
 
-                Button {
-                    screenTime.applyRestriction()
-                } label: {
-                    Label(
-                        screenTime.hasAppliedRestriction ? "制限を再適用" : "制限を適用",
-                        systemImage: "lock.iphone")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.primary)
-                .disabled(!screenTime.isAuthorized || hasOpenUsageGrant)
-
-                if hasOpenUsageGrant {
-                    Text("利用枠を閉じると変更できます。")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.secondaryInk)
-                }
+                Text("ここでは制限するアプリを設定します。Macで作業を開始すると自動で制限します。一時停止中も、iPhoneで報酬の利用枠を確保するまでは制限を維持します。利用枠中は解除し、Macで作業を終了すると解除します。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let reason = screenTime.applyRestrictionUnavailableReason {
                     Label(reason, systemImage: "info.circle")
@@ -150,18 +143,47 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Button("このアプリの制限を解除", role: .destructive) {
-                    screenTime.clearRestriction()
-                }
-                .disabled(!screenTime.hasAppliedRestriction || hasOpenUsageGrant)
-
             }
+
+            #if DEBUG
+            SurfaceCard {
+                sectionTitle("ウィジェット確認", icon: "widget.small")
+                Text("友達のキャラクター表示を、この端末だけのサンプルで確認できます。")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                if isShowingWidgetPreview {
+                    Label("ちほ・ゆう・はるの3体を表示中", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.teal)
+                }
+                Button {
+                    if isShowingWidgetPreview {
+                        GroupFocusWidgetCache.hideLocalPreview()
+                    } else {
+                        GroupFocusWidgetCache.showLocalPreview()
+                    }
+                    isShowingWidgetPreview = GroupFocusWidgetCache.isShowingLocalPreview
+                } label: {
+                    Label(
+                        isShowingWidgetPreview ? "サンプル表示を終了" : "サンプルをウィジェットに表示",
+                        systemImage: isShowingWidgetPreview ? "xmark.circle" : "sparkles"
+                    )
+                }
+                .buttonStyle(.bordered)
+                Text("ホーム画面を長押しして「集中ルーム」ウィジェットを追加してください。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+            }
+            #endif
         }
         .navigationTitle("設定")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             screenTime.refreshAuthorizationStatus()
             refreshOpenUsageGrant()
+            #if DEBUG
+            isShowingWidgetPreview = GroupFocusWidgetCache.isShowingLocalPreview
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

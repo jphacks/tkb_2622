@@ -16,6 +16,12 @@ type Group struct {
 	Members   []Member
 }
 
+type FocusedMember struct {
+	DisplayName string
+	AvatarID    string
+	StartedAt   time.Time
+}
+
 type Invitation struct {
 	ID        string
 	Token     string
