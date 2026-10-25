@@ -75,7 +75,14 @@ final class GroupFocusWidgetSyncCoordinator: ObservableObject {
             if !isShowingLocalPreview && UIApplication.shared.applicationState == .active {
                 do {
                     let members = try await ConfiguredGroupRepository().fetchFocusedMembers()
+                    #if DEBUG
+                    // A request may have started just before local preview was enabled.
+                    if !GroupFocusWidgetCache.isShowingLocalPreview {
+                        GroupFocusWidgetCache.save(members: members)
+                    }
+                    #else
                     GroupFocusWidgetCache.save(members: members)
+                    #endif
                 } catch {
                     // Keep the last successful snapshot; the widget marks old data as stale.
                 }

@@ -166,6 +166,11 @@ struct SettingsView: View {
                 Text("友達のキャラクター表示を、この端末だけのサンプルで確認できます。")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.secondaryInk)
+                if isShowingWidgetPreview {
+                    Label("ちほ・ゆう・はるの3体を表示中", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.teal)
+                }
                 Button {
                     if isShowingWidgetPreview {
                         GroupFocusWidgetCache.hideLocalPreview()
