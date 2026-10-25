@@ -6,7 +6,7 @@ struct MobileHomeSnapshot {
     let minimumSeconds: Int?
     let minimumProgress: Double?
     let minimumReached: Bool
-    let rewardBalanceMinutes: Int
+    let rewardBalanceSeconds: Int
     let desiredRestriction: DesiredRestrictionMode
     let restrictionStatus: RestrictionStatus
     let restrictedApps: [String]
@@ -24,13 +24,15 @@ struct MobileHomeSnapshot {
     let activeGrantReservedSeconds: Int?
     let activeGrantStatus: String?
 
+    var rewardBalanceMinutes: Int { rewardBalanceSeconds / 60 }
+
     static let workingSample = MobileHomeSnapshot(
         sessionStatus: .working,
         elapsedMinutes: 48,
         minimumSeconds: 60 * 60,
         minimumProgress: 0.8,
         minimumReached: false,
-        rewardBalanceMinutes: 32,
+        rewardBalanceSeconds: 32 * 60,
         desiredRestriction: .shielded,
         restrictionStatus: .restricted,
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
@@ -55,7 +57,7 @@ struct MobileHomeSnapshot {
         minimumSeconds: 60 * 60,
         minimumProgress: 0.8,
         minimumReached: false,
-        rewardBalanceMinutes: 42,
+        rewardBalanceSeconds: 42 * 60,
         desiredRestriction: .shielded,
         restrictionStatus: .restricted,
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
@@ -80,7 +82,7 @@ struct MobileHomeSnapshot {
         minimumSeconds: 60 * 60,
         minimumProgress: 0.8,
         minimumReached: false,
-        rewardBalanceMinutes: 32,
+        rewardBalanceSeconds: 32 * 60,
         desiredRestriction: .timedUnlock,
         restrictionStatus: .temporarilyReleased(endsAt: .now.addingTimeInterval(10 * 60)),
         restrictedApps: ["YouTube", "X", "Instagram", "TikTok", "Safari", "Netflix"],
@@ -105,7 +107,7 @@ struct MobileHomeSnapshot {
         minimumSeconds: nil,
         minimumProgress: nil,
         minimumReached: false,
-        rewardBalanceMinutes: 0,
+        rewardBalanceSeconds: 0,
         desiredRestriction: .unrestricted,
         restrictionStatus: .unrestricted,
         restrictedApps: [],

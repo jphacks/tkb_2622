@@ -76,13 +76,19 @@ func run(logger *slog.Logger) error {
 	notifications := notification.NewDispatcher(db, apnsSender)
 	go notifications.Run(ctx, 30*time.Second)
 	identityService := application.New(persistence.New(db))
+	rewardRepository := rewardpersistence.New(db)
+	rewardWallets := reward.New(rewardRepository)
+	if os.Getenv("APP_ENV") == "local" && os.Getenv("REWARD_POLICY_TEST_MODE") == "true" {
+		rewardWallets = reward.NewWithPolicy(rewardRepository, reward.PolicyTest)
+		logger.Warn("local reward test policy enabled", "work_block_seconds", 60, "reward_seconds", 20)
+	}
 	handler := server.Handler(server.Deps{
 		Identity:      identityService,
 		Verifier:      verifier,
 		Focus:         focus.New(focuspersistence.NewStore(db)),
 		Groups:        group.New(grouppersistence.New(db)),
 		Sessions:      workflow.New(workflowadapter.NewRunner(db), server.Devices{Identity: identityService}),
-		Wallets:       reward.New(rewardpersistence.New(db)),
+		Wallets:       rewardWallets,
 		Restriction:   restriction.New(restrictionpersistence.NewStore(db)),
 		EnableDocs:    os.Getenv("API_DOCS_ENABLED") == "true",
 		Notifications: notifications,

@@ -48,10 +48,18 @@ type transactionCursor struct {
 }
 
 type Wallets struct {
-	repo Repository
+	repo          Repository
+	currentPolicy domain.Policy
 }
 
-func New(repo Repository) *Wallets { return &Wallets{repo: repo} }
+func New(repo Repository) *Wallets { return NewWithPolicy(repo, domain.CurrentPolicy) }
+
+func NewWithPolicy(repo Repository, currentPolicy domain.Policy) *Wallets {
+	if currentPolicy.Version == 0 {
+		currentPolicy = domain.CurrentPolicy
+	}
+	return &Wallets{repo: repo, currentPolicy: currentPolicy}
+}
 
 func (w *Wallets) Balance(ctx context.Context, userID string) (domain.Wallet, error) {
 	return w.repo.Wallet(ctx, userID)
@@ -108,7 +116,7 @@ func (w *Wallets) Open(ctx context.Context, userID, sessionID string) (domain.Wa
 		return domain.Wallet{}, domain.ErrState
 	}
 	wallet.UserID, wallet.SessionID, wallet.EvaluatedSeq = userID, sessionID, 0
-	wallet.PolicyVersion = domain.CurrentPolicy.Version
+	wallet.PolicyVersion = w.currentPolicy.Version
 	wallet.GrantStopped, wallet.StopReason, wallet.CollectorHealthy = false, "", false
 	wallet.Version++
 	return wallet, w.repo.SaveWallet(ctx, wallet)
@@ -130,7 +138,7 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 		wallet.CollectorHealthy = *eligibility.CollectorHealthy
 	}
 	if wallet.PolicyVersion == 0 {
-		wallet.PolicyVersion = domain.CurrentPolicy.Version
+		wallet.PolicyVersion = w.currentPolicy.Version
 	}
 	policy, err := domain.PolicyForVersion(wallet.PolicyVersion)
 	if err != nil {
@@ -140,7 +148,7 @@ func (w *Wallets) Accrue(ctx context.Context, userID, sessionID string, workMill
 	if err != nil {
 		return 0, domain.Wallet{}, err
 	}
-	eligible, reason := eligibility.Check(wallet.CollectorHealthy)
+	eligible, reason := eligibility.CheckForPolicy(wallet.CollectorHealthy, policy.MinimumKnownActiveMillis)
 	if policy.Version == domain.PolicyV1.Version {
 		eligible, reason = true, ""
 	}
@@ -208,7 +216,7 @@ func (w *Wallets) Discard(ctx context.Context, userID, sessionID string, eligibi
 		wallet.CollectorHealthy = *eligibility.CollectorHealthy
 	}
 	if wallet.PolicyVersion == 0 {
-		wallet.PolicyVersion = domain.CurrentPolicy.Version
+		wallet.PolicyVersion = w.currentPolicy.Version
 	}
 	policy, err := domain.PolicyForVersion(wallet.PolicyVersion)
 	if err != nil {
@@ -218,7 +226,7 @@ func (w *Wallets) Discard(ctx context.Context, userID, sessionID string, eligibi
 	if err != nil {
 		return 0, domain.Wallet{}, err
 	}
-	eligible, reason := eligibility.Check(wallet.CollectorHealthy)
+	eligible, reason := eligibility.CheckForPolicy(wallet.CollectorHealthy, policy.MinimumKnownActiveMillis)
 	if policy.Version == domain.PolicyV1.Version {
 		eligible, reason = true, ""
 	}
@@ -279,6 +287,7 @@ const (
 var (
 	PolicyV1         = domain.PolicyV1
 	PolicyV2         = domain.PolicyV2
+	PolicyTest       = domain.PolicyTest
 	CurrentPolicy    = domain.CurrentPolicy
 	PolicyForVersion = domain.PolicyForVersion
 )

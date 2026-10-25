@@ -178,7 +178,7 @@ struct APIHomeRepository: HomeRepository {
             minimumSeconds: minimumSeconds.map { Int(max(0, $0)) },
             minimumProgress: minimumProgress,
             minimumReached: session?.minimumReached ?? false,
-            rewardBalanceMinutes: Int(max(0, balance.balanceSeconds.value / 60)),
+            rewardBalanceSeconds: Int(max(0, balance.balanceSeconds.value)),
             desiredRestriction: desiredRestrictionMode(restriction.desiredMode),
             restrictionStatus: appliedRestrictionStatus(restriction),
             restrictedApps: [],

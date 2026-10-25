@@ -11,10 +11,17 @@ struct ActiveUsageGrant: Hashable, Identifiable {
 
 @MainActor
 final class UsageReservationViewModel: ObservableObject {
-    let balanceMinutes: Int
-    let options = [1, 5, 10, 15, 30]
+    let balanceSeconds: Int
+    var availableDurations: [Int] {
+        var durations = [1, 5, 10, 20, 30, 60, 300, 600, 900, 1_800]
+            .filter { $0 <= balanceSeconds }
+        if balanceSeconds > 0 && !durations.contains(balanceSeconds) {
+            durations.append(balanceSeconds)
+        }
+        return durations.sorted()
+    }
 
-    @Published var selectedMinutes = 10
+    @Published var selectedSeconds = 60
     @Published private(set) var isReserving = false
     @Published private(set) var reservationError: String?
     @Published var activeGrant: ActiveUsageGrant?
@@ -25,21 +32,19 @@ final class UsageReservationViewModel: ObservableObject {
     private let defaults = UserDefaults.standard
 
     init(
-        balanceMinutes: Int,
+        balanceSeconds: Int,
         sessionID: String,
         sessionVersion: Int64,
         screenTime: MobileScreenTimeController
     ) {
-        self.balanceMinutes = balanceMinutes
+        self.balanceSeconds = balanceSeconds
         self.sessionID = sessionID
         self.sessionVersion = sessionVersion
         self.screenTime = screenTime
-        if balanceMinutes < selectedMinutes {
-            selectedMinutes = options.last(where: { $0 <= balanceMinutes }) ?? 0
-        }
+        selectedSeconds = min(max(balanceSeconds, 0), 60)
         if defaults.string(forKey: "mobile.usage.reserve.pendingOperationID") != nil,
            let pendingSeconds = defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int {
-            selectedMinutes = pendingSeconds / 60
+            selectedSeconds = pendingSeconds
         }
     }
 
@@ -49,7 +54,7 @@ final class UsageReservationViewModel: ObservableObject {
     }
 
     var canReserve: Bool {
-        !isReserving && selectedMinutes > 0 && eligibility == .allowed && sessionCanReserve
+        !isReserving && selectedSeconds > 0 && eligibility == .allowed && sessionCanReserve
     }
 
     private var sessionCanReserve: Bool {
@@ -61,8 +66,8 @@ final class UsageReservationViewModel: ObservableObject {
 
     private var eligibility: UsageReservationEligibility {
         UsageReservationEligibility.evaluate(
-            selectedMinutes: selectedMinutes,
-            balanceMinutes: balanceMinutes,
+            selectedSeconds: selectedSeconds,
+            balanceSeconds: balanceSeconds,
             pendingOperationID: defaults.string(forKey: "mobile.usage.reserve.pendingOperationID"),
             pendingSeconds: defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int
         )
@@ -99,8 +104,8 @@ final class UsageReservationViewModel: ObservableObject {
         let savedOperationID = defaults.string(forKey: "mobile.usage.reserve.pendingOperationID")
         let operationID = savedOperationID ?? UUID().uuidString.lowercased()
         let requestedSeconds = savedOperationID == nil
-            ? selectedMinutes * 60
-            : (defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int ?? selectedMinutes * 60)
+            ? selectedSeconds
+            : (defaults.object(forKey: "mobile.usage.reserve.pendingSeconds") as? Int ?? selectedSeconds)
         defaults.set(operationID, forKey: "mobile.usage.reserve.pendingOperationID")
         defaults.set(requestedSeconds, forKey: "mobile.usage.reserve.pendingSeconds")
 
@@ -176,13 +181,13 @@ struct UsageReservationView: View {
     @ObservedObject private var screenTime: MobileScreenTimeController
 
     init(
-        balanceMinutes: Int,
+        balanceSeconds: Int,
         sessionID: String,
         sessionVersion: Int64,
         screenTime: MobileScreenTimeController
     ) {
         _viewModel = StateObject(wrappedValue: UsageReservationViewModel(
-            balanceMinutes: balanceMinutes,
+            balanceSeconds: balanceSeconds,
             sessionID: sessionID,
             sessionVersion: sessionVersion,
             screenTime: screenTime
@@ -197,11 +202,9 @@ struct UsageReservationView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(AppTheme.secondaryInk)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(viewModel.balanceMinutes.formatted())
+                    Text(Self.durationLabel(viewModel.balanceSeconds))
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                    Text("分")
-                        .font(.title3.weight(.semibold))
                 }
                 .foregroundStyle(AppTheme.teal)
             }
@@ -211,30 +214,30 @@ struct UsageReservationView: View {
                     .font(.headline)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(viewModel.options, id: \.self) { minutes in
+                    ForEach(viewModel.availableDurations, id: \.self) { seconds in
                         Button {
-                            viewModel.selectedMinutes = minutes
+                            viewModel.selectedSeconds = seconds
                         } label: {
                             HStack {
-                                Text("\(minutes)分")
+                                Text(Self.durationLabel(seconds))
                                 Spacer()
-                                if viewModel.selectedMinutes == minutes { Image(systemName: "checkmark") }
+                                if viewModel.selectedSeconds == seconds { Image(systemName: "checkmark") }
                             }
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(viewModel.selectedMinutes == minutes ? AppTheme.teal : AppTheme.ink)
+                            .foregroundStyle(viewModel.selectedSeconds == seconds ? AppTheme.teal : AppTheme.ink)
                             .padding(14)
                             .background(
-                                viewModel.selectedMinutes == minutes ? AppTheme.mint : AppTheme.background,
+                                viewModel.selectedSeconds == seconds ? AppTheme.mint : AppTheme.background,
                                 in: RoundedRectangle(cornerRadius: 13)
                             )
                             .overlay {
                                 RoundedRectangle(cornerRadius: 13)
-                                    .strokeBorder(viewModel.selectedMinutes == minutes ? AppTheme.teal : .clear, lineWidth: 1.5)
+                                .strokeBorder(viewModel.selectedSeconds == seconds ? AppTheme.teal : .clear, lineWidth: 1.5)
                             }
                         }
                         .buttonStyle(.plain)
-                        .disabled(minutes > viewModel.balanceMinutes || viewModel.hasPendingRequest)
-                        .opacity(minutes > viewModel.balanceMinutes ? 0.4 : 1)
+                        .disabled(seconds > viewModel.balanceSeconds || viewModel.hasPendingRequest)
+                        .opacity(seconds > viewModel.balanceSeconds ? 0.4 : 1)
                     }
                 }
             }
@@ -242,7 +245,7 @@ struct UsageReservationView: View {
             SurfaceCard {
                 Label("選んだアプリの画面利用時間をDeviceActivityで計測します。", systemImage: "hourglass")
                 Label("計測と自動再制限にはiPhoneのFamily Controls許可が必要です。", systemImage: "checkmark.shield.fill")
-                Label("DeviceActivityが1分単位で計測し、backendへは利用中画面の表示中に1分おき、アプリ復帰時に同期します。", systemImage: "clock")
+                Label("選択したアプリの利用時間をDeviceActivityで監視します。backendへは利用中画面の表示中に1分おき、アプリ復帰時に同期します。", systemImage: "clock")
             }
             .font(.footnote)
             .foregroundStyle(AppTheme.secondaryInk)
@@ -273,8 +276,8 @@ struct UsageReservationView: View {
                     viewModel.isReserving
                         ? "利用枠を確保中…"
                         : viewModel.hasPendingRequest
-                            ? "\(viewModel.selectedMinutes)分の予約を再試行"
-                            : "\(viewModel.selectedMinutes)分の利用枠を確保",
+                            ? "\(Self.durationLabel(viewModel.selectedSeconds))の予約を再試行"
+                            : "\(Self.durationLabel(viewModel.selectedSeconds))の利用枠を確保",
                     systemImage: viewModel.isReserving ? "hourglass" : "lock.open"
                 )
                 .font(.headline)
@@ -296,6 +299,13 @@ struct UsageReservationView: View {
         }
         .navigationTitle("残高を使う")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private static func durationLabel(_ seconds: Int) -> String {
+        if seconds < 60 { return "\(seconds)秒" }
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return remainder == 0 ? "\(minutes)分" : "\(minutes)分\(remainder)秒"
     }
 }
 
@@ -417,7 +427,7 @@ struct UsageReservationView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             UsageReservationView(
-                balanceMinutes: 32,
+                balanceSeconds: 32 * 60,
                 sessionID: "preview-session",
                 sessionVersion: 1,
                 screenTime: MobileScreenTimeController()
