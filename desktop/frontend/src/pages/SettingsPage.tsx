@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Classification, ClassificationCandidate, Settings, Task } from '../bridge/types';
+import type { Classification, ClassificationCandidate, Settings, Snapshot, Task } from '../bridge/types';
 import type { PageProps } from './SessionPage';
 import { minimumDuration, plannedDuration } from '../components/format';
 import { taskPurposes } from '../fixtures';
@@ -19,6 +19,52 @@ const classificationCategories: Classification['category'][] = ['work', 'related
 const classificationCategoryLabels: Record<Classification['category'], string> = {
   work: '作業（T）', related: '関連作業（R）', distraction: '脱線（D）', uncertain: '不明（U）',
 };
+
+function iPhoneRestrictionSummary(state: Snapshot, accountStatus: string, integrationStatus: string) {
+  if (state.mode === 'demo') {
+    return { label: 'デモ', detail: 'ブラウザープレビュー用の状態です。', unavailable: true };
+  }
+  if (accountStatus !== 'signedIn') {
+    return { label: integrationStatus, detail: 'ログイン後、サーバーが受信したiPhoneの適用報告を表示します。', unavailable: true };
+  }
+  if (state.iPhoneRestrictionError) {
+    return { label: integrationStatus, detail: state.iPhoneRestrictionError, unavailable: true };
+  }
+
+  const restriction = state.iPhoneRestriction;
+  if (!restriction) {
+    return { label: integrationStatus, detail: 'iPhoneから適用報告をまだ受信していません。', unavailable: true };
+  }
+
+  const permissionLabels: Record<string, string> = {
+    GRANTED: 'Screen Time許可済み',
+    DENIED: 'Screen Time許可なし',
+    NOT_DETERMINED: 'Screen Time許可未確認',
+    UNSPECIFIED: 'Screen Time許可不明',
+  };
+  const shieldLabels: Record<string, string> = {
+    SHIELDED: '制限適用済み',
+    UNSHIELDED: '制限解除済み',
+    UNKNOWN: '適用状態不明',
+    ERROR: '適用エラー',
+    UNSPECIFIED: '適用報告なし',
+  };
+  let label = shieldLabels[restriction.shieldStatus] ?? '適用状態不明';
+  if (restriction.permissionStatus === 'DENIED') {
+    label = 'Screen Time許可なし';
+  } else if (restriction.permissionStatus === 'NOT_DETERMINED') {
+    label = 'Screen Time許可未確認';
+  } else if (restriction.shieldStatus !== 'ERROR' && restriction.appliedRevision < restriction.controlRevision) {
+    label = '制限の反映待ち';
+  }
+
+  const detail = [
+    'サーバーに届いた最終報告',
+    `${permissionLabels[restriction.permissionStatus] ?? 'Screen Time許可不明'} · 制御 ${restriction.appliedRevision}/${restriction.controlRevision}`,
+    restriction.failureReason,
+  ].filter(Boolean).join(' · ');
+  return { label, detail, unavailable: ['ERROR', 'UNKNOWN', 'UNSPECIFIED'].includes(restriction.shieldStatus) || restriction.permissionStatus !== 'GRANTED' || restriction.appliedRevision < restriction.controlRevision };
+}
 
 function validDomain(value: string) {
   const host = value.trim().toLowerCase().replace(/\.$/, '');
@@ -148,6 +194,11 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
     unsupported: '未対応OS',
     demo: 'デモ',
   }[monitor.state] ?? monitor.state;
+  const iPhoneRestriction = iPhoneRestrictionSummary(
+    state,
+    account.status,
+    iPhoneIntegrationStatus(account, state.iPhoneRestriction, state.iPhoneRestrictionError),
+  );
 
   useEffect(() => setDraft(structuredClone(state.settings)), [stateSignature]);
   useEffect(() => { if (account.email) setEmail(account.email); }, [account.email]);
@@ -294,8 +345,8 @@ export function SettingsPage({ state, busy, execute, getClassificationCandidates
           {account.message && <p className="settings-note" role="status">{account.message}</p>}
         </>}
       </section>
-      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}{monitor.appId ? ' · AppID ' + monitor.appId : ''}{monitor.domain ? ' · Domain ' + monitor.domain : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>iPhone連携<small>作業状態はサーバー経由で共有。制限の実適用はiPhone側で別に確認</small></span><span>{iPhoneIntegrationStatus(account, state.iPhoneRestriction, state.iPhoneRestrictionError)}</span></div></section>
-      <section className="card settings-section compact-settings"><h2>通知</h2><div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>このMacとiPhoneに届きます</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div></section>
+      <section className="card settings-section compact-settings"><h2>端末と報酬</h2><div className="settings-row"><span>macOS計測<small>{monitor.message || '前面アプリ・入力アイドル・対応ブラウザーのドメインを観測'}{monitor.appId ? ' · AppID ' + monitor.appId : ''}{monitor.domain ? ' · Domain ' + monitor.domain : ''}</small></span><span className={monitor.state === 'error' || monitor.state === 'unavailable' ? 'unavailable' : ''}>{monitorStatus}</span></div><div className="settings-row"><span>iPhoneの制限<small>{iPhoneRestriction.detail}</small></span><span className={iPhoneRestriction.unavailable ? 'unavailable' : ''}>{iPhoneRestriction.label}</span></div></section>
+      <section className="card settings-section compact-settings"><h2>通知</h2><div className="settings-row"><span>グループのメンバーが作業を始めたら通知<small>APNsの本番配信は未接続です</small></span><span className="unavailable">未接続</span></div><div className="settings-row"><span>作業中・一時停止中は、報酬や利用開始の通知を出しません</span><strong>常に有効</strong></div></section>
       <section className="card settings-section"><h2>プライバシー</h2><div className="settings-row"><span>観測する情報<small>前面アプリ名・アプリID、入力アイドル、対応ブラウザーのドメインをこのMacへ保存します</small></span><span>ローカル</span></div><p className="settings-note">キー入力の内容、raw URL、ページタイトル、画面画像、ブラウザーのタブIDは取得・保存しません。分類結果はローカル評価し、報酬換算はサーバー接続後に扱います。</p></section>
       <div className="settings-save"><button type="submit" className="button primary" disabled={busy || !canSaveDraft || !draftIsValid || !hasUnsavedChanges}>保存</button></div>
     </form>

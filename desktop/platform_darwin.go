@@ -14,6 +14,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -49,8 +50,10 @@ type popoverState struct {
 	TimerHint       string            `json:"timerHint"`
 	Balance         string            `json:"balance"`
 	Detail          string            `json:"detail"`
+	DetailTooltip   string            `json:"detailTooltip"`
 	HasTask         bool              `json:"hasTask"`
 	HasResult       bool              `json:"hasResult"`
+	StartRetryable  bool              `json:"startRetryable"`
 	Start           popoverCapability `json:"start"`
 	Pause           popoverCapability `json:"pause"`
 	Resume          popoverCapability `json:"resume"`
@@ -207,6 +210,11 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 	switch {
 	case snapshot.Failure != nil && snapshot.Failure.Message != "":
 		view.Detail = snapshot.Failure.Message
+		view.DetailTooltip = snapshot.Failure.Message
+		if snapshot.Failure.Code == "session_start" {
+			view.StartRetryable = true
+			view.Detail = compactPopoverStartFailure(snapshot.Failure.Message)
+		}
 	case snapshot.CloudOperationPending:
 		view.Detail = "サーバーへの作業状態を同期しています。"
 	case snapshot.Sync == "failed":
@@ -224,7 +232,21 @@ func makePopoverState(snapshot session.Snapshot) popoverState {
 	case view.HasResult:
 		view.Detail = "前回の作業結果を確認できます。"
 	}
+	if view.DetailTooltip == "" {
+		view.DetailTooltip = view.Detail
+	}
 	return view
+}
+
+func compactPopoverStartFailure(message string) string {
+	switch {
+	case strings.Contains(message, "iPhoneで利用制限を有効にしてください"):
+		return "iPhoneで利用制限をオンにしてください。"
+	case strings.Contains(message, "iPhoneを制限対象として登録してください"):
+		return "iPhoneを制限対象に登録してください。"
+	default:
+		return strings.TrimPrefix(message, "サーバーで作業を開始できませんでした: ")
+	}
 }
 
 func capability(snapshot session.Snapshot, action string) popoverCapability {

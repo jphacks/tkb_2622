@@ -76,13 +76,13 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         )
         let service = SupabaseAuthService(client: client)
 
-        let hasSession = try await service.verifyEmailOTP(
+        let verificationResult = try await service.verifyEmailOTP(
             email: "person@example.test",
             code: "123456"
         )
         let accessToken = try await service.accessToken()
 
-        XCTAssertTrue(hasSession)
+        XCTAssertEqual(verificationResult, .authenticated)
         XCTAssertEqual(accessToken, "refreshed-simulator-access-token")
         let request = try XCTUnwrap(requests.values.first)
         XCTAssertEqual(request.url?.path, "/auth/v1/verify")
@@ -111,14 +111,39 @@ final class SupabaseAuthRefreshSimulatorTests: XCTestCase {
         )
         let service = SupabaseAuthService(client: client)
 
-        let hasSession = try await service.verifyEmailOTP(
+        let verificationResult = try await service.verifyEmailOTP(
             email: "person@example.test",
             code: "123456"
         )
 
-        XCTAssertFalse(hasSession)
+        XCTAssertEqual(verificationResult, .responseMissingSession)
         XCTAssertNil(client.auth.currentSession)
         XCTAssertEqual(requests.values.first?.url?.path, "/auth/v1/verify")
+    }
+
+    func testEmailOTPVerificationDistinguishesSessionStorageFailure() async throws {
+        AuthRefreshURLProtocol.handler = { _ in
+            (200, Self.refreshedSessionJSON)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AuthRefreshURLProtocol.self]
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://project.example.test")!,
+            supabaseKey: "simulator-publishable-key",
+            options: SupabaseClientOptions(
+                auth: .init(storage: NonPersistingAuthLocalStorage(), autoRefreshToken: false),
+                global: .init(session: URLSession(configuration: configuration))
+            )
+        )
+        let service = SupabaseAuthService(client: client)
+
+        let verificationResult = try await service.verifyEmailOTP(
+            email: "person@example.test",
+            code: "123456"
+        )
+
+        XCTAssertEqual(verificationResult, .sessionNotPersisted)
+        XCTAssertNil(client.auth.currentSession)
     }
 
     func testExpiredStoredSessionRefreshesBeforeReturningAccessToken() async throws {
@@ -264,6 +289,14 @@ private final class LockedAuthLocalStorage: AuthLocalStorage, @unchecked Sendabl
         values[key] = nil
         lock.unlock()
     }
+}
+
+private struct NonPersistingAuthLocalStorage: AuthLocalStorage {
+    func store(key: String, value: Data) throws {}
+
+    func retrieve(key: String) throws -> Data? { nil }
+
+    func remove(key: String) throws {}
 }
 
 private final class LockedAuthRequests {

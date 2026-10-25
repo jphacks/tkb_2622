@@ -120,11 +120,17 @@ struct SupabaseAuthService: AccessTokenProviding {
     try await client.auth.signInWithOTP(email: email, shouldCreateUser: true)
   }
 
-  func verifyEmailOTP(email: String, code: String) async throws -> Bool {
+  func verifyEmailOTP(email: String, code: String) async throws -> EmailOTPVerificationResult {
     // `.email` matches both the signup confirmation code (first login) and the
     // magic-link code (existing user), so a single request covers both cases.
     let response = try await client.auth.verifyOTP(email: email, token: code, type: .email)
-    return response.session != nil && client.auth.currentSession != nil
+    guard response.session != nil else {
+      return .responseMissingSession
+    }
+    guard client.auth.currentSession != nil else {
+      return .sessionNotPersisted
+    }
+    return .authenticated
   }
 
   func accessToken() async throws -> String? {
@@ -151,6 +157,12 @@ struct SupabaseAuthService: AccessTokenProviding {
       }
     )
   }
+}
+
+enum EmailOTPVerificationResult: Equatable {
+  case authenticated
+  case responseMissingSession
+  case sessionNotPersisted
 }
 
 private final class SupabaseClientCache: @unchecked Sendable {
