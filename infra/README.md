@@ -171,6 +171,21 @@ bootstrap → envs/shared/gcp → envs/<env>/gcp → (Secret 投入・初回デ�
    curl --fail "$(terraform -chdir=infra/envs/dev/cloudflare output -raw api_url)/healthz"
    ```
 
+### GitHub Actions の設定
+
+main に backend の変更が push されると，`.github/workflows/deploy-backend.yml` が dev へデプロイする（イメージのビルド・公開 → マイグレーション Job → API 更新 → `/health` の確認）．Actions のタブから `workflow_dispatch` で手動実行もできる．
+
+リポジトリの Settings → Environments で `dev` を作り，次の Environment variables を登録する（Secret ではなく Variables）．
+
+| 変数 | 値 |
+| --- | --- |
+| `GCP_PROJECT_ID` | `tkb-2622-dev` |
+| `GCP_REGION` | `asia-northeast1` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform -chdir=infra/envs/shared/gcp output -raw workload_identity_provider` |
+| `GCP_DEPLOYER_SERVICE_ACCOUNT` | `terraform -chdir=infra/envs/shared/gcp output -raw deployer_service_account_email` |
+
+Workload Identity 連携は `jphacks/tkb_2622` のトークンしか受け付けないため，fork からは実行できない．
+
 ### 検証
 
 ```bash
@@ -185,7 +200,7 @@ make -C infra lock       # provider 更新後にロックファイルを再生�
 | --- | --- |
 | `run.app` URL からの迂回 | Cloud Run は公開されており，`run.app` へ直接アクセスすると Cloudflare を通らない．Worker が共有シークレットのヘッダーを付け，API で検証する案がある（backend の対応が必要） |
 | レート制限 | workers.dev ではゾーンのレート制限・WAF を使えない．必要になったら Worker の Rate Limiting バインディングで Worker 内に制限を入れる案がある |
-| CI のワークフロー | Workload Identity 連携と CI 用 SA は作成するが，GitHub Actions のワークフローは未作成．prod へのデプロイを main ブランチに限定するかも未決 |
+| CI のワークフロー | main への push で dev へデプロイ（`.github/workflows/deploy-backend.yml`）．prod は未定 |
 | Supabase の Terraform 管理 | 当面は手動．設定項目が増えたら Supabase provider の導入を検討 |
 | 監視・アラート | 未設定 |
 
