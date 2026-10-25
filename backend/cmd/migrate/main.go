@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -33,7 +34,8 @@ func run(logger *slog.Logger) error {
 	defer db.Close()
 	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files)
 	if err != nil {
-		return errors.New("migration provider initialization failed")
+		// The error only names migration files, never the connection URL.
+		return fmt.Errorf("migration provider initialization failed: %w", err)
 	}
 	switch os.Args[1] {
 	case "up":
