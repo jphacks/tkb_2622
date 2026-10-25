@@ -51,6 +51,38 @@ final class DevicePolicySyncSimulatorTests: XCTestCase {
         XCTAssertEqual(policy.policyVersion, 1)
     }
 
+    func testResyncsMatchingPolicyWhenServerNeedsCurrentDevicePermissionReport() async throws {
+        let methods = LockedRequestMethods()
+        DevicePolicySyncURLProtocol.handler = { request in
+            let method = request.url?.lastPathComponent ?? ""
+            methods.append(method)
+            switch method {
+            case "RegisterDevice":
+                return (200, #"{"device":{"id":"device-1","status":"ACTIVE"}}"#)
+            case "GetRestrictionPolicy":
+                return (200, #"{"policy":{"deviceId":"device-1","status":"POLICY_STATUS_PERMISSION_REQUIRED","targetMode":"TARGET_MODE_SELECTED_APPS","deviceConfigVersion":"4","configured":true,"version":"2"}}"#)
+            case "UpdateRestrictionPolicy":
+                return (200, #"{"policy":{"deviceId":"device-1","status":"POLICY_STATUS_PERMISSION_REQUIRED","targetMode":"TARGET_MODE_SELECTED_APPS","deviceConfigVersion":"4","configured":true,"version":"3"}}"#)
+            default:
+                return (404, #"{"code":"not_found","message":"unknown route"}"#)
+            }
+        }
+
+        let policy = try await repository().sync(
+            settings: DeviceRestrictionSettings(
+                enabled: true,
+                targetMode: "TARGET_MODE_SELECTED_APPS",
+                configured: true,
+                deviceConfigVersion: 4
+            ),
+            client: client(),
+            deviceName: "Simulator"
+        )
+
+        XCTAssertEqual(methods.values, ["RegisterDevice", "GetRestrictionPolicy", "UpdateRestrictionPolicy"])
+        XCTAssertEqual(policy.policyVersion, 3)
+    }
+
     func testReloadsPolicyAfterVersionConflictAndAcceptsMatchingServerState() async throws {
         let methods = LockedRequestMethods()
         var policyReadCount = 0

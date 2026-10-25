@@ -20,5 +20,7 @@ module "api" {
   max_instances       = var.max_instances
   deletion_protection = var.deletion_protection
 
+  origin_auth_token_version = var.origin_auth_token_version
+
   deployer_service_account_email = data.terraform_remote_state.shared_gcp.outputs.deployer_service_account_email
 }

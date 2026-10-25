@@ -1,4 +1,5 @@
 -- +goose Up
+-- StatementBegin/End keeps goose from splitting the DO block at its inner semicolons.
 -- +goose StatementBegin
 DO $$
 BEGIN

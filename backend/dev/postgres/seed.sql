@@ -275,7 +275,7 @@ ON CONFLICT (device_id) DO UPDATE SET
     enabled = EXCLUDED.enabled,
     target_mode = EXCLUDED.target_mode,
     usage_time_mode = 'ACTIVE_USAGE',
-    allowed_apps_policy = 'STANDARD_APPS_EXCEPT_SAFARI',
+    allowed_apps_policy = 'NONE',
     device_config_version = EXCLUDED.device_config_version,
     configured = EXCLUDED.configured,
     version = EXCLUDED.version,

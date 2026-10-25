@@ -152,7 +152,8 @@ struct ConfiguredDeviceSettingsRepository {
                currentPolicy.targetMode == settings.targetMode,
                currentPolicy.enabled == settings.enabled,
                currentPolicy.configured == settings.configured,
-               currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion {
+               currentPolicy.deviceConfigVersion.value == settings.deviceConfigVersion,
+               !(settings.enabled && currentPolicy.status == "POLICY_STATUS_PERMISSION_REQUIRED") {
                 return SyncedDevicePolicy(
                     deviceID: deviceID,
                     deviceName: deviceName,

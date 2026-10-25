@@ -322,7 +322,7 @@ func (s *Service) UpdatePolicy(ctx context.Context, a Actor, in PolicyInput) (ou
 			if in.ExpectedVersion != 0 {
 				return "", apperr.ErrConflict
 			}
-			p = Policy{DeviceID: in.DeviceID, UserID: a.UserID, UsageTimeMode: "ACTIVE_USAGE", AllowedAppsPolicy: "STANDARD_APPS_EXCEPT_SAFARI"}
+			p = Policy{DeviceID: in.DeviceID, UserID: a.UserID, UsageTimeMode: "ACTIVE_USAGE", AllowedAppsPolicy: "NONE"}
 		case e != nil:
 			return "", e
 		case p.Version != in.ExpectedVersion:
@@ -335,6 +335,32 @@ func (s *Service) UpdatePolicy(ctx context.Context, a Actor, in PolicyInput) (ou
 		}
 		if e = repo.SavePolicy(ctx, p); e != nil {
 			return "", e
+		}
+		state, e := repo.GetState(ctx, a.UserID)
+		if e != nil {
+			return "", e
+		}
+		if state.DeviceID != "" && state.DeviceID != p.DeviceID {
+			// The authenticated actor is the sole active iPhone, and UpdatePolicy has already
+			// rejected an open grant. Move the control state off the revoked previous device and
+			// require the newly registered iPhone to report its actual Screen Time state.
+			desiredMode := state.DesiredMode
+			if desiredMode == domain.TimedUnlock {
+				if state.SessionID != "" {
+					desiredMode = domain.Shielded
+				} else {
+					desiredMode = domain.Unrestricted
+				}
+			}
+			state.DeviceID = p.DeviceID
+			state.AppliedRevision = 0
+			state.ShieldStatus, state.PermissionStatus = "UNKNOWN", "NOT_DETERMINED"
+			state.LastAppliedAt, state.LastReportedAt = nil, nil
+			state.FailureReason = ""
+			state.Want(desiredMode, "")
+			if e = saveState(ctx, repo, &state); e != nil {
+				return "", e
+			}
 		}
 		permission, e := permissionOf(ctx, repo, a.UserID, p.DeviceID)
 		out = PolicyView{Policy: p, Status: p.Status(permission)}

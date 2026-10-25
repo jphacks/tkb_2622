@@ -230,11 +230,11 @@ export namespace session {
 	    lastAppliedAt?: string;
 	    lastReportedAt?: string;
 	    failureReason?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new IPhoneRestrictionState(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sessionId = source["sessionId"];
