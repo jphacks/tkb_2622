@@ -278,7 +278,7 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 .settings-help > summary::before { content: '＋'; display: inline-block; width: 22px; color: var(--purple); }
 .settings-help[open] > summary::before { content: '−'; }
 .settings-help > p { margin: 8px 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.6; }
-.classification-toolbar { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
+.settings-section-heading > .classification-toolbar { display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
 .classification-toolbar .button { min-height: 38px; padding: 0 12px; }
 .classification-status.is-error { color: #B4421F; }
 .classification-group { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: start; gap: 14px; padding: 14px 0; border-top: 1px solid #F2F0FA; color: var(--muted); font-size: 14px; }
@@ -320,11 +320,12 @@ h2 { font-size: 15px; margin-bottom: 8px; }
 @media (max-width: 680px) { .app-shell { grid-template-columns: 1fr; } .sidebar { padding: 16px; } .sidebar-balance { display: none; } .main-navigation { flex-direction: row; flex-wrap: wrap; } .nav-item { width: auto; } .page-content { padding: 20px 16px; } .compact-window { align-items: flex-start; padding: 0; } .startup-panel { width: 100%; max-width: 440px; } .settings-section-heading { align-items: flex-start; flex-direction: column; } .classification-toolbar { width: 100%; flex-direction: column; } .classification-toolbar .button { width: 100%; } .classification-chips { grid-template-columns: 1fr; } .classification-form-fields { grid-template-columns: 1fr; } .classification-form label { grid-template-rows: auto 42px; } .classification-form-actions { flex-direction: column-reverse; align-items: stretch; } .classification-form-actions .button, .classification-form-actions .text-button { width: 100%; } .classification-candidate { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 8px; } .candidate-copy { grid-column: 2 / 4; grid-row: 1; } .candidate-count { grid-column: 1 / 2; grid-row: 2; margin: 0; } .candidate-category { grid-column: 2 / 3; grid-row: 2; } .classification-candidate .text-button { grid-column: 3 / 4; grid-row: 2; margin: 0; } }
 
 @media (max-width: 680px) {
-  .classification-toolbar {
+  .settings-section-heading > .classification-toolbar {
     display: grid;
+    flex-direction: initial;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .classification-toolbar .button {
+  .settings-section-heading > .classification-toolbar .button {
     min-width: 0;
     min-height: 48px;
     padding: 6px 8px;
