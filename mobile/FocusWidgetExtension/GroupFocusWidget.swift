@@ -19,12 +19,13 @@ private struct FocusRoomEntry: TimelineEntry {
     let date: Date
     let members: [StoredFocusMember]
     let updatedAt: Date?
+    let isLocalPreview: Bool
     let movementPhase: Int
 }
 
 private struct FocusRoomProvider: TimelineProvider {
     func placeholder(in context: Context) -> FocusRoomEntry {
-        FocusRoomEntry(date: .now, members: [], updatedAt: nil, movementPhase: 0)
+        FocusRoomEntry(date: .now, members: [], updatedAt: nil, isLocalPreview: false, movementPhase: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (FocusRoomEntry) -> Void) {
@@ -33,12 +34,14 @@ private struct FocusRoomProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<FocusRoomEntry>) -> Void) {
         let now = Date()
-        let snapshot = readSnapshot()
+        let isLocalPreview = isLocalPreviewEnabled
+        let snapshot = readSnapshot() ?? (isLocalPreview ? localPreviewSnapshot() : nil)
         let entries = (0..<4).map { phase in
             FocusRoomEntry(
                 date: now.addingTimeInterval(TimeInterval(phase * 4 * 60)),
                 members: snapshot?.members ?? [],
                 updatedAt: snapshot?.updatedAt,
+                isLocalPreview: isLocalPreview,
                 movementPhase: phase
             )
         }
@@ -46,13 +49,32 @@ private struct FocusRoomProvider: TimelineProvider {
     }
 
     private func makeEntry(at date: Date, phase: Int) -> FocusRoomEntry {
-        let snapshot = readSnapshot()
+        let isLocalPreview = isLocalPreviewEnabled
+        let snapshot = readSnapshot() ?? (isLocalPreview ? localPreviewSnapshot() : nil)
         return FocusRoomEntry(
             date: date,
             members: snapshot?.members ?? [],
             updatedAt: snapshot?.updatedAt,
+            isLocalPreview: isLocalPreview,
             movementPhase: phase
         )
+    }
+
+    private var isLocalPreviewEnabled: Bool {
+        #if DEBUG
+        return UserDefaults(suiteName: focusAppGroup)?.bool(forKey: "mobile.widget.groupFocusLocalPreview") ?? false
+        #else
+        return false
+        #endif
+    }
+
+    private func localPreviewSnapshot() -> StoredFocusSnapshot {
+        let now = Date()
+        return StoredFocusSnapshot(members: [
+            StoredFocusMember(displayName: "ちほ", avatarID: "cat", startedAt: now),
+            StoredFocusMember(displayName: "ゆう", avatarID: "dragon", startedAt: now),
+            StoredFocusMember(displayName: "はる", avatarID: "slime", startedAt: now)
+        ], updatedAt: now)
     }
 
     private func readSnapshot() -> StoredFocusSnapshot? {
@@ -67,6 +89,7 @@ private struct FocusRoomWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     private var isStale: Bool {
+        if entry.isLocalPreview { return false }
         guard let updatedAt = entry.updatedAt else { return true }
         return entry.date.timeIntervalSince(updatedAt) >= 12 * 60
     }
