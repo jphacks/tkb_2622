@@ -211,12 +211,19 @@ final class MobileScreenTimeController: ObservableObject {
         refreshAuthorizationStatus()
 
         let shared = ScreenTimeSharedStorage.defaults
+        if shared.string(forKey: "mobile.usage.activeGrantID") != nil {
+            shared.set(
+                String(snapshot.restrictionControlRevision),
+                forKey: "mobile.usage.controlRevision"
+            )
+        }
         var status = "SHIELD_STATUS_UNKNOWN"
         var failureReason = ""
         var grantID = ""
 
         switch snapshot.desiredRestriction {
         case .shielded:
+            DeviceActivityUsageMonitor().stopMonitoring()
             if applyRestriction() {
                 status = "SHIELD_STATUS_SHIELDED"
             } else {
@@ -240,6 +247,7 @@ final class MobileScreenTimeController: ObservableObject {
             let grantFinished = shared.string(forKey: "mobile.usage.completedGrantID") == activeGrantID
                 || shared.bool(forKey: "mobile.usage.monitorIntervalEnded")
             if grantFinished {
+                DeviceActivityUsageMonitor().stopMonitoring()
                 if applyRestriction() {
                     status = "SHIELD_STATUS_SHIELDED"
                 } else {
@@ -261,6 +269,7 @@ final class MobileScreenTimeController: ObservableObject {
                 }
             }
         case .unrestricted, .sessionEnded:
+            DeviceActivityUsageMonitor().stopMonitoring()
             if clearRestriction() {
                 status = "SHIELD_STATUS_UNSHIELDED"
             }
@@ -282,6 +291,7 @@ final class MobileScreenTimeController: ObservableObject {
             shared.removeObject(forKey: operationKey)
             shared.removeObject(forKey: appliedAtKey)
             shared.removeObject(forKey: requestFingerprintKey)
+            await synchronizeStoppedGrantIfNeeded(snapshot)
             return
         }
 
@@ -325,9 +335,26 @@ final class MobileScreenTimeController: ObservableObject {
             shared.removeObject(forKey: operationKey)
             shared.removeObject(forKey: appliedAtKey)
             shared.removeObject(forKey: requestFingerprintKey)
+            await synchronizeStoppedGrantIfNeeded(snapshot)
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "制限の適用状態をbackendへ報告できませんでした。"
+        }
+    }
+
+    private func synchronizeStoppedGrantIfNeeded(_ snapshot: MobileHomeSnapshot) async {
+        guard snapshot.desiredRestriction != .timedUnlock,
+              let grantID = ScreenTimeSharedStorage.defaults.string(forKey: "mobile.usage.activeGrantID"),
+              !grantID.isEmpty else {
+            return
+        }
+
+        do {
+            let repository = try ConfiguredUsageGrantRepository()
+            _ = try await repository.synchronizeActiveGrant(grantID: grantID)
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "終了した利用枠の消費状況をbackendへ同期できませんでした。"
         }
     }
 

@@ -139,21 +139,20 @@ final class UsageReservationViewModel: ObservableObject {
             }
         } catch {
             if error is UsageGrantRepositoryError {
-                DeviceActivityUsageMonitor().stop()
-                defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
-                defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
-            }
-            if let clientError = error as? ConnectJSONClient.ClientError {
-                switch clientError {
-                case .connect, .httpStatus, .missingAccessToken, .invalidResponse, .unexpectedHealthStatus:
-                    DeviceActivityUsageMonitor().stop()
-                    defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
-                    defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
-                }
+                clearPendingReservation()
+            } else if let clientError = error as? ConnectJSONClient.ClientError,
+                      case .missingAccessToken = clientError {
+                clearPendingReservation()
             }
             reservationError = (error as? LocalizedError)?.errorDescription
-                ?? "利用枠の確保結果を確認できませんでした。同じ時間のまま再試行してください。"
+                ?? "利用枠の確保結果を確認できませんでした。同じ要求のまま再試行してください。"
         }
+    }
+
+    private func clearPendingReservation() {
+        DeviceActivityUsageMonitor().stop()
+        defaults.removeObject(forKey: "mobile.usage.reserve.pendingOperationID")
+        defaults.removeObject(forKey: "mobile.usage.reserve.pendingSeconds")
     }
 }
 
