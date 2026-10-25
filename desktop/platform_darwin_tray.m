@@ -19,7 +19,7 @@ extern void FocusLinkQuit(void);
     id _outsideClickMonitor;
 }
 
-- (void)installStatusItem;
+- (void)installStatusItem:(NSData *)iconData;
 - (void)removeStatusItem;
 - (void)statusItemPressed:(id)sender;
 - (void)showWindow:(id)sender;
@@ -53,7 +53,7 @@ static FocusLinkStatusController *focusLinkStatusController;
 
 @implementation FocusLinkStatusController
 
-- (void)installStatusItem {
+- (void)installStatusItem:(NSData *)iconData {
     if (_statusItem != nil) {
         return;
     }
@@ -66,9 +66,19 @@ static FocusLinkStatusController *focusLinkStatusController;
     }
 
     NSStatusBarButton *button = _statusItem.button;
+    // 埋め込んだテンプレート画像を使い、読み込めない場合はSF Symbol、さらに文字へ戻す。
     NSImage *image = nil;
-    if (@available(macOS 11.0, *)) {
-        image = [NSImage imageWithSystemSymbolName:@"timer" accessibilityDescription:@"Focus Link"];
+    if (iconData.length > 0) {
+        image = [[[NSImage alloc] initWithData:iconData] autorelease];
+        if (image != nil) {
+            image.size = NSMakeSize(18, 18);
+            image.accessibilityDescription = @"Focus Link";
+        }
+    }
+    if (image == nil) {
+        if (@available(macOS 11.0, *)) {
+            image = [NSImage imageWithSystemSymbolName:@"timer" accessibilityDescription:@"Focus Link"];
+        }
     }
     if (image != nil) {
         image.template = YES;
@@ -185,12 +195,13 @@ static FocusLinkStatusController *focusLinkStatusController;
 
 @end
 
-void FocusLinkInstallStatusItem(void) {
+void FocusLinkInstallStatusItem(const void *iconData, int iconLength) {
     @autoreleasepool {
         if (focusLinkStatusController == nil) {
             focusLinkStatusController = [[FocusLinkStatusController alloc] init];
         }
-        [focusLinkStatusController performSelectorOnMainThread:@selector(installStatusItem) withObject:nil waitUntilDone:YES];
+        NSData *icon = (iconData != NULL && iconLength > 0) ? [NSData dataWithBytes:iconData length:(NSUInteger)iconLength] : nil;
+        [focusLinkStatusController performSelectorOnMainThread:@selector(installStatusItem:) withObject:icon waitUntilDone:YES];
     }
 }
 
