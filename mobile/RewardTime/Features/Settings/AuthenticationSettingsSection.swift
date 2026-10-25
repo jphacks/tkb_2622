@@ -293,10 +293,19 @@ struct AuthenticationSettingsSection: View {
     isWorking = true
     defer { isWorking = false }
     do {
-      let hasSession = try await service.verifyEmailOTP(email: targetEmail, code: code)
-      guard hasSession else {
+      let verificationResult = try await service.verifyEmailOTP(email: targetEmail, code: code)
+      guard verificationResult == .authenticated else {
+        let message: String
+        switch verificationResult {
+        case .authenticated:
+          return
+        case .responseMissingSession:
+          message = "確認コードは受理されましたが、Supabaseからログインセッションが返りませんでした。しばらく待ってから確認コードを再送してください。"
+        case .sessionNotPersisted:
+          message = "ログインセッションは返されましたが、この端末に保存できませんでした。しばらく待ってから確認コードを再送してください。"
+        }
         setMessage(
-          "確認コードは受理されましたが、ログインセッションが発行されませんでした。確認コードを再送してもう一度ログインしてください。",
+          message,
           error: true
         )
         return
