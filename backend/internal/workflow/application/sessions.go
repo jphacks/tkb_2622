@@ -129,7 +129,7 @@ type StartInput struct {
 	TaskVersion         int64
 }
 
-// StartはRUNNINGセッションを作り、残高0のwalletを結び付ける。有効なiPhoneがなければ記録専用で開始する。
+// StartはRUNNINGセッションを作り、ポリシーに応じた初期残高のwalletを結び付ける。有効なiPhoneがなければ記録専用で開始する。
 func (w *Sessions) Start(ctx context.Context, a focus.Actor, in StartInput) (SessionResult, error) {
 	if !focus.ValidID(in.TaskID) || in.TaskVersion < 1 {
 		return SessionResult{}, apperr.ErrInvalid
