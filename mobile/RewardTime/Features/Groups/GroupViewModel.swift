@@ -14,14 +14,20 @@ final class GroupViewModel: ObservableObject {
     @Published private(set) var workStarts: [MobileGroupWorkStart] = []
     @Published private(set) var workStartError: String?
     private let repository: any GroupRepository
+    private let sleep: (UInt64) async throws -> Void
     private var loadGeneration = 0
     private var isLoadingWorkStarts = false
 
-    init(repository: any GroupRepository) {
+    init(
+        repository: any GroupRepository,
+        sleep: @escaping (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
+    ) {
         self.repository = repository
+        self.sleep = sleep
     }
 
     func load() async {
+        guard !Task.isCancelled else { return }
         loadGeneration += 1
         let requestGeneration = loadGeneration
         let previousGroups: [MobileGroup]?
@@ -34,11 +40,11 @@ final class GroupViewModel: ObservableObject {
         loadError = nil
         do {
             let groups = try await repository.fetchGroups()
-            guard requestGeneration == loadGeneration else { return }
+            guard !Task.isCancelled, requestGeneration == loadGeneration else { return }
             state = .loaded(groups)
             loadError = nil
         } catch {
-            guard requestGeneration == loadGeneration else { return }
+            guard !Task.isCancelled, requestGeneration == loadGeneration else { return }
             let message = Self.failureMessage(for: error, operation: .listGroups)
             if let previousGroups {
                 state = .loaded(previousGroups)
@@ -54,27 +60,38 @@ final class GroupViewModel: ObservableObject {
         while !Task.isCancelled {
             await refreshWorkStarts()
             do {
-                try await Task.sleep(nanoseconds: 30_000_000_000)
+                try await sleep(needsGroupReload ? 5_000_000_000 : 30_000_000_000)
             } catch {
                 return
+            }
+            guard !Task.isCancelled else { return }
+            if needsGroupReload {
+                await load()
             }
         }
     }
 
+    private var needsGroupReload: Bool {
+        if case .failed = state { return true }
+        return loadError != nil
+    }
+
     func refreshWorkStarts() async {
-        guard !isLoadingWorkStarts,
+        guard !Task.isCancelled, !isLoadingWorkStarts,
               case .loaded(let groups) = state,
               !groups.isEmpty else { return }
         isLoadingWorkStarts = true
         defer { isLoadingWorkStarts = false }
         do {
             let newEvents = try await repository.fetchWorkStarts()
+            guard !Task.isCancelled else { return }
             workStartError = nil
             let knownIDs = Set(workStarts.map(\.id))
             workStarts = Array((newEvents.filter { !knownIDs.contains($0.id) } + workStarts)
                 .sorted { $0.startedAt.date > $1.startedAt.date }
                 .prefix(30))
         } catch {
+            guard !Task.isCancelled else { return }
             workStartError = GroupAPIErrorMessage.describe(error, operation: .workStartFeed)
         }
     }
