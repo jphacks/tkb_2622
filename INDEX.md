@@ -1,15 +1,15 @@
 # tkb_2622 — 開発資料と Skills
 
-新規アプリの初期開発用リポジトリ。PCでの実作業をiPhoneの娯楽アプリの利用可能時間に変え、大学生や社会人の学業・仕事における作業開始と継続を動機づける構想です。詳細仕様は策定中です。プロダクトの目的と仮説は下記の戦略資料、バックエンドの構成方針は仕様資料を参照してください。
+Focus Linkの実装・設計・検証資料を管理するリポジトリです。PCでの実作業をiPhoneの娯楽アプリの利用可能時間につなげ、大学生や社会人の学業・仕事における作業開始と継続を支援します。Desktop・iPhone・Go API・インフラの実装を備えます。プロダクトの目的と仮説は戦略資料、構成と業務ルールは仕様資料、起動方法と検証実績は各コンポーネントのREADMEを参照してください。
 
 ## ディレクトリ
 
 | ディレクトリ | 用途・現状 |
 | --- | --- |
-| [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restrictionのRPC，HTTP／Connectヘルスチェック，Docker起動手順 |
-| [desktop/](desktop/) | macOS・Windows向けのWails v2 / Go / Web UIアプリ用 |
-| [mobile/](mobile/) | SwiftUIアプリ。ホーム・認証・履歴・グループ・Screen TimeのAPI／OS連携を順次実装中。[画面対応と開発の進め方](mobile/README.md)を参照 |
-| [infra/](infra/) | Terraform（Cloudflare・Google Cloud）用．ディレクトリ構成・管理範囲・適用順序の方針を[README](infra/README.md)に記載．コード未作成 |
+| [backend/](backend/) | Go APIの実装。PostgreSQL，identity・focus・reward・restriction・groupのRPC，通知Outbox・APNs配信処理，HTTP／Connectヘルスチェック，Docker起動手順 |
+| [desktop/](desktop/) | Wails v2 / Go / Reactアプリ。作業セッション・履歴・認証のAPI接続，macOSネイティブ計測とメニューバー，Windowsタスクトレイを実装。Windows計測はデモモード |
+| [mobile/](mobile/) | SwiftUIアプリ。ホーム・認証・履歴・グループのAPI接続，Screen Time制御・利用時間監視拡張，集中ルームWidgetを実装。[画面対応と検証範囲](mobile/README.md)を参照 |
+| [infra/](infra/) | TerraformでCloudflare Workers・Cloud Run・Secret Manager・CI連携を定義。入口の検査・レート制限・直接アクセス対策を実装。[適用手順と検証範囲](infra/README.md)を参照 |
 | [poc/](poc/) | 機能検証用。[macOS操作ログPoC](poc/macos-native/README.md)は拡張機能なしの自前取得を検証。 [iOS報酬時間PoC](poc/ios-reward-time/)、[友だち集中のウィジェット／Dynamic Island PoC](poc/ios-friend-focus-widget/)、手順は [README](poc/README.md) を参照 |
 | [docs/](docs/) | 仕様・設計資料 |
 
@@ -19,9 +19,9 @@
 | --- | --- |
 | [プロダクト戦略](docs/strategy/1.プロダクト戦略.md) | 目的・課題と仮説・想定ユーザーストーリー・差別化の核を記載 |
 | [機能・非機能要件](docs/strategy/2.機能-非機能要件.md) | アプリ・バックエンドの機能，品質要件案，受け入れシナリオ，未決事項を記載 |
-| [PoC戦略](docs/strategy/3.poc戦略.md) | 追加要件の実機検証計画を記載．検証は未実施 |
+| [PoC戦略](docs/strategy/3.poc戦略.md) | Mac/API/iPhone通信の確認実績，Screen Time・Widget・Dynamic Islandの実装と実機受け入れ項目を記載 |
 | [機能分担戦略](docs/strategy/4.機能分担戦略.md) | 検討中：4人の担当案・責任の境界・並行開発の進め方を記載 |
-| [デスクトップアプリ配布](docs/strategy/5.デスクトップアプリ配布.md) | 検討中：OS別の配布形式，署名・公証，GitHub Releasesの運用，段階ごとの進め方を記載．配布用ビルド・CIは未実施 |
+| [デスクトップアプリ配布](docs/strategy/5.デスクトップアプリ配布.md) | OS別のビルド・配布形式，署名・公証，GitHub ReleasesとリリースCIの導入方針を記載 |
 
 ## 仕様資料
 
@@ -29,20 +29,21 @@
 | --- | --- |
 | [プロダクト全体像](docs/spec/5.プロダクト全体像.md) | 採用構成・Mermaid全体図・各要素の役割・利用の流れを記載 |
 | [バックエンド構成](docs/spec/1.バックエンド構成.md) | モジュラーモノリス，クリーンアーキテクチャの依存方向，横断処理・トランザクション方針を記載 |
-| [API仕様書](docs/spec/3.API仕様書.md) | ヘルスチェックを実装済み．小休憩モデルの業務動作，基本APIの契約案，全機能の対応表，未決事項を記載 |
+| [API仕様書](docs/spec/3.API仕様書.md) | タスク・セッション・報酬・制限・グループ・通知のAPI，実装対応表，小休憩モデルの業務動作と受け入れ条件を記載 |
 | [ドメインモデル定義](docs/spec/4.ドメインモデル定義.md) | 途中報酬・小休憩，終了時の全未使用報酬破棄・制限解除，グループ・通知のモデルを記載 |
-| [iOSクライアント開発フロー](docs/spec/6.iOSクライアント開発フロー.md) | バックエンドAPI完成後のmobile接続順，開始条件，画面別API対応，iOS側の未決事項と担当を記載 |
-| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLの接続・権限・環境設定，Supabase接続の残作業を記載．コードのPostgreSQL移行は済み，Supabase接続は未実施 |
+| [iOSクライアント開発フロー](docs/spec/6.iOSクライアント開発フロー.md) | mobileの認証・画面別API・端末制限の実装，Release設定，段階ごとの受け入れ条件を記載 |
+| [インフラ構成](docs/spec/2.インフラ構成.md) | Supabase PostgreSQLの接続・権限・環境設定，実装済みTerraformと環境別の接続確認手順を記載 |
 | [認証構成](docs/spec/6.認証構成.md) | Supabase Auth採用，ログイン方法の比較，JWT検証，業務User対応の契約案を記載 |
-| [フロントエンド構成](docs/spec/6.フロントエンド構成.md) | Wails v2・React・TypeScript・ViteとSwiftUIの構成，責務・状態・検証方針を記載．デスクトップ共通基盤はデモ実装済み，API・計測・iPhone連携は未接続 |
+| [フロントエンド構成](docs/spec/6.フロントエンド構成.md) | Wails v2・React・TypeScript・ViteとSwiftUIの構成，両クライアントのAPI接続，OS別の常駐・計測と検証方針を記載 |
 | [デスクトップ共同開発](docs/spec/7.デスクトップ共同開発.md) | Mac担当者が先行する共通基盤，OS別UIの境界・配置・接続契約，引き渡し条件・分担・検証を記載 |
-| [Desktop・iPhone連携の現状と本番化課題](docs/spec/8.desktop-mobile連携の現状と課題.md) | 同一アカウントで共有される状態，未接続範囲，環境設定と本番化の優先課題を記載 |
+| [Desktop・iPhone連携の構成と受け入れ確認](docs/spec/8.desktop-mobile連携の現状と課題.md) | 同一アカウントの認証・作業状態・残高・制限状態の連携，環境設定と受け入れ手順を記載 |
 
-## 作業計画
+## 検証・確認資料
 
 | 資料 | 状態 |
 | --- | --- |
-| [Mobile APIエラー安定化 作業リスト](docs/plans/2026-10-25-mobile-api-stability.md) | mobileのAPIエラーを優先し、Simulator test・実装・文書更新・ローカルコミットを縦切りで進める。ウィジェット／Dynamic Islandは後続 |
+| [Mobileの検証手順・実績](mobile/README.md) | host・Simulator・ログイン画面UIのテスト実績，APIエラーと再試行，実機受け入れ手順を記載 |
+| [macOS操作ログの実機結果](poc/macos-native/docs/results.md) | 前面アプリ・ブラウザードメインの取得，5分類評価，無操作境界と復帰の検証結果を記載 |
 
 ## UIモック
 
