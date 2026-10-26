@@ -1,8 +1,8 @@
 # バックエンド
 
-Go / `net/http`でHTTPとConnect互換のヘルスチェック，identityモジュールのRPC（業務User登録・端末登録）を提供する最小構成です．DBはPostgreSQL（Supabase PostgreSQLを想定）で，スキーマはgooseで管理します．Supabase AuthのアクセストークンをJWKSで検証します．識別以外の業務RPC・テストコードは未実装です．
+Go / `net/http`とConnect RPCで，業務User・端末登録，タスク・作業セッション，報酬残高・履歴，iPhoneの利用枠・制限状態，招待制グループを扱うAPIを実装しています．HTTP／Connectヘルスチェック，グループの作業開始フィード・集中状態取得APIも提供します．DBはPostgreSQL（Supabase PostgreSQLを想定）で，スキーマはgoose，クエリはsqlc，RPC定義と生成はProtocol Buffers／Bufで管理します．Supabase AuthのアクセストークンをJWKSで検証し，業務処理・認可・競合制御のテストを配置しています．
 
-今後の業務実装は，6つの業務モジュールと横断処理のworkflowからなるモジュラーモノリスとし，各モジュール内でクリーンアーキテクチャの依存方向を守ります．目標のディレクトリ構成・責務・トランザクション境界は[バックエンド構成](../docs/spec/1.バックエンド構成.md)を参照してください．以下は現在実装済みの構成と起動手順です．
+業務実装は，identity・focus・reward・restriction・group・notificationと横断処理のworkflowからなるモジュラーモノリスとし，各モジュールの責務と依存方向を分けています．ディレクトリ構成・責務・トランザクション境界は[バックエンド構成](../docs/spec/1.バックエンド構成.md)を参照してください．以下は現在の構成と起動手順です．
 
 ## 採用方針と移行状況
 

@@ -19,7 +19,7 @@ flowchart LR
 
 Cloudflare から Cloud Run への接続は **Cloudflare Workers による転送**を採用した．Worker が API へのリクエストを受け，Cloud Run のデフォルト URL（`run.app`）へ転送する．
 
-費用をかけないため，ドメインは取得せず，Worker を Cloudflare の無料サブドメイン（workers.dev）で公開する．API の URL は `https://tkb-<env>-api-proxy.<subdomain>.workers.dev` となる．Workers の無料枠で動き，ドメイン・LB の費用がかからない．自分のゾーンを持たないため，ゾーン単位の WAF・レート制限・SSL/TLS 設定は使えない．`run.app` URL へ直接アクセスすると Cloudflare を迂回できる点は残る（[5. 未決事項](#5-未決事項)）．
+費用をかけないため，ドメインは取得せず，Worker を Cloudflare の無料サブドメイン（workers.dev）で公開する．API の URL は `https://tkb-<env>-api-proxy.<subdomain>.workers.dev` となる．Workers の無料枠で動き，ドメイン・LB の費用がかからない．ゾーン単位の WAF は使わず，Worker の許可ルート・認証形式・リクエストサイズ検査と Rate Limiting バインディングで入口を制御する．Worker は共有トークンを `X-Origin-Auth` に付与し，Cloud Run 上の API が検証するため，トークンのない `run.app` への直接アクセスは403で拒否する構成を実装している．適用後は Worker 経由と直接アクセスの両方を確認する．
 
 | 対象 | Terraform で管理するもの | Terraform で管理しないもの |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Cloudflare から Cloud Run への接続は **Cloudflare Workers による転送
 
 - **アプリのデプロイとインフラ設定を分ける．** Cloud Run サービス・Job のイメージは CI（`gcloud`）が更新し，Terraform は `lifecycle.ignore_changes` でイメージを差分対象から外す．環境変数・SA・スケール等の設定変更は Terraform で行う．
 - **秘密の値を tfstate・リポジトリに入れない．** Secret の器と IAM だけを Terraform で作り，値は `gcloud secrets versions add` で投入する．
-- **公開範囲:** Cloud Run は Worker から到達できるよう `invoker_iam_disabled = true` で公開し，利用者の認証は API が Supabase の JWT で行う．
+- **公開範囲:** Cloud Run は Worker から到達できるよう `invoker_iam_disabled = true` とし，API が `X-Origin-Auth` を検証して Worker 経由の要求に限定する．利用者の認証・業務認可は別途 Supabase の JWT と業務 API で行う．
 - Cloudflare の API トークン・GCP の認証情報は環境変数（`CLOUDFLARE_API_TOKEN`，ADC）から渡し，`*.tf`・`*.tfvars` に書かない．
 
 ## 2. ディレクトリ構成
@@ -199,8 +199,8 @@ make -C infra lock       # provider 更新後にロックファイルを再生�
 
 | 項目 | 現状・選択肢 |
 | --- | --- |
-| `run.app` URL からの迂回 | Cloud Run は公開されており，`run.app` へ直接アクセスすると Cloudflare を通らない．Worker が共有シークレットのヘッダーを付け，API で検証する案がある（backend の対応が必要） |
-| レート制限 | workers.dev ではゾーンのレート制限・WAF を使えない．必要になったら Worker の Rate Limiting バインディングで Worker 内に制限を入れる案がある |
+| `run.app` URL からの直接アクセス | Worker の `X-Origin-Auth` 付与，API の共有トークン検証，Terraform の設定連携を実装済み．適用後に直接アクセスの403と Worker 経由の疎通を確認する |
+| レート制限 | Worker の Rate Limiting バインディングと IP 単位の制限を実装済み．環境に適用して429応答と許容リクエスト数を確認する |
 | CI のワークフロー | main への push で dev へデプロイ（`.github/workflows/deploy-backend.yml`）．prod は未定 |
 | Supabase の Terraform 管理 | 当面は手動．設定項目が増えたら Supabase provider の導入を検討 |
 | 監視・アラート | 未設定 |
